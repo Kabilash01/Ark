@@ -2,8 +2,6 @@
 
 **Project:** ARK OS (Autonomous Reasoning Kernel — Operating System)
 **Optional Mode:** SAGE (Scientific Autonomous Generation Engine)
-**Author:** Kabilash (E0323036) · Pavitra P (E0323038)
-**Institution:** Sri Ramachandra Faculty of Engineering and Technology (SRIHER), Chennai
 **Version:** 1.1 (corrected from v1.0)
 **Status:** Draft for build kickoff
 **Horizon:** 6-month build (20 deeply-built agents) → plugin-ready for 70+
