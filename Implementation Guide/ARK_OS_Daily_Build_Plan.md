@@ -1,17 +1,48 @@
 # ARK OS — Day-by-Day Build Plan
+**Version 2.0 — Updated with all recommendations**
 **6 Months · 20 Agents · Every Single Day Planned**
 
-**Rules:**
-- Mon–Sat: Build days (active coding)
-- Sunday: Review, document, plan next week
-- Each day has ONE primary deliverable
-- Never skip the Memory Agent rule: it goes first, always
-- If a day runs over → carry the task, do not skip it
+---
+
+## What's New in v2.0
+
+| Addition | Where Added | Why |
+|---|---|---|
+| Hardware auto-detection | Day 1–2 | Anyone can install, any GPU |
+| llama.cpp inference layer | Day 60 | 10–30% faster than Ollama alone |
+| Agent versioning | Day 30 | Scientific rigor for self-improvement claim |
+| Privacy mode flag | Day 33 | Enterprise/institutional users |
+| Checkpoint system | Day 81 | SAGE loop survives power cuts |
+| Task scheduling (cron) | Day 82 | True autonomous operation |
+| ARK-VLM custom model | Days 86–90 | Paper #5, custom SigLIP + Qwen2.5 |
+| MCP server | Day 109 | Distribution via Claude Code / Cursor |
+| Obsidian/Notion export | Day 117 | Researchers actually use the output |
+| 24/7 deployment guide | Day 118 | Raspberry Pi + cloud options |
+| **STATE.md** | Day 16 | Human-readable live system snapshot |
+| **--until done conditions** | Day 37 | Loop runs until objective test passes, not "feels done" |
+
+---
+
+## Rules (Read These First)
+
+```
+Mon–Sat:  Build days (active coding)
+Sunday:   Review, document, plan next week only — no new features
+
+Each day has ONE primary deliverable.
+Never start Day N+1 if Day N is incomplete. Carry it forward.
+Write tests alongside code — never after.
+Commit to git every single day.
+Commit format: "[Day NN] Component: what was built"
+ARKMessage schema is FROZEN after Day 4. Never change it.
+Memory Agent is sacred. Break it → fix it before touching anything else.
+ARKBench scores recorded every month — non-negotiable.
+```
 
 ---
 
 # MONTH 1 — FOUNDATION
-## Goal: Kernel scaffold + Memory Agent + Supervisor + Planner + Research + Coding + Evaluation
+## Goal: Environment + Hardware Detection + Memory Agent + Kernel + MVP Loop
 
 ---
 
@@ -20,80 +51,216 @@
 ---
 
 **Day 1 — Monday**
-**Task: Environment Setup**
+**Task: Environment Setup + Hardware Auto-Detection**
 
 ```
-Install everything. Verify everything works. Nothing else.
+PART A — Install everything
 
-Steps:
   1. Install Python 3.11
        sudo apt install python3.11 python3.11-venv python3.11-dev
+
   2. Create virtualenv
        python3.11 -m venv ark-env
        source ark-env/bin/activate
+
   3. Install Ollama
        curl -fsSL https://ollama.com/install.sh | sh
-  4. Pull all three local models (will take time — start early)
+
+  4. Pull all three local models (start early — takes time)
        ollama pull gemma4:26b-instruct-qat
        ollama pull qwen2.5-coder:7b
        ollama pull qwen2-vl:7b
+
   5. Install Docker + Docker Compose
        sudo apt install docker.io docker-compose-plugin
-  6. Set environment variables in ~/.bashrc
+
+  6. Install llama-cpp-python (CUDA build for RTX 5060)
+       pip install llama-cpp-python \
+         --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121
+
+  7. Set environment variables in ~/.bashrc
        export ANTHROPIC_API_KEY=your_key_here
        export GROQ_API_KEY=your_key_here
-  7. Test Ollama is working
-       ollama run gemma4:26b-instruct-qat "say hello"
 
-Done when: All models respond. Docker runs. Python 3.11 is active.
+  8. Test everything works
+       ollama run gemma4:26b-instruct-qat "say hello"
+       python -c "from llama_cpp import Llama; print('llama.cpp OK')"
+       docker run hello-world
+
+PART B — Hardware Detection Script
+
+  File: scripts/select-model.py
+
+  What it does:
+    Detects GPU VRAM + system RAM
+    Assigns hardware tier (T1–T6)
+    Writes config/active-models.json with selected models
+
+  Tier table:
+    T1  VRAM < 6GB    Qwen2.5-3B + Phi-3-mini (very light)
+    T2  VRAM 6–10GB   Gemma4-26B-A4B + Coder-7B + VL-7B  ← yours
+    T3  VRAM 14–20GB  Qwen2.5-14B + Coder-14B + VL-7B
+    T4  VRAM 22GB+    Qwen2.5-32B + Coder-32B + VL-72B
+    T5  CPU only      Phi-3-mini Q4 (slow but works)
+    T6  Apple M-chip  MLX models (faster on unified memory)
+
+  Code to write:
+
+    import subprocess, json, platform, psutil
+
+    def detect_gpu_vram() -> float:
+        try:
+            r = subprocess.run(
+                ["nvidia-smi","--query-gpu=memory.total",
+                 "--format=csv,noheader,nounits"],
+                capture_output=True, text=True)
+            if r.returncode == 0:
+                return round(int(r.stdout.strip().split('\n')[0]) / 1024, 1)
+        except FileNotFoundError:
+            pass
+        if platform.system()=="Darwin" and platform.machine()=="arm64":
+            return round(psutil.virtual_memory().total / (1024**3), 1)
+        return 0.0
+
+    def assign_tier(vram_gb):
+        if vram_gb == 0:  return "T5"
+        if vram_gb < 6:   return "T1"
+        if vram_gb < 14:  return "T2"
+        if vram_gb < 22:  return "T3"
+        return "T4"
+
+    vram  = detect_gpu_vram()
+    ram   = round(psutil.virtual_memory().total / (1024**3), 1)
+    tier  = assign_tier(vram)
+
+    with open("config/model-library.json") as f:
+        library = json.load(f)
+    models = library["tiers"][tier]["models"]
+
+    with open("config/active-models.json","w") as f:
+        json.dump({"tier":tier,"vram_gb":vram,"ram_gb":ram,"models":models},f,indent=2)
+
+    print(f"Detected: {vram}GB VRAM, {ram}GB RAM → Tier {tier}")
+
+Done when: Hardware tier detected. active-models.json written.
+           All models respond. Docker runs. Python 3.11 active.
 ```
 
 ---
 
 **Day 2 — Tuesday**
-**Task: Repository Scaffold**
+**Task: Repository Scaffold + model-library.json**
 
 ```
-Create the full folder structure. Initialize git. Write pyproject.toml.
+PART A — Full folder structure
 
-Steps:
-  1. Create repo
-       mkdir ark-os && cd ark-os
-       git init
+  mkdir -p ark-os && cd ark-os && git init
+  mkdir -p core memory kernel workers/phase1 workers/phase2 workers/phase3
+  mkdir -p sage tools/science api dashboard cli
+  mkdir -p benchmarks/arkbench benchmarks/coding_self_repair
+  mkdir -p config scripts installers/windows/lib
+  mkdir -p tests/memory tests/kernel tests/workers tests/tools tests/integration
+  mkdir -p docs research/conflict_data
 
-  2. Create full folder structure
-       mkdir -p core memory kernel workers/phase1 workers/phase2 workers/phase3
-       mkdir -p sage tools api dashboard benchmarks/arkbench tests docs
+PART B — config/model-library.json
 
-  3. Create empty placeholder files
-       touch core/__init__.py
-       touch core/ark_message.py
-       touch core/base_agent.py
-       touch core/message_bus.py
-       touch core/agent_registry.py
-       touch memory/__init__.py
-       touch memory/memory_agent.py
-       touch memory/working_memory.py
-       touch memory/episodic_memory.py
-       touch memory/semantic_memory.py
-       touch memory/procedural_memory.py
-       touch kernel/__init__.py
-       touch kernel/supervisor_agent.py
-       touch kernel/planner_agent.py
-       touch kernel/evaluation_agent.py
-       touch workers/phase1/research_agent.py
-       touch workers/phase1/coding_agent.py
-       touch api/main.py
-       touch docker-compose.yml
-       touch README.md
+  Write the complete model library that select-model.py reads:
 
-  4. Write pyproject.toml with Python 3.11 pin
-  5. First git commit: "initial scaffold"
+  {
+    "tiers": {
+      "T1": {
+        "vram_min_gb": 3, "vram_max_gb": 5,
+        "models": {
+          "general":  "qwen2.5:3b",
+          "code":     "qwen2.5-coder:3b",
+          "vision":   null,
+          "orchestration": "groq_required"
+        }
+      },
+      "T2": {
+        "vram_min_gb": 6, "vram_max_gb": 10,
+        "models": {
+          "general":  "gemma4:26b-instruct-qat",
+          "code":     "qwen2.5-coder:7b",
+          "vision":   "qwen2-vl:7b",
+          "orchestration": "groq_preferred"
+        }
+      },
+      "T3": {
+        "vram_min_gb": 14, "vram_max_gb": 20,
+        "models": {
+          "general":  "qwen2.5:14b",
+          "code":     "qwen2.5-coder:14b",
+          "vision":   "qwen2-vl:7b",
+          "orchestration": "local_capable"
+        }
+      },
+      "T4": {
+        "vram_min_gb": 22, "vram_max_gb": 9999,
+        "models": {
+          "general":  "qwen2.5:32b",
+          "code":     "qwen2.5-coder:32b",
+          "vision":   "qwen2-vl:72b",
+          "orchestration": "fully_local"
+        }
+      },
+      "T5": {
+        "vram_min_gb": 0, "vram_max_gb": 0,
+        "models": {
+          "general":  "phi3:mini",
+          "code":     "phi3:mini",
+          "vision":   null,
+          "orchestration": "groq_required"
+        }
+      }
+    }
+  }
 
-Files created:
-  ark-os/ (full tree as above)
+PART C — installers/windows/lib/tier-map.ps1
+  Windows PowerShell version of hardware detection:
 
-Done when: git status shows clean tree. Folder structure matches §24 of v1.1.
+  $gpu = (Get-WmiObject Win32_VideoController |
+          Where-Object {$_.AdapterRAM -gt 0} |
+          Select-Object -First 1).AdapterRAM
+  $vram_gb = [math]::Round($gpu / 1GB, 1)
+
+  if     ($vram_gb -ge 22) { $tier = "T4" }
+  elseif ($vram_gb -ge 14) { $tier = "T3" }
+  elseif ($vram_gb -ge 6)  { $tier = "T2" }
+  elseif ($vram_gb -ge 3)  { $tier = "T1" }
+  else                      { $tier = "T5" }
+
+  Write-Output "Detected ${vram_gb}GB VRAM → Tier $tier"
+  $tier | Out-File -FilePath "config\active-tier.txt"
+
+PART D — Create placeholder files for all modules
+  touch core/__init__.py core/ark_message.py core/base_agent.py
+  touch core/message_bus.py core/agent_registry.py core/event_emitter.py
+  touch memory/__init__.py memory/memory_agent.py
+  touch memory/working_memory.py memory/episodic_memory.py
+  touch memory/semantic_memory.py memory/procedural_memory.py
+  touch memory/citation_graph.py
+  touch kernel/__init__.py kernel/supervisor_agent.py
+  touch kernel/planner_agent.py kernel/evaluation_agent.py
+  touch kernel/router.py kernel/heartbeat_monitor.py
+  touch kernel/conflict_resolver.py kernel/ark_state.py
+  touch workers/phase1/research_agent.py workers/phase1/coding_agent.py
+  touch api/main.py api/events.py
+  touch cli/ark_cli.py
+  touch docker-compose.yml README.md pyproject.toml
+
+PART E — pyproject.toml
+  [tool.poetry.dependencies]
+  python = ">=3.11,<3.12"
+
+  [tool.poetry.scripts]
+  ark = "cli.ark_cli:main"
+
+PART F — First git commit
+  git add . && git commit -m "[Day 02] Scaffold: full repo structure + model-library.json"
+
+Done when: All folders exist. model-library.json complete.
+           Windows PS1 script written. Git shows clean tree.
 ```
 
 ---
@@ -102,27 +269,57 @@ Done when: git status shows clean tree. Folder structure matches §24 of v1.1.
 **Task: Docker Compose — All Services Up**
 
 ```
-Write docker-compose.yml. Start all services. Verify they are reachable.
-
 File: docker-compose.yml
 
-Services to configure:
-  qdrant:      image: qdrant/qdrant:latest     port: 6333
-  redis:       image: redis:7-alpine           port: 6379
-  neo4j:       image: neo4j:5.15-community     port: 7474 + 7687
-  mlflow:      image: ghcr.io/mlflow/mlflow    port: 5000
-  (ark-api and ark-ui come later — leave as stubs)
+Services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports: ["6333:6333"]
+    volumes: ["qdrant_data:/qdrant/storage"]
 
-Steps:
-  1. Write docker-compose.yml with all 4 services
-  2. docker compose up -d
-  3. Test each service:
-       curl http://localhost:6333/healthz          # Qdrant
-       redis-cli ping                              # Redis → PONG
-       curl http://localhost:7474                  # Neo4j browser
-       curl http://localhost:5000/health           # MLflow
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    volumes: ["redis_data:/data"]
+    command: redis-server --appendonly yes
 
-Done when: All 4 services healthy. docker compose ps shows all running.
+  neo4j:
+    image: neo4j:5.15-community
+    ports: ["7474:7474", "7687:7687"]
+    environment:
+      NEO4J_AUTH: neo4j/ark_os_password
+    volumes: ["neo4j_data:/data"]
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    ports: ["5000:5000"]
+    command: mlflow server --host 0.0.0.0
+    volumes: ["mlflow_data:/mlflow"]
+
+  ark-sandbox:
+    build: ./docker/sandbox/
+    # isolated Python environment for Coding Agent
+    # pre-installs: numpy pandas matplotlib torch scikit-learn
+
+  # ark-api and ark-ui added in Month 2
+
+volumes:
+  qdrant_data: redis_data: neo4j_data: mlflow_data:
+
+Also write: docker/sandbox/Dockerfile
+  FROM python:3.11-slim
+  RUN pip install numpy pandas matplotlib scikit-learn torch requests
+  WORKDIR /sandbox
+  CMD ["python"]
+
+Commands:
+  docker compose up -d
+  curl http://localhost:6333/healthz   # Qdrant ✓
+  redis-cli ping                       # PONG ✓
+  curl http://localhost:7474           # Neo4j ✓
+  curl http://localhost:5000/health    # MLflow ✓
+
+Done when: All 5 services healthy. docker compose ps all green.
 ```
 
 ---
@@ -131,29 +328,84 @@ Done when: All 4 services healthy. docker compose ps shows all running.
 **Task: ARKMessage Schema — AgentSpec v1.0 FROZEN**
 
 ```
-Write the ARKMessage TypedDict. This is frozen after today. Never change it.
+This is frozen after today. Never change it.
 
 File: core/ark_message.py
 
-What to write:
-  - ARKMessage TypedDict with ALL fields from v1.1 answers
-  - validate_ark_message() function
-  - create_ark_message() factory function
-  - Intent enum (RESEARCH, CODE, SEARCH, EXECUTE, STORE, EVALUATE, REFLECT, DISCOVER)
-  - Status enum (PENDING, RUNNING, DONE, FAILED, RETRY)
+from typing import TypedDict
+from enum import Enum
 
-Fields (from Q4 answers):
-  task_id, sender, receiver, parent_task_id,
-  intent, payload, memory_context,
-  priority, status, retry_count, max_retries,
-  output, quality_score, timestamp
+class Intent(str, Enum):
+    RESEARCH   = "RESEARCH"
+    CODE       = "CODE"
+    SEARCH     = "SEARCH"
+    EXECUTE    = "EXECUTE"
+    STORE      = "STORE"
+    EVALUATE   = "EVALUATE"
+    REFLECT    = "REFLECT"
+    DISCOVER   = "DISCOVER"
+    SUPERVISE  = "SUPERVISE"
+    PLAN       = "PLAN"
+    BROWSE     = "BROWSE"
+    SECURITY   = "SECURITY"
+    VISION     = "VISION"
 
-Tests to write: tests/test_ark_message.py
-  - Create a valid ARKMessage
-  - Validate missing required fields fail
-  - Factory function produces correct defaults
+class Status(str, Enum):
+    PENDING  = "PENDING"
+    RUNNING  = "RUNNING"
+    DONE     = "DONE"
+    FAILED   = "FAILED"
+    RETRY    = "RETRY"
 
-Done when: All tests pass. Schema is committed and tagged v1.0-agentspec.
+class ARKMessage(TypedDict):
+    # Routing
+    task_id:        str
+    sender:         str
+    receiver:       str
+    parent_task_id: str
+
+    # Intent and content
+    intent:         str
+    payload:        dict
+    memory_context: list
+
+    # Control
+    priority:       int
+    status:         str
+    retry_count:    int
+    max_retries:    int
+
+    # Output (populated on completion)
+    output:         dict
+    quality_score:  float   # -1.0 = not yet scored
+    timestamp:      str     # ISO 8601
+
+    # NEW — Agent versioning (added in v2.0)
+    agent_version:  str     # e.g. "coding_agent@1.2.0"
+
+def create_ark_message(sender, receiver, intent, payload,
+                       priority=5, parent_task_id="") -> ARKMessage:
+    from datetime import datetime, timezone
+    return ARKMessage(
+        task_id=f"ark_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}",
+        sender=sender, receiver=receiver,
+        parent_task_id=parent_task_id,
+        intent=intent, payload=payload,
+        memory_context=[],
+        priority=priority,
+        status=Status.PENDING,
+        retry_count=0, max_retries=3,
+        output={}, quality_score=-1.0,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        agent_version=""
+    )
+
+Tests: tests/test_ark_message.py
+  - Factory creates valid message
+  - Missing required fields raise error
+  - All Intent + Status enum values accessible
+
+Done when: Tests pass. Tagged: git tag v1.0-agentspec
 ```
 
 ---
@@ -162,65 +414,117 @@ Done when: All tests pass. Schema is committed and tagged v1.0-agentspec.
 **Task: BaseAgent Abstract Class**
 
 ```
-Write the BaseAgent class. All 20 agents will inherit this.
-
 File: core/base_agent.py
 
-Methods to implement (from Q5 answers):
-  Abstract (must implement in every agent):
-    run(message: ARKMessage) -> ARKMessage
-    get_capabilities() -> list[str]
+from abc import ABC, abstractmethod
+from ark_os.core.ark_message import ARKMessage
 
-  Default implementations (can override):
-    register(registry) -> None
-    health_check() -> dict
-    validate_message(message: ARKMessage) -> bool
-    on_error(message, exception) -> ARKMessage
+class BaseAgent(ABC):
+    def __init__(self, agent_name: str, model_name: str, version: str = "1.0.0"):
+        self.agent_name  = agent_name
+        self.model_name  = model_name
+        self.version     = version        # e.g. "1.0.0" → agent versioning
 
-Also write:
-  - __init__ that takes agent_name and model_name
-  - _run_with_error_handling() wrapper that calls validate → run → on_error
-  - structured logging on every run (task_id, agent, timestamp, score)
+    # ── Abstract — must implement ───────────────────────────────────
+    @abstractmethod
+    def run(self, message: ARKMessage) -> ARKMessage:
+        pass
+
+    @abstractmethod
+    def get_capabilities(self) -> list[str]:
+        pass
+
+    # ── Provided defaults — override if needed ──────────────────────
+    def register(self, registry) -> None:
+        registry.register(
+            name=self.agent_name,
+            capabilities=self.get_capabilities(),
+            model=self.model_name,
+            version=self.version,       # version tracked in registry
+            status="IDLE"
+        )
+
+    def health_check(self) -> dict:
+        from datetime import datetime, timezone
+        return {
+            "status": "IDLE",
+            "current_task": None,
+            "version": self.version,
+            "last_heartbeat": datetime.now(timezone.utc).isoformat()
+        }
+
+    def validate_message(self, message: ARKMessage) -> bool:
+        required = ["task_id","sender","receiver","intent",
+                    "payload","status","timestamp"]
+        return (
+            all(f in message for f in required)
+            and message["status"] == "PENDING"
+            and message["receiver"] == self.agent_name
+        )
+
+    def on_error(self, message: ARKMessage, exception: Exception) -> ARKMessage:
+        message["status"]       = "FAILED"
+        message["output"]       = {
+            "error_type":    type(exception).__name__,
+            "error_message": str(exception),
+            "agent":         self.agent_name,
+            "agent_version": self.version
+        }
+        message["quality_score"] = 0.0
+        return message
+
+    def _run_with_error_handling(self, message: ARKMessage) -> ARKMessage:
+        message["agent_version"] = f"{self.agent_name}@{self.version}"
+        if not self.validate_message(message):
+            return self.on_error(message, ValueError("Invalid ARKMessage"))
+        try:
+            return self.run(message)
+        except Exception as e:
+            return self.on_error(message, e)
 
 Tests: tests/test_base_agent.py
-  - Create a dummy TestAgent that extends BaseAgent
-  - Test all 5 methods
-  - Test that abstract methods cannot be skipped
-
-Done when: All tests pass. BaseAgent is clean, documented, importable.
+Done when: All tests pass. BaseAgent importable. Abstract enforcement works.
 ```
 
 ---
 
 **Day 6 — Saturday**
-**Task: Agent Registry**
+**Task: Agent Registry + Versioning Support**
 
 ```
-Write the Agent Registry service. Supervisor uses this to route tasks.
-
 File: core/agent_registry.py
 
-AgentRecord fields (from Q6 answers):
-  name, capabilities, model, status, current_task,
-  last_heartbeat, load_count, avg_quality_score
+AgentRecord fields (8 original + version added):
+  name              str    unique agent ID
+  capabilities      list   intent types handled
+  model             str    LLM used
+  version           str    semantic version e.g. "1.2.0"  ← NEW
+  status            str    IDLE | BUSY | ERROR | OFFLINE
+  current_task      str    task_id or ""
+  last_heartbeat    str    ISO 8601
+  load_count        int    total tasks handled (for load balancing)
+  avg_quality_score float  rolling average (triggers self-improvement)
 
 Methods:
-  register(agent_record)             → add agent to registry
-  deregister(agent_name)             → remove agent
-  get_agent(agent_name)              → return record
-  find_agents_for_intent(intent)     → list of capable agents
-  get_least_loaded(agents)           → agent with lowest load_count
-  update_status(agent_name, status)  → update IDLE/BUSY/ERROR
-  update_quality(agent_name, score)  → rolling average of quality_score
-  heartbeat(agent_name)              → update last_heartbeat timestamp
-  get_all()                          → full registry dump
+  register(record)
+  deregister(name)
+  get_agent(name) -> AgentRecord
+  find_agents_for_intent(intent) -> list
+  get_least_loaded(agents) -> AgentRecord
+  update_status(name, status)
+  update_version(name, new_version)     ← NEW: Self-Improvement updates this
+  update_quality(name, score)           rolling average
+  heartbeat(name)
+  get_all() -> list[AgentRecord]
 
-Storage: Redis hash (agent:{name} → JSON record)
-         So registry survives process restart
+Storage: Redis hash per agent → "registry:{agent_name}"
+
+Version history: Redis list → "registry:version_history:{agent_name}"
+  Each entry: {version, timestamp, benchmark_score, changed_by}
+  Self-Improvement Agent appends here when it upgrades an agent
 
 Tests: tests/test_agent_registry.py
-
-Done when: All tests pass. Registry stores and retrieves from Redis correctly.
+Done when: Registry stores 8-field records in Redis. Version history works.
 ```
 
 ---
@@ -229,2312 +533,1622 @@ Done when: All tests pass. Registry stores and retrieves from Redis correctly.
 **Task: Week 1 Review**
 
 ```
-No new code. Review everything built this week.
+No new code today.
 
 Checklist:
-  □ All Docker services still healthy?
-  □ ARKMessage schema reviewed — is it complete?
-  □ BaseAgent reviewed — is it clean?
-  □ Agent Registry reviewed — does it use Redis correctly?
-  □ All tests passing?
-  □ README.md updated with Week 1 progress?
+  □ Hardware detected correctly (run scripts/select-model.py)
+  □ model-library.json has all 5 tiers
+  □ Docker services all healthy
+  □ ARKMessage schema complete — last chance to change anything
+  □ BaseAgent with versioning support
+  □ Agent Registry with version history
 
-Write in your notebook (not code):
-  - What was harder than expected?
-  - What would you change in the design?
-  - Is there anything that feels wrong about the schema?
+Write in notebook:
+  - Does the ARKMessage schema feel complete?
+  - Is there anything missing from model-library.json?
+  - Which tier did your hardware land on?
 
-This is the LAST chance to change ARKMessage. After Week 2 begins,
-AgentSpec v1.0 is permanently frozen.
+FINAL DECISION POINT: AgentSpec v1.0 is permanently frozen after this.
 ```
 
 ---
 
-### WEEK 2 — Memory Agent (Most Important Week)
+### WEEK 2 — Memory Agent (Most Critical Week)
 
 ---
 
-**Day 8 — Monday**
-**Task: Redis Working Memory Tier**
-
+**Day 8 — Monday: Redis Working Memory**
 ```
-Build the first memory tier. Working memory = current task state.
-
 File: memory/working_memory.py
-
-What it stores:
-  Current task context, active variables, temp results
-  Duration: only for the life of one task (TTL-based)
-
-Methods:
-  set(task_id, key, value, ttl=3600)  → store with expiry
-  get(task_id, key)                   → retrieve
-  get_all(task_id)                    → all context for a task
-  delete(task_id, key)                → remove one key
-  clear_task(task_id)                 → remove all keys for a task
-  exists(task_id, key)                → check existence
-
-Implementation:
-  Redis key pattern: "working:{task_id}:{key}"
-  All ops use async redis (redis.asyncio)
-
-Tests: tests/memory/test_working_memory.py
-  - Store and retrieve across types (str, dict, list)
-  - TTL expiry works correctly
-  - clear_task removes all keys for that task only
-
-Done when: All tests pass. Redis stores and retrieves correctly.
+Methods: set(task_id, key, value, ttl=3600), get, get_all, delete, clear_task, exists
+Key pattern: "working:{task_id}:{key}"
+Tests: TTL expiry, multi-type storage, clear_task isolation
+Done when: All tests pass.
 ```
 
----
-
-**Day 9 — Tuesday**
-**Task: SQLite Episodic Memory Tier**
-
+**Day 9 — Tuesday: SQLite Episodic Memory**
 ```
-Build the episodic memory tier. Permanent task history log.
-
 File: memory/episodic_memory.py
-
-What it stores:
-  What happened in past runs — timestamped task records
-
-Schema (SQLite table: episodes):
-  id           INTEGER PRIMARY KEY
-  task_id      TEXT
-  agent_name   TEXT
-  intent       TEXT
-  summary      TEXT    (what happened, in plain text)
-  quality_score REAL
-  timestamp    TEXT    (ISO 8601)
-  metadata     TEXT    (JSON blob for extras)
-
-Methods:
-  log(task_id, agent_name, intent, summary, quality_score, metadata)
-  query_by_agent(agent_name, limit=10)
-  query_by_intent(intent, limit=10)
-  query_by_timerange(start_iso, end_iso)
-  query_recent(limit=20)
-  search(keyword)     → LIKE search on summary field
-
-Tests: tests/memory/test_episodic_memory.py
-  - Log 5 episodes, retrieve by agent, intent, time
-  - Keyword search returns correct rows
-  - Persists across connection close/reopen (true persistence test)
-
-Done when: All tests pass. SQLite file written to disk and readable.
+Table: episodes (id, task_id, agent_name, agent_version, intent,
+                  summary, quality_score, timestamp, metadata)
+agent_version column added → tracks which version of agent ran
+Methods: log, query_by_agent, query_by_intent, query_by_timerange,
+         query_recent, search, query_by_version
+Tests: persist across restart, keyword search, version filter
+Done when: All tests pass. SQLite written to disk.
 ```
 
----
-
-**Day 10 — Wednesday**
-**Task: Qdrant Semantic Memory Tier**
-
+**Day 10 — Wednesday: Qdrant Semantic Memory**
 ```
-Build the semantic memory tier. Vector knowledge base.
-
 File: memory/semantic_memory.py
-
-Embedding model: BAAI/bge-large-en-v1.5 (1024-dim) — from Q8 answer
-Qdrant collection: ark_semantic_memory
-
-Methods:
-  store(text, metadata)           → embed text, upsert to Qdrant
-  retrieve(query, top_k=5)        → embed query, return top-k chunks
-  retrieve_by_metadata(filters)   → filter by source, agent, date
-  delete(point_id)                → remove a specific vector
-  count()                         → how many vectors stored
-
-Also write:
-  _embed(text) → np.ndarray    using sentence-transformers
-  EmbeddingModel singleton      load once at startup, reuse
-
-Tests: tests/memory/test_semantic_memory.py
-  - Store 5 text chunks about different topics
-  - Query returns most similar chunk correctly
-  - Metadata filtering works
-
-Note: First run will download BAAI model (~670MB). This is fine — runs once.
-
-Done when: All tests pass. Qdrant has vectors. Similarity retrieval works.
+Embedding model: BAAI/bge-large-en-v1.5 (1024-dim)
+Collection: ark_semantic_memory
+Methods: store, retrieve, retrieve_by_metadata, delete, count
+Tests: semantic similarity works, metadata filter works
+Done when: Vectors stored, cosine similarity retrieval correct.
 ```
 
----
-
-**Day 11 — Thursday**
-**Task: Procedural Memory Tier (JSON + FAISS)**
-
+**Day 11 — Thursday: Procedural Memory (JSON + FAISS)**
 ```
-Build the procedural memory tier. How-to skill library.
-
 File: memory/procedural_memory.py
-
-Skill schema (from Q11 answer):
-  skill_id, intent, description, steps, success_rate, use_count, last_used, source
-
-Storage:
-  skills.json          → list of all Skill records (human readable)
-  skills.faiss         → FAISS index on description embeddings
-
-Methods:
-  add_skill(skill)             → add to JSON + rebuild FAISS index
-  retrieve_skills(intent, query, top_k=3)
-                               → FAISS search by description × success_rate
-  update_success_rate(skill_id, was_success)
-                               → rolling average update
-  increment_use_count(skill_id)
-  delete_skill(skill_id)
-  get_all_skills()
-
-Tests: tests/memory/test_procedural_memory.py
-  - Add 3 skills for different intents
-  - Retrieve skills by intent + query, get correct top-1
-  - Success rate updates correctly
-
-Done when: All tests pass. Skills saved to disk, FAISS index queryable.
+Skill schema: skill_id, intent, description, steps,
+              success_rate, use_count, last_used, source
+Storage: skills.json + skills.faiss
+Retrieval: FAISS nearest neighbor × success_rate weighted
+Done when: Skills saved, FAISS index queryable.
 ```
 
----
-
-**Day 12 — Friday**
-**Task: Memory Agent — Unified Interface**
-
+**Day 12 — Friday: Memory Agent Unified Interface**
 ```
-Build the Memory Agent that wraps all 4 tiers into one interface.
-All other agents will ONLY talk to this — never to the tiers directly.
-
 File: memory/memory_agent.py
-
-Extends: BaseAgent
-
-Methods (the Memory Agent API):
-  store(memory_type, key, value, metadata)
-    → routes to correct tier based on memory_type
-    → memory_type: "working" | "episodic" | "semantic" | "procedural"
-
-  retrieve(query, memory_type, top_k=5)
-    → retrieves from correct tier
-    → for semantic/procedural: vector search
-    → for episodic: keyword + time search
-    → for working: exact key lookup
-
-  forget(memory_type, key_or_policy)
-    → deletes from correct tier
-    → policy: "ttl_expired" | "low_relevance" | specific key
-
-  inject_context(task: ARKMessage) -> ARKMessage
-    → given a task, find all relevant memories across all tiers
-    → inject them into task["memory_context"]
-    → returns enriched ARKMessage
-
-  run(message: ARKMessage) -> ARKMessage
-    → handles STORE / RETRIEVE / FORGET / INJECT intents
-
-Tests: tests/memory/test_memory_agent.py
-  - Store to each tier via Memory Agent
-  - Retrieve from each tier via Memory Agent
-  - inject_context populates memory_context correctly
-  - Persists across process restart (critical test)
-
-Done when: ALL persistence tests pass.
-           Memory survives: store → kill process → restart → retrieve ✓
+API: store, retrieve, forget, inject_context
+CRITICAL TEST: memory survives process kill + restart
+Done when: All 4 tiers accessible. Persistence test passes.
 ```
 
----
-
-**Day 13 — Saturday**
-**Task: Redis Message Bus**
-
+**Day 13 — Saturday: Redis Message Bus**
 ```
-Build the message bus. Agents talk to each other through this.
-
 File: core/message_bus.py
+Channels: agent:{name}, ark:broadcast, ark:heartbeat, ark:audit_log
+Class: ARKMessageBus — publish, subscribe, broadcast,
+       publish_heartbeat, log_to_audit, get_audit_log
+Done when: Two agents communicate through Redis pub/sub.
+```
 
-Channel topology (from Q10 answer):
-  "agent:{agent_name}"    → each agent's inbox
-  "ark:broadcast"         → system-wide messages
-  "ark:heartbeat"         → health pings
-  "ark:audit_log"         → all messages logged here
-
-Class: ARKMessageBus
-
-Methods:
-  publish(receiver_name, message: ARKMessage)   → send to agent's channel
-  subscribe(agent_name) → AsyncGenerator        → listen on own channel
-  broadcast(message)                            → send to ark:broadcast
-  publish_heartbeat(agent_name, health: dict)   → ping heartbeat channel
-  log_to_audit(message: ARKMessage)             → write to audit_log
-  get_audit_log(limit=50)                       → read recent messages
-
-Implementation: redis.asyncio pub/sub
-
-Tests: tests/test_message_bus.py
-  - Publish message to agent channel, subscribe receives it
-  - Audit log captures every message
-  - Broadcast reaches all subscribers
-
-Done when: Two agents can communicate through Redis pub/sub correctly.
+**Day 14 — Sunday: Week 2 Review — Memory Audit**
+```
+Full audit of all 4 memory tiers. Must all pass before moving on.
+Write: docs/memory_architecture.md
+Only proceed to Week 3 if every persistence test passes.
 ```
 
 ---
 
-**Day 14 — Sunday**
-**Task: Week 2 Review — Memory System Audit**
-
-```
-This is the most important review of the entire project.
-Memory is the foundation. It must be perfect before anything else is built.
-
-Full audit checklist:
-  □ Working memory: stores and retrieves with TTL — tested
-  □ Episodic memory: persists to SQLite, queryable by time/agent/intent — tested
-  □ Semantic memory: BAAI embeddings in Qdrant, similarity search works — tested
-  □ Procedural memory: FAISS index, success_rate weighting works — tested
-  □ Memory Agent: all 4 tiers accessible via one interface — tested
-  □ inject_context: correctly enriches ARKMessages — tested
-  □ Persistence: restart test passed for all 4 tiers
-
-Write memory architecture document: docs/memory_architecture.md
-  - How each tier works
-  - When to use which tier
-  - Code examples for every operation
-
-Only proceed to Week 3 if every tier is tested and working.
-```
+### WEEK 3 — Supervisor + Planner + Router
 
 ---
 
-### WEEK 3 — Supervisor + Planner
-
----
-
-**Day 15 — Monday**
-**Task: LangGraph State Machine Setup**
-
+**Day 15 — Monday: LangGraph State Machine**
 ```
-Set up LangGraph. Define the ARKState that flows between agents.
-
-File: kernel/ark_state.py
-
-ARKState TypedDict:
-  task_id:       str
-  original_goal: str
-  current_plan:  list[dict]       # task DAG from Planner
-  results:       dict             # accumulated results by task_id
-  active_agents: list[str]        # who is currently running
-  memory_context: list           # injected by Memory Agent
-  iteration:     int             # retry counter
-  status:        str             # RUNNING | DONE | FAILED
-
-Also write: kernel/ark_graph.py
-  - StateGraph(ARKState) initialization
-  - Add all agent nodes (stubs for now)
-  - Set entry point: supervisor_agent
-
-Tests: tests/kernel/test_ark_state.py
-  - ARKState initializes correctly
-  - StateGraph compiles without errors
-
-Done when: LangGraph graph compiles. State flows through a stub node.
+File: kernel/ark_state.py + kernel/ark_graph.py
+ARKState fields: task_id, original_goal, current_plan, results,
+                 active_agents, memory_context, iteration, status,
+                 privacy_mode (bool) ← NEW: privacy flag flows through state
+Done when: LangGraph graph compiles. State flows through stub node.
 ```
 
----
-
-**Day 16 — Tuesday**
-**Task: Supervisor Agent — Intent Classification**
-
+**Day 16 — Tuesday: Supervisor Agent + STATE.md**
 ```
-Build the Supervisor. This is the CEO of ARK OS.
-
 File: kernel/supervisor_agent.py
-
-Extends: BaseAgent
 Model: claude-sonnet-4-6 (primary) → groq:qwen2.5-72b (fallback)
-Capabilities: ["SUPERVISE", "ROUTE", "ARBITRATE"]
+Privacy mode handling:
+  if state.privacy_mode == True:
+    → force all calls to local models only
+    → set flag on every ARKMessage: {"privacy": true}
+    → Planner must also use local fallback
 
-What Supervisor does:
-  1. Receives user goal as plain text
-  2. Classifies intent (RESEARCH / CODE / SEARCH / SECURITY / SAGE / MIXED)
-  3. Sets priority (1-10) based on keywords
-  4. Checks Agent Registry for available agents
-  5. Routes to Planner with enriched ARKMessage
-  6. Handles escalations when agents fail max_retries
+STATE.md — Auto-updated by Supervisor after every task:
+  The 4-tier memory (Redis/SQLite/Qdrant/FAISS) is machine-readable.
+  STATE.md is what YOU read to instantly understand where ARK OS is.
+  Located at project root. Supervisor writes it after every task completion.
 
-System prompt:
-  You are the Supervisor of ARK OS. You receive user goals and:
-  1. Classify the intent type
-  2. Assess priority 1-10
-  3. Identify which domains are needed
-  4. Route to Planner with complete context
-  Output ONLY valid JSON matching ARKMessage schema.
+  Format:
+    # ARK OS STATE
+    Last updated: 2026-07-10 02:14 UTC
+    ─────────────────────────────────────
+    Current goal:    Solar cell materials discovery
+    Active loop:     SAGE iteration 3/5
+    Done condition:  novelty_score > 0.7 AND feasibility > 0.6
+    Condition met:   ✗ (novelty=0.61, feasibility=0.71)
+    ─────────────────────────────────────
+    Last task:       coding_agent → implement_band_gap_predictor
+    Last score:      0.84 (coding_agent@1.3.1)
+    Next scheduled:  arkbench daily at 07:00
+    Skills learned:  3 today / 47 total
+    ─────────────────────────────────────
+    Agents online:   17/20
+    Agents offline:  vision_agent, ml_engineer_agent, devops_agent
+    Memory usage:    Redis 142MB / Qdrant 4,821 vectors / Episodes 1,204
 
-Tests: tests/kernel/test_supervisor.py
-  - "Research X" → intent = RESEARCH
-  - "Write code for Y" → intent = CODE
-  - "Research X and implement it" → intent = MIXED
-  - Priority scoring is consistent
+  File: core/state_writer.py
+    class StateWriter:
+        STATE_PATH = "STATE.md"
 
-Done when: Supervisor correctly classifies 10 different goal types.
+        def update(self, ark_state: ARKState, last_result: dict):
+            lines = [
+                "# ARK OS STATE",
+                f"Last updated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
+                "─" * 37,
+                f"Current goal:    {ark_state.original_goal}",
+                f"Active loop:     {ark_state.current_loop or 'None'}",
+                f"Done condition:  {ark_state.done_condition or 'Not set'}",
+                f"Condition met:   {self._check_condition(ark_state)}",
+                "─" * 37,
+                f"Last task:       {last_result.get('agent')} → {last_result.get('task')}",
+                f"Last score:      {last_result.get('score')} ({last_result.get('version')})",
+                f"Next scheduled:  {self._next_schedule()}",
+                f"Skills learned:  {self._skills_today()} today / {self._skills_total()} total",
+                "─" * 37,
+                f"Agents online:   {self._agents_online()}",
+            ]
+            with open(self.STATE_PATH, "w") as f:
+                f.write("\n".join(lines))
+
+  Supervisor calls StateWriter.update() after every task — no manual step.
+
+Done when: Supervisor classifies 10 goal types correctly.
+           STATE.md written at project root after each task.
 ```
 
----
-
-**Day 17 — Wednesday**
-**Task: Planner Agent — Task DAG Generation**
-
+**Day 17 — Wednesday: Planner Agent**
 ```
-Build the Planner. This is the Project Manager of ARK OS.
-
 File: kernel/planner_agent.py
-
-Extends: BaseAgent
 Model: claude-sonnet-4-6 (primary) → groq:qwen2.5-72b (fallback)
-Capabilities: ["PLAN", "DECOMPOSE", "SCHEDULE"]
-
-What Planner does:
-  1. Receives enriched ARKMessage from Supervisor
-  2. Decomposes goal into subtasks
-  3. Identifies dependencies between subtasks (what must run before what)
-  4. Identifies which subtasks can run in parallel
-  5. Produces a task DAG as JSON
-  6. Assigns each subtask to an agent capability type
-
-System prompt:
-  You are the Planner of ARK OS. Given a goal:
-  1. Break it into atomic subtasks (each takes 1-10 minutes)
-  2. Identify dependencies: task B requires output of task A
-  3. Mark parallel tasks: these can run simultaneously
-  4. Assign each task to: RESEARCH | CODE | SEARCH | SECURITY | MEMORY
-  Output ONLY valid JSON task DAG.
-
-Task DAG format:
-  {
-    "tasks": [
-      {
-        "task_id": "t001",
-        "intent": "RESEARCH",
-        "instruction": "Find 10 papers on X",
-        "depends_on": [],
-        "parallel_with": ["t002"]
-      },
-      ...
-    ]
-  }
-
-Tests: tests/kernel/test_planner.py
-  - Simple goal → 2-step sequential DAG
-  - Complex goal → parallel tasks correctly identified
-  - Dependencies are acyclic (no cycles)
-
-Done when: Planner produces valid DAGs for 5 different goal types.
+Output: task DAG JSON with depends_on + parallel_with fields
+Done when: Planner produces valid acyclic DAGs for 5 goal types.
 ```
 
----
-
-**Day 18 — Thursday**
-**Task: Supervisor ↔ Planner Integration**
-
+**Day 18 — Thursday: Supervisor ↔ Planner Integration**
 ```
-Wire Supervisor and Planner together through the message bus.
-First real inter-agent communication.
-
-File: kernel/ark_graph.py (update)
-
-Steps:
-  1. Supervisor publishes to message bus → Planner receives
-  2. Planner processes → publishes task DAG back to Supervisor
-  3. Supervisor stores task DAG in ARKState
-  4. Memory Agent's inject_context called before every routing step
-
-Integration test: tests/integration/test_supervisor_planner.py
-  Input:  "Research transformer attention and implement a demo"
-  Expected flow:
-    Supervisor: classifies MIXED intent, priority 7
-    Memory: injects prior context (empty at first)
-    Planner: produces DAG with research → coding dependency
-  Output: valid task DAG in ARKState
-
-Done when: Full Supervisor → Planner flow runs end-to-end.
-           Task DAG is stored correctly in Redis.
+Wire through Redis message bus.
+Memory Agent inject_context called before every routing step.
+Integration test: "Research transformers and implement a demo"
+Done when: Full Supervisor → Planner flow end-to-end.
 ```
 
----
-
-**Day 19 — Friday**
-**Task: Planner → Worker Routing Logic**
-
+**Day 19 — Friday: Router + Topological Dispatch**
 ```
-Build the routing logic that sends subtasks to the right agents.
-
 File: kernel/router.py
-
-What it does:
-  1. Takes task DAG from Planner
-  2. For each task in DAG:
-     - Find capable agents in Agent Registry
-     - Pick least-loaded agent (load_count)
-     - Publish task to that agent's Redis channel
-  3. Handles parallel dispatch (multiple tasks at once)
-  4. Tracks which tasks are complete, which are pending
-  5. When all dependencies of task T are done → dispatch T
-
-Key functions:
-  dispatch_dag(dag, state: ARKState)
-  dispatch_task(task, agent_name)
-  on_task_complete(task_id, result)    → check if dependencies unblocked
-  get_execution_order(dag)             → topological sort
-
-Tests: tests/kernel/test_router.py
-  - Simple 3-task DAG dispatched in correct order
-  - Parallel tasks dispatched simultaneously
-  - Dependency respected: task B not dispatched until task A done
-
-Done when: Router correctly topologically sorts and dispatches a 4-task DAG.
+Topological sort of task DAG.
+Parallel dispatch for independent tasks.
+Dependency tracking: task B not dispatched until task A DONE.
+Done when: 4-task DAG dispatched in correct order.
 ```
 
----
-
-**Day 20 — Saturday**
-**Task: Heartbeat Monitor + Agent Health**
-
+**Day 20 — Saturday: Heartbeat Monitor**
 ```
-Build the heartbeat system. Supervisor needs to know if agents are alive.
-
 File: kernel/heartbeat_monitor.py
-
-What it does:
-  - Every 30 seconds, all agents publish to ark:heartbeat channel
-  - Monitor listens and updates Agent Registry
-  - If agent misses 3 heartbeats → mark OFFLINE
-  - Supervisor skips OFFLINE agents when routing
-
-HeartbeatMonitor:
-  start()                    → begin listening to ark:heartbeat
-  on_heartbeat(agent, data)  → update registry last_heartbeat
-  check_dead_agents()        → find agents with old heartbeat
-  revive_attempt(agent_name) → try to restart dead agent
-
-Tests: tests/kernel/test_heartbeat.py
-  - Agent publishes heartbeat → registry updated
-  - Missed heartbeats → agent marked OFFLINE
-  - Routing skips OFFLINE agents
-
-Done when: Dead agents are automatically detected and skipped.
+Every 30 seconds: agents ping ark:heartbeat
+3 missed pings → mark OFFLINE
+Routing skips OFFLINE agents
+Done when: Dead agents detected and skipped automatically.
 ```
 
----
-
-**Day 21 — Sunday**
-**Task: Week 3 Review**
-
+**Day 21 — Sunday: Week 3 Review**
 ```
-Review all kernel components.
-
-Checklist:
-  □ LangGraph state machine compiles
-  □ Supervisor classifies intents correctly
-  □ Planner produces valid DAGs
-  □ Supervisor ↔ Planner communication through Redis
-  □ Router dispatches tasks in correct dependency order
-  □ Heartbeat monitor detects dead agents
-
-End-to-end trace:
-  Run this manually and verify every step in logs:
-  "Research quantum computing"
-  → Supervisor → Planner → DAG → Router → (Research stub)
-
+End-to-end trace: "Research quantum computing"
+→ Supervisor → Planner → DAG → Router → (Research stub)
 Write: docs/kernel_architecture.md
 ```
 
 ---
 
-### WEEK 4 — Research Agent + Coding Agent
+### WEEK 4 — Research + Coding + Evaluation
 
 ---
 
-**Day 22 — Monday**
-**Task: arXiv API Tool**
-
+**Day 22 — Monday: arXiv + Semantic Scholar Tools**
 ```
-Build the arXiv search tool. Research Agent uses this.
-
 File: tools/research_tools.py
-
-Functions:
-  search_arxiv(query, max_results=10, date_from=None, date_to=None)
-    → returns list of {title, authors, abstract, arxiv_id, url, published}
-
-  fetch_arxiv_paper(arxiv_id)
-    → returns full paper text (abstract + sections if available)
-
-  search_semantic_scholar(query, limit=10)
-    → uses Semantic Scholar API (free, no key needed)
-
-  get_paper_citations(arxiv_id)
-    → returns list of papers that cite this one (via Semantic Scholar)
-
-Tests: tests/tools/test_research_tools.py
-  - Search returns correct number of results
-  - Fetch returns paper content
-  - Results have all required fields
-
-Done when: Can search arXiv and get full paper details programmatically.
+Functions: search_arxiv, fetch_arxiv_paper,
+           search_semantic_scholar, get_paper_citations
+Done when: arXiv search returns correct results.
 ```
 
----
-
-**Day 23 — Tuesday**
-**Task: Research Agent — Core**
-
+**Day 23 — Tuesday: Research Agent**
 ```
-Build the Research Agent. This reads papers and builds knowledge.
-
 File: workers/phase1/research_agent.py
-
-Extends: BaseAgent
-Model: gemma4:26b-instruct-qat (local)
-Capabilities: ["RESEARCH", "LITERATURE_REVIEW", "HYPOTHESIS_SEARCH"]
-
-What it does:
-  1. Receives RESEARCH task with topic/query
-  2. Searches arXiv + Semantic Scholar
-  3. Reads top papers (abstract + key sections)
-  4. Embeds each paper → stores in Qdrant via Memory Agent
-  5. Runs RAG over stored papers
-  6. Produces structured research summary
-
-System prompt:
-  You are the ARK OS Research Agent. Your job is to:
-  1. Find the most relevant papers on the given topic
-  2. Extract key findings, methods, and gaps
-  3. Synthesize into a structured summary
-  4. Identify what is NOT yet known (research gaps)
-  Always cite papers with arxiv IDs.
-
-RAG pipeline inside Research Agent:
-  query → search_arxiv → fetch papers → embed → store in Qdrant
-        → retrieve top-k from Qdrant → synthesize with LLM → output
-
-Tests: tests/workers/test_research_agent.py
-  - Given "transformer attention efficiency":
-    → finds at least 5 papers
-    → stores them in semantic memory
-    → produces structured summary with citations
-    → identifies at least 1 research gap
-
-Done when: Research Agent produces a quality summary with citations.
+Model: gemma4:26b-instruct-qat (local, from active-models.json)
+RAG pipeline: search → fetch → embed → store in Qdrant → synthesize
+Done when: Returns structured summary with arxiv citations.
 ```
 
----
-
-**Day 24 — Wednesday**
-**Task: Code Execution Tool + Sandbox**
-
+**Day 24 — Wednesday: Code Execution Sandbox**
 ```
-Build safe code execution. Critical for Coding Agent.
-
 File: tools/code_tools.py
-
-IMPORTANT: All code runs inside Docker container — never on host directly.
-
-Functions:
-  run_python_code(code: str, timeout=30) -> dict
-    → {stdout, stderr, exit_code, execution_time}
-    → runs in isolated Docker container (ark-sandbox)
-    → kills container after timeout
-
-  install_package(package_name: str) -> dict
-    → pip install inside sandbox container
-    → returns {success, output, error}
-
-  write_file(path: str, content: str) -> bool
-    → write to sandboxed filesystem only
-
-  read_file(path: str) -> str
-    → read from sandboxed filesystem
-
-  run_tests(test_file_path: str) -> dict
-    → {passed, failed, errors, coverage}
-
-Docker sandbox image: ark-sandbox
-  FROM python:3.11-slim
-  RUN pip install numpy pandas matplotlib scikit-learn torch
-  (pre-installed common packages)
-
-Tests: tests/tools/test_code_tools.py
-  - Run simple Python code → get output
-  - Run code with error → get stderr cleanly
-  - Timeout kills runaway code
-  - Cannot access host filesystem
-
-Done when: Code runs in Docker, timeouts work, output captured cleanly.
+All code runs in ark-sandbox Docker container — never on host.
+Functions: run_python_code, install_package, write_file,
+           read_file, run_tests
+Done when: Timeout kills runaway code. Host filesystem inaccessible.
 ```
 
----
-
-**Day 25 — Thursday**
-**Task: Coding Agent — Core**
-
+**Day 25 — Thursday: Coding Agent + Self-Repair Loop**
 ```
-Build the Coding Agent. This writes, tests, and fixes code.
-
 File: workers/phase1/coding_agent.py
-
-Extends: BaseAgent
-Model: qwen2.5-coder:7b (local)
-Capabilities: ["CODE_GENERATION", "DEBUG", "CODE_REVIEW", "TEST_WRITING"]
-
-What it does:
-  1. Receives CODE_GENERATION task with specification
-  2. Checks Memory Agent for relevant prior code patterns (procedural)
-  3. Writes implementation code
-  4. Writes unit tests
-  5. Runs tests via code_tools.run_python_code()
-  6. If tests fail → reads error → fixes → reruns (self-repair loop)
-  7. Max 3 self-repair attempts before returning FAILED
-
-Self-repair loop (the most important part):
-  write code
-    → run tests
-    → if pass: return DONE
-    → if fail:
-        read error
-        diagnose with LLM
-        write fix
-        run tests again
-        (max 3 attempts)
-    → if still failing: return FAILED with diagnosis
-
-Tests: tests/workers/test_coding_agent.py
-  - "Write a function to calculate Fibonacci numbers"
-    → produces working code
-    → tests pass
-  - Inject a syntax error in prompt
-    → agent detects and fixes
-  - "Calculate RSI from price data" (finance task from memory docs)
-    → working RSI implementation
-
-Done when: Coding Agent self-repairs at least 1 injected bug correctly.
+Model: qwen2.5-coder:7b (local, from active-models.json)
+Self-repair: write → test → fail → diagnose → fix → test (max 3)
+Done when: Agent self-repairs 1 injected bug correctly.
 ```
 
----
-
-**Day 26 — Friday**
-**Task: Evaluation Agent**
-
+**Day 26 — Friday: Evaluation Agent**
 ```
-Build the Evaluation Agent. Scores everything 0.0–1.0.
-
 File: kernel/evaluation_agent.py
-
-Extends: BaseAgent
-Model: claude-haiku-4-5 (fastest, cheapest for scoring)
-Capabilities: ["EVALUATE", "SCORE", "QUALITY_CHECK"]
-
-Rubrics (from Q7 answers):
-  Research:      citation accuracy(40) + coverage(30) + clarity(30)
-  Code:          tests pass(50) + no syntax errors(20) + style(15) + security(15)
-  Security:      CVE recall(50) + false positive rate(30) + completeness(20)
-  Hypothesis:    novelty(50) + feasibility(30) + clarity(20)
-  Data analysis: statistical validity(50) + visualization(25) + interpretation(25)
-
-Thresholds:
-  RETRY_THRESHOLD  = 0.65   (below → send back for retry)
-  ACCEPT_THRESHOLD = 0.80   (above → accepted)
-  WARN_RANGE = 0.65–0.80    (accept with warning to Reflection Agent)
-
-System prompt per rubric type:
-  You are the ARK OS Evaluation Agent. Score this {output_type} output
-  on the following criteria: {rubric_criteria}
-  Return ONLY a JSON object: {"score": float, "breakdown": dict, "feedback": str}
-
-run() method:
-  1. Detect output type from message.intent
-  2. Select correct rubric
-  3. Call Claude Haiku with rubric prompt
-  4. Parse score
-  5. Set message.quality_score
-  6. If score < RETRY_THRESHOLD → set status = RETRY
-  7. If score >= ACCEPT_THRESHOLD → set status = DONE
-
-Tests: tests/kernel/test_evaluation_agent.py
-  - Good research output → score >= 0.80
-  - Bad research output → score < 0.65
-  - Working code → score >= 0.80
-  - Broken code → score < 0.65
-
-Done when: Evaluation correctly scores 6 different output types.
+Model: claude-haiku-4-5
+Rubrics: Research(40/30/30) Code(50/20/15/15)
+         Security(50/30/20) Hypothesis(50/30/20) Data(50/25/25)
+Thresholds: RETRY=0.65, ACCEPT=0.80
+Done when: Correctly scores 6 different output types.
 ```
 
----
-
-**Day 27 — Saturday**
-**Task: Full MVP Loop Integration Test**
-
+**Day 27 — Saturday: Full MVP Loop Integration Test**
 ```
-Wire everything together. Run the first complete end-to-end task.
-
-Test: tests/integration/test_mvp_loop.py
-
-Goal: "Research Fibonacci algorithms and implement the most efficient one"
-
-Expected full flow:
-  User → Supervisor (classify: MIXED, priority 6)
-       → Memory Agent (inject_context: empty on first run)
-       → Planner (DAG: research → coding)
-       → Router (dispatch research task)
-       → Research Agent (finds papers, stores in Qdrant)
-       → Router (research done, dispatch coding task)
-       → Coding Agent (implements, tests pass)
-       → Evaluation Agent (scores code: expect >= 0.75)
-       → Memory Agent (stores outcome to episodic + semantic)
-  Output: working Fibonacci implementation + research summary
-
-Debug every step. Log every message. Fix every failure.
-
-Done when: Full loop completes without manual intervention.
-           Evaluation score >= 0.70 on first run.
+Goal: "Research Fibonacci algorithms, implement the most efficient one"
+Full flow: User → Supervisor → Planner → Research → Coding → Evaluation → Memory
+Done when: Loop completes autonomously. Score >= 0.70.
 ```
 
----
-
-**Day 28 — Sunday**
-**Task: Month 1 Review + Architecture Write-Up**
-
+**Day 28 — Sunday: Month 1 Review**
 ```
-Month 1 is complete. Full audit and documentation.
-
-Code review checklist:
-  □ ARKMessage schema: all fields present, TypedDict correct
-  □ BaseAgent: all 5 methods, error handling clean
-  □ Agent Registry: 8 fields, Redis persistence working
-  □ Working memory: TTL, key patterns correct
-  □ Episodic memory: SQLite persists across restarts
-  □ Semantic memory: BAAI embeddings in Qdrant
-  □ Procedural memory: FAISS index working
-  □ Memory Agent: all tiers accessible via one interface
-  □ Message Bus: Redis Pub/Sub routing works
-  □ Supervisor: intent classification correct
-  □ Planner: DAG generation valid and acyclic
-  □ Router: topological dispatch working
-  □ Research Agent: finds papers, stores in Qdrant
-  □ Coding Agent: self-repair loop working
-  □ Evaluation Agent: scores with correct rubric
-
+Full audit of all 15 components built.
 Write: docs/month1_results.md
-  - What was built
-  - Test pass rates
-  - Performance numbers (latency per agent)
-  - What was harder than expected
-  - What to improve in Month 2
-
-Start draft of Paper #1 introduction.
+Start Paper #1 introduction draft.
 ```
 
 ---
 
-# MONTH 2 — COMPLETE THE MVP LOOP
-## Goal: Harden the 6-agent loop + Web Search + File System + Dashboard + ARKBench v0.1
+# MONTH 2 — COMPLETE MVP + VERSIONING + PRIVACY + DASHBOARD
+## Goal: Harden loop + Agent versioning + Privacy mode + Dashboard + ARKBench v0.1
 
 ---
 
-### WEEK 5 — Harden Core Loop
+### WEEK 5 — Harden Core Loop + New Features
 
 ---
 
-**Day 29 — Monday**
-**Task: Retry Logic + Escalation**
-
+**Day 29 — Monday: Retry Logic + Escalation**
 ```
-Build proper retry handling in the Supervisor.
-
 File: kernel/supervisor_agent.py (update)
-
-Retry flow:
-  Evaluation returns RETRY
-    → Supervisor increments retry_count
-    → if retry_count < max_retries (3):
-        re-dispatch to same agent with feedback
-    → if retry_count >= max_retries:
-        escalate (mark task FAILED, notify user)
-
-Also build: EscalationHandler
-  - Logs escalation to episodic memory
-  - Notifies dashboard via WebSocket
-  - Creates detailed failure report
-
-Tests:
-  - Inject a task that always scores < 0.65
-  - Verify: retried 3 times, then marked FAILED
-  - Escalation report generated
-
-Done when: 3-retry loop works correctly with escalation.
+3-attempt retry loop with escalation handler.
+EscalationHandler: logs to episodic, notifies dashboard via WebSocket.
+Done when: 3-retry loop works. Escalation report generated.
 ```
 
 ---
 
-**Day 30 — Tuesday**
-**Task: Conflict Resolution — Type 3 (Priority)**
+**Day 30 — Tuesday: Agent Versioning System**
 
 ```
-Build priority conflict resolution (first and simplest type).
+This is the scientific rigour layer. Every agent change is tracked.
 
+File: core/agent_versioner.py
+
+AgentVersion:
+  agent_name:       str
+  version:          str    # semver: major.minor.patch
+  prompt_hash:      str    # sha256 of system prompt
+  model:            str
+  benchmark_score:  float  # ARKBench score at this version
+  changed_by:       str    # "self_improvement" | "manual" | "initial"
+  created_at:       str    # ISO timestamp
+  change_summary:   str    # what changed and why
+
+Class AgentVersioner:
+  bump_version(agent_name, change_type, new_prompt, score, changed_by)
+    → increments patch (bug fix), minor (improvement), major (rewrite)
+    → saves to version history in Redis
+    → updates agent_registry with new version string
+
+  get_version_history(agent_name) -> list[AgentVersion]
+  rollback(agent_name, target_version)
+    → retrieves old prompt from history
+    → updates agent to use that prompt
+    → logs rollback event
+
+  compare_versions(agent_name, version_a, version_b)
+    → returns score delta between two versions
+
+Integration into BaseAgent:
+  Every agent constructor takes version="1.0.0"
+  Every ARKMessage carries agent_version field
+  Every episodic log records which version ran
+
+Why this matters for papers:
+  ARKBench results tagged with agent version
+  "coding_agent@1.0.0 scored 0.71 in Month 1"
+  "coding_agent@1.3.2 scored 0.84 in Month 6"
+  Reviewers cannot question: "which version are you comparing?"
+
+Tests: tests/test_agent_versioner.py
+  - Version bumps correctly (patch → minor → major)
+  - Rollback restores old prompt
+  - compare_versions returns correct delta
+
+Done when: All agents carry version strings. History stored in Redis.
+```
+
+---
+
+**Day 31 — Wednesday: Reflection Agent**
+```
+File: workers/phase2/reflection_agent.py
+Model: groq:qwen2.5-72b
+After every task: analyze logs → extract patterns → update procedural memory
+Output: {what_worked, what_failed, pattern_learned, skill_update,
+         flag_for_self_improvement, agent_version_recommendation}
+flag_for_self_improvement → queued for Self-Improvement Agent in Month 6
+Done when: Reflection runs automatically after every task.
+```
+
+---
+
+**Day 32 — Thursday: Conflict Resolution — Type 3 (Priority)**
+```
 File: kernel/conflict_resolver.py
-
-Type 3: Priority conflict
-  When 2 tasks arrive simultaneously with equal priority:
-  Resolution: FIFO by timestamp, then round-robin by domain
-
-ConflictResolver class:
-  detect_priority_conflict(task_queue) -> bool
-  resolve_priority(task_a, task_b) -> task    (which goes first)
-  log_conflict(conflict_type, resolution)     (to episodic memory)
-
-Resolution rules:
-  1. Higher priority wins
-  2. If equal priority: earlier timestamp wins
-  3. If same timestamp: round-robin (RESEARCH → CODE → SECURITY → repeat)
-
-Tests:
-  - Two RESEARCH tasks, different priorities → higher wins
-  - Two RESEARCH tasks, same priority, different timestamps → earlier wins
-  - Domain round-robin is correct
-
+Resolution rules: higher priority wins → earlier timestamp → round-robin
+ConflictResolver: detect_priority_conflict, resolve_priority, log_conflict
 Done when: Priority conflicts resolved correctly in all test cases.
 ```
 
 ---
 
-**Day 31 — Wednesday**
-**Task: Reflection Agent**
+**Day 33 — Friday: Privacy Mode Flag**
 
 ```
-Build the Reflection Agent. Learns from every completed task.
+One-day build. Massive impact for institutional/enterprise users.
 
-File: workers/phase2/reflection_agent.py
+Files to update:
+  cli/ark_cli.py
+  api/main.py
+  kernel/supervisor_agent.py
+  kernel/planner_agent.py
 
-Extends: BaseAgent
-Model: groq:qwen2.5-72b (needs strong reasoning for analysis)
-Capabilities: ["REFLECT", "ANALYZE", "STRATEGY_UPDATE"]
+CLI usage:
+  ark --privacy "research confidential topic"
+  ark --privacy sage "materials science discovery"
 
-What it does:
-  After every task completes (pass OR fail):
-  1. Reads task history from episodic memory
-  2. Analyzes: what worked? what failed? why?
-  3. Extracts patterns: "When X happens, doing Y leads to score > 0.80"
-  4. Updates procedural memory with new/updated skills
-  5. Flags patterns for Self-Improvement Agent (Month 6)
+API usage:
+  POST /task
+  Body: {"goal": "...", "privacy": true}
 
-Reflection output format:
+What privacy mode does:
+  1. Sets ARKState.privacy_mode = True
+  2. Supervisor: skips Claude API → uses local Qwen2.5-14B via Ollama
+  3. Planner: skips Groq → uses local Qwen2.5-14B via Ollama
+  4. Evaluation: skips Claude Haiku → uses local Gemma4
+  5. ALL agents: log only to local SQLite/Redis, never to cloud
+  6. Network: no outbound API calls except arXiv/Semantic Scholar
+              (configurable — can disable those too with --airgap flag)
+
+Config: config/privacy_config.json
   {
-    "task_id": "...",
-    "what_worked": [...],
-    "what_failed": [...],
-    "pattern_learned": "...",
-    "skill_update": {skill record},
-    "flag_for_self_improvement": bool
+    "privacy_mode": false,
+    "airgap_mode": false,           # even stricter: no internet at all
+    "allowed_external": [           # whitelist when privacy=true
+      "api.semanticscholar.org",
+      "export.arxiv.org"
+    ]
   }
 
-System prompt:
-  You are the ARK OS Reflection Agent. After each task, analyze the
-  execution log and extract learnable patterns. Be specific and actionable.
+Quality impact (documented honestly):
+  ~15-20% lower routing quality vs Claude Sonnet
+  Acceptable for sensitive use cases
 
-Tests:
-  - After a successful coding task: identifies what made it succeed
-  - After a failed research task: identifies root cause
-  - Skill is updated in procedural memory
+Target users:
+  - Corporate researchers (confidential IP)
+  - Government/defence labs
+  - Healthcare research (HIPAA considerations)
+  - Anyone in regions with data sovereignty laws
 
-Done when: Reflection runs automatically after every task completion.
+Tests: tests/test_privacy_mode.py
+  - Privacy mode: zero API calls to Anthropic/Groq verified
+  - Airgap mode: zero outbound connections verified
+  - Quality score still > 0.60 on basic tasks in privacy mode
+
+Done when: Privacy mode verifiably makes zero external API calls.
 ```
 
 ---
 
-**Day 32 — Thursday**
-**Task: Web Search Agent**
-
+**Day 34 — Saturday: Web Search + File System Agents**
 ```
-Build the Web Search Agent. Grounds knowledge in current web content.
-
 File: workers/phase2/web_search_agent.py
-
-Extends: BaseAgent
-Model: gemma4:26b-instruct-qat (local)
-Capabilities: ["WEB_SEARCH", "CURRENT_EVENTS", "URL_FETCH"]
-
-Tools to build: tools/web_tools.py
-  search_web(query, num_results=5)
-    → Use DuckDuckGo API (free, no key) or Tavily (key needed)
-    → Returns: [{title, url, snippet, date}]
-
-  fetch_url(url)
-    → Download and parse web page text (BeautifulSoup)
-    → Returns cleaned text content
-
-  search_news(query, days_back=7)
-    → Filter results to recent news only
-
-Agent behavior:
-  1. Receives SEARCH task
-  2. Formulates search query from task instruction
-  3. Searches web, fetches top 3 results fully
-  4. Synthesizes findings
-  5. Stores in semantic memory for future retrieval
-  6. Returns structured summary
-
-Tests:
-  - Search "latest LangGraph updates" → gets recent results
-  - Fetch a specific URL → returns text content
-  - Results stored in semantic memory
-
-Done when: Web Search returns grounded, current information.
-```
-
----
-
-**Day 33 — Friday**
-**Task: File System Agent**
-
-```
-Build the File System Agent. Reads, writes, and watches files.
+  Model: reads from active-models.json (general tier)
+  Tools: DuckDuckGo (no key) or Tavily (key)
+  Privacy mode: skip web search entirely if --airgap
 
 File: workers/phase2/file_system_agent.py
+  Allowed directory whitelist in config/
+  Logs every write to episodic memory
 
-Extends: BaseAgent
-Model: gemma4:26b-instruct-qat (local)
-Capabilities: ["FILE_READ", "FILE_WRITE", "FILE_SEARCH", "DIRECTORY_INDEX"]
-
-Tools to build: tools/file_tools.py
-  read_file(path)                          → file content as string
-  write_file(path, content)                → write text file
-  append_file(path, content)               → append to file
-  list_directory(path, recursive=False)    → directory listing
-  search_files(directory, pattern)         → find files matching glob
-  watch_file(path, callback)               → notify on change
-  read_pdf(path)                           → extract text from PDF
-  read_docx(path)                          → extract text from DOCX
-
-Safety rules:
-  - Only read/write within allowed directories (configurable whitelist)
-  - Never touch system files (/etc, /sys, /boot)
-  - Log every write operation to episodic memory
-
-Tests:
-  - Read a text file → returns content
-  - Write a file → content saved to disk
-  - Read PDF → text extracted correctly
-  - Blocked path rejected → raises PermissionError
-
-Done when: File operations work safely within allowed directories.
+Done when: Both agents working. Privacy mode respected.
 ```
 
 ---
 
-**Day 34 — Saturday**
-**Task: FastAPI Backend — Core Routes**
-
+**Day 35 — Sunday: Week 5 Review**
 ```
-Build the FastAPI backend. Both terminal and web connect to this.
+Check:
+  □ Retry + escalation working
+  □ Agent versioning system complete
+  □ Reflection Agent producing useful output
+  □ Privacy mode: zero API calls verified
+  □ Web Search + File System agents working
+```
 
+---
+
+### WEEK 6 — FastAPI + Dashboard + ARKBench
+
+---
+
+**Day 36 — Monday: FastAPI Backend + Privacy Routes**
+```
 File: api/main.py
 
-Routes to implement:
+Routes:
+  POST /task              → submit task (supports privacy: bool in body)
+  GET  /task/{task_id}    → task status + output
+  GET  /tasks             → recent task list
+  DELETE /task/{task_id}  → cancel task
+  GET  /agents            → agent registry dump
+  GET  /agents/{name}/versions  → version history  ← NEW
+  GET  /memory/{tier}     → memory contents
+  POST /memory/search     → semantic search
+  POST /config/privacy    → toggle privacy mode    ← NEW
+  WebSocket /ws           → event stream
 
-  POST /task
-    Body: {"goal": "..."}
-    → Creates ARKMessage, sends to Supervisor
-    → Returns: {task_id, status: "submitted"}
-
-  GET /task/{task_id}
-    → Returns current status + output of a task
-
-  GET /tasks
-    → Returns list of recent tasks (from episodic memory)
-
-  DELETE /task/{task_id}
-    → Cancels a running task
-
-  GET /agents
-    → Returns Agent Registry dump (all agents + status)
-
-  GET /memory/{tier}
-    → tier: working|episodic|semantic|procedural
-    → Returns memory contents for that tier
-
-  POST /memory/search
-    Body: {"query": "...", "tier": "semantic"}
-    → Returns similar memories
-
-  WebSocket /ws
-    → Client connects → receives all event stream updates
-
-Start FastAPI:
-  uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
-
-Tests:
-  - POST /task → task_id returned
-  - GET /task/{id} → status updated correctly
-  - WebSocket receives events as task runs
-
-Done when: All REST routes work. WebSocket streams events.
+Done when: All routes work. Privacy toggle functional.
 ```
 
----
-
-**Day 35 — Sunday**
-**Task: Week 5 Review**
-
+**Day 37 — Tuesday: WebSocket Event System + Terminal CLI + Done Conditions**
 ```
-Review and test everything built this week.
-
-Integration test:
-  Run full end-to-end task via API:
-  curl -X POST http://localhost:8000/task \
-    -d '{"goal": "Search for recent papers on RAG and summarize them"}'
-
-  → Supervisor → Planner → Web Search + Research → Evaluation → Reflection
-  → All logged to episodic memory
-  → Result retrievable via GET /task/{id}
-
-Check:
-  □ Retry logic fires correctly on low scores
-  □ Reflection Agent produces useful output
-  □ Web Search returns current results
-  □ File System reads and writes correctly
-  □ FastAPI endpoints all working
-
-Update README with full setup instructions.
-```
-
----
-
-### WEEK 6 — Dashboard + ARKBench v0.1
-
----
-
-**Day 36 — Monday**
-**Task: WebSocket Event System**
-
-```
-Build the event emission system. Every agent action broadcasts events.
-
-File: api/events.py
-
-Event types to emit (every agent sends these):
-  agent_started      {agent, task_id, timestamp}
-  agent_thought      {agent, task_id, thought_text}
-  tool_called        {agent, task_id, tool_name, tool_input}
-  tool_result        {agent, task_id, tool_name, result_summary}
-  agent_done         {agent, task_id, quality_score, duration}
-  memory_written     {tier, key, summary}
-  task_completed     {task_id, final_score, output_path}
-  task_failed        {task_id, error, retry_count}
-  conflict_detected  {conflict_type, agents_involved}
-
-Every BaseAgent.run() call emits:
-  agent_started → (run) → agent_thought (for each thought) → agent_done
-
-File: core/event_emitter.py
-  emit(event_type, data)    → publish to WebSocket + Redis audit_log
-
-Update BaseAgent to inject event_emitter.
-
-Done when: Running any task streams events to WebSocket client.
-```
-
----
-
-**Day 37 — Tuesday**
-**Task: Terminal CLI — ark command**
-
-```
-Build the terminal interface. Users type: ark "their goal"
+File: api/events.py + core/event_emitter.py
+All agent actions emit events: agent_started, agent_thought,
+tool_called, tool_result, agent_done, memory_written,
+task_completed, task_failed, conflict_detected,
+version_updated ← NEW event type
 
 File: cli/ark_cli.py
+Commands: ark "goal", ark --privacy "goal", ark status, ark list,
+          ark stop, ark agents, ark memory search/show,
+          ark logs, ark versions <agent_name>  ← NEW
 
-Commands:
-  ark "goal text"                  → submit task, stream output live
-  ark status <task_id>             → show task status
-  ark list                         → show recent tasks
-  ark stop <task_id>               → cancel task
-  ark agents                       → show all agent statuses
-  ark memory search "query"        → search semantic memory
-  ark memory show <tier>           → show memory contents
-  ark logs <task_id>               → full execution log
-  ark                              → interactive mode (REPL)
+--until Done Conditions (Loop Engineering concept):
+  Instead of running "until the model thinks it's done",
+  the loop runs until an OBJECTIVE, TESTABLE condition is met.
+  The Evaluation Agent checks the condition after every iteration.
 
-Terminal output format:
-  ARK OS ──────────────────────────────────────────
-  Task: ark_001 | Priority: 7 | Goal: "..."
-  [10:31:02] Supervisor  → intent: RESEARCH
-  [10:31:03] Planner     → 3 subtasks created
-  [10:31:04] Research    ⟳ searching arXiv...
-  [10:31:18] Research    ✓ 8 papers found
-  [10:31:19] Evaluation  ✓ score: 0.87
-  Done in 1m 12s | Output: /ark/outputs/ark_001/
-  ──────────────────────────────────────────────────
+  Examples:
+    ark --until "all_tests_pass AND coverage > 80" "implement auth system"
+    ark --until "novelty_score > 0.7" sage "solar cell materials"
+    ark --until "security_issues == 0" "scan and fix codebase"
+    ark --until "quality_score > 0.85" "write research summary on BERT"
 
-Uses WebSocket internally to receive and format events.
+  How it works:
+    1. User defines the done condition as a string expression
+    2. Supervisor stores it in ARKState.done_condition
+    3. After each iteration, Evaluation Agent parses + checks the condition
+    4. STATE.md shows: Done condition: [expression] | Met: ✗ (current=0.61)
+    5. Loop continues until condition is True OR max_iterations hit
+    6. Max iterations default: 10 (override: --max-iter 20)
 
-Entry point in pyproject.toml:
-  [tool.poetry.scripts]
-  ark = "cli.ark_cli:main"
+  File: core/done_condition.py
+    class DoneConditionEvaluator:
+        ALLOWED_VARS = {
+            "quality_score", "novelty_score", "feasibility_score",
+            "all_tests_pass", "coverage", "security_issues",
+            "self_repair_rate", "citation_count"
+        }
 
-Done when: ark "research quantum computing" runs and streams correctly.
+        def evaluate(self, condition_str: str, metrics: dict) -> bool:
+            # Safe eval — only allowed variable names
+            safe_vars = {k: metrics.get(k, 0) for k in self.ALLOWED_VARS}
+            return bool(eval(condition_str, {"__builtins__": {}}, safe_vars))
+
+        def check(self, condition_str: str, ark_state: ARKState) -> tuple[bool, dict]:
+            metrics  = self._collect_metrics(ark_state)
+            met      = self.evaluate(condition_str, metrics)
+            return met, metrics
+
+  API support:
+    POST /task
+    Body: {"goal": "...", "until": "quality_score > 0.85", "max_iter": 10}
+
+Done when: ark --until command runs loop until condition met.
+           Loop stops immediately when condition is True.
+           STATE.md shows condition + current values after each iteration.
 ```
 
----
-
-**Day 38 — Wednesday**
-**Task: Web Dashboard — Layout + Live Agent Grid**
-
+**Day 38 — Wednesday: Web Dashboard — Agent Grid + Live Log**
 ```
-Build the web dashboard frontend.
-
 Directory: dashboard/ (React + Vite)
+npm install socket.io-client recharts lucide-react reactflow
 
-Setup:
-  cd dashboard && npm create vite@latest . -- --template react
-  npm install socket.io-client recharts lucide-react
+Components:
+  AgentGrid.jsx — 20 agent cards, live status colors
+                  Shows version string on each card  ← NEW
+  TaskQueue.jsx — active + recent tasks
+  LiveLog.jsx   — scrolling event stream
 
-Components to build today:
-  AgentGrid.jsx
-    - Shows all 20 agents (or however many exist)
-    - Each agent card shows: name, status (IDLE/BUSY/ERROR), model, current task
-    - Status color: green=IDLE, yellow=BUSY, red=ERROR, gray=OFFLINE
-    - Updates in real-time via WebSocket
-
-  TaskQueue.jsx
-    - Shows active + recent tasks
-    - Each task shows: goal (truncated), status, time elapsed, score
-
-  LiveLog.jsx
-    - Scrolling log of all events
-    - Color-coded by event type
-
-Layout:
-  Left panel (30%): AgentGrid
-  Right panel (70%): TaskQueue on top, LiveLog on bottom
-
-Done when: Dashboard shows live agent status. Colors update as tasks run.
+Done when: Dashboard shows live agent status with version numbers.
 ```
 
----
-
-**Day 39 — Thursday**
-**Task: Web Dashboard — Task Detail + Memory Browser**
-
+**Day 39 — Thursday: Dashboard — Task Detail + Memory Browser + Version History**
 ```
-Add task detail view and memory browser to dashboard.
+Components:
+  TaskDetail.jsx      — DAG, agent log, output, download button
+  MemoryBrowser.jsx   — 4-tier browser with search
+  VersionHistory.jsx  ← NEW: click any agent → see full version history
+                        Shows: version, date, score delta, what changed
+                        Rollback button per version
 
-Components to build:
-
-  TaskDetail.jsx
-    - Click any task → full detail view
-    - Shows: goal, DAG visualization (simple list), agent log, output
-    - Download output button
-
-  MemoryBrowser.jsx
-    - Tab for each memory tier: Working | Episodic | Semantic | Procedural
-    - Working: key-value list
-    - Episodic: timeline of past tasks
-    - Semantic: searchable list of stored knowledge
-    - Procedural: skill library with success rates
-
-  SearchBar.jsx (in MemoryBrowser)
-    - Type query → calls POST /memory/search → shows results
-    - Results ranked by similarity
-
-Done when: Can browse all 4 memory tiers from browser. Search works.
+Done when: Can browse memory, view version history, rollback an agent.
 ```
 
----
-
-**Day 40 — Friday**
-**Task: ARKBench v0.1 — First 10 Tasks**
-
+**Day 40 — Friday: ARKBench v0.1 — First 10 Tasks**
 ```
-Build the evaluation benchmark. This proves ARK OS works.
-
 File: benchmarks/arkbench/benchmark_v0.1.json
-
-Write 10 benchmark tasks (5 research + 5 coding):
-
-Research tasks:
-  1. "Summarize the key contributions of the original Transformer paper"
-     Expected: mentions attention mechanism, parallelization, BLEU score
-  2. "Find 3 papers from 2024 on retrieval-augmented generation"
-     Expected: 3 real papers with correct arxiv IDs
-  3. "What are the main differences between dense and sparse retrieval?"
-     Expected: covers BM25 vs embeddings, accuracy vs speed tradeoffs
-  4. "Explain how LoRA reduces VRAM requirements for fine-tuning"
-     Expected: covers rank decomposition, frozen base model, adapter size
-  5. "What research gaps exist in multi-agent AI systems as of 2025?"
-     Expected: mentions memory, conflict resolution, evaluation benchmarks
-
-Coding tasks:
-  6. "Write a Python function to calculate RSI given a list of closing prices"
-     Expected: correct RSI formula, handles edge cases
-  7. "Write a binary search implementation with unit tests"
-     Expected: O(log n), works for edge cases (empty, single, not found)
-  8. "Write a FastAPI endpoint that accepts a JSON body and returns it reversed"
-     Expected: working FastAPI route, correct Pydantic model
-  9. "Write a function to detect if a string is a palindrome"
-     Expected: handles spaces, capitalization, special chars
-  10. "Write a SQLite wrapper class with connect, execute, fetchall methods"
-      Expected: context manager, parameterized queries, error handling
-
-File: benchmarks/arkbench/run_benchmark.py
-  Runs all 10 tasks sequentially, collects scores, generates report
-
-Done when: Benchmark runs all 10 tasks. Baseline scores recorded.
+5 research tasks + 5 coding tasks (as originally planned)
+Each task records: agent_version field alongside score  ← NEW
+Done when: 10 tasks defined. Benchmark runner written.
 ```
 
----
-
-**Day 41 — Saturday**
-**Task: Run ARKBench v0.1 + Record Baseline**
-
+**Day 41 — Saturday: Run ARKBench v0.1 + Record Baseline**
 ```
-Run the benchmark. Record scores. These are your Month 1 baseline.
-
-Steps:
-  1. python benchmarks/arkbench/run_benchmark.py
-  2. Collect quality_score for each task
-  3. Record in: benchmarks/arkbench/results/month1_baseline.json
-
-Expected baseline scores (rough targets):
-  Research tasks: 0.65–0.75 (research quality should be decent)
-  Coding tasks:   0.70–0.85 (coding agent + self-repair helps)
-
-If any task scores below 0.50:
-  → Debug that specific task
-  → Fix the agent's prompt or tool
-  → Re-run that task until score > 0.60
-
-This baseline is IMPORTANT — Month 6 must beat these scores to prove M5 (self-improvement).
-
-File: benchmarks/arkbench/results/month1_baseline.json
-  {task_id, score, duration, agent_path, notes}
-
-Done when: All 10 tasks have scores. Baseline saved.
+python benchmarks/arkbench/run_benchmark.py
+Record: benchmarks/arkbench/results/month2_baseline.json
+Each result: {task_id, score, duration, agent_version, notes}
+This is Month 2 baseline with version stamps.
+Done when: All 10 scored. Baseline saved with version info.
 ```
 
----
-
-**Day 42 — Sunday**
-**Task: Month 2 Review**
-
+**Day 42 — Sunday: Month 2 Review**
 ```
-Month 2 complete. Full audit.
-
 Checklist:
-  □ Retry logic + 3-attempt escalation works
-  □ Reflection Agent produces useful patterns
-  □ Web Search Agent returns current results
-  □ File System Agent reads/writes safely
-  □ FastAPI backend — all routes working
-  □ WebSocket streams events in real-time
-  □ Terminal CLI: ark command works
-  □ Web Dashboard: live agent grid, task list, memory browser
-  □ ARKBench v0.1: 10 tasks, baseline scores recorded
+  □ Agent versioning: version history in Redis
+  □ Privacy mode: zero external calls verified
+  □ FastAPI + WebSocket: all routes working
+  □ Terminal CLI: ark command functional
+  □ Dashboard: live grid, memory browser, version history
+  □ ARKBench v0.1: 10 tasks, baseline scored with versions
 
-Month 2 deliverable: Write docs/month2_results.md
-  Include: ARKBench v0.1 scores table
-
-Paper #1 status: Introduction + Architecture section draft
+Write: docs/month2_results.md
+Paper #1: Architecture section draft started
 ```
 
 ---
 
-# MONTH 3 — PHASE 2 WORKERS PART 1
-## Goal: Browser, Terminal, GitHub agents + Coding self-repair evaluation
+# MONTH 3 — PHASE 2 WORKERS + LLAMA.CPP INFERENCE
+## Goal: Browser + Terminal + GitHub + llama.cpp + Self-repair evaluation
 
 ---
 
-### WEEK 7 — Browser + Terminal Agents
+### WEEK 7 — Browser + Terminal + GitHub
 
 ---
 
-**Day 43 — Monday**
-**Task: Playwright Browser Tool**
-
+**Day 43 — Monday: Playwright Browser Tool**
 ```
-Build browser automation tools. Browser Agent uses these.
-
 File: tools/browser_tools.py
-
-Install: pip install playwright && playwright install chromium
-
-Functions:
-  open_browser()                           → launch headless Chromium
-  navigate(url)                            → go to URL
-  get_page_text()                          → extract all visible text
-  get_page_html()                          → raw HTML
-  click(selector)                          → click element by CSS selector
-  type_text(selector, text)               → type in input field
-  screenshot(path)                         → save screenshot as PNG
-  fill_form(field_map: dict)              → fill multiple fields at once
-  extract_links()                          → all links on page
-  extract_table(selector)                 → parse HTML table to list of dicts
-  wait_for_element(selector, timeout=10)  → wait until element appears
-  close_browser()
-
-Context manager:
-  async with ARKBrowser() as browser:
-      await browser.navigate("https://arxiv.org")
-      text = await browser.get_page_text()
-
-Tests:
-  - Navigate to a known URL, get text
-  - Screenshot saves correctly
-  - Extract links returns list of URLs
-
-Done when: Can navigate, read, and screenshot any website.
+pip install playwright && playwright install chromium
+Functions: open_browser, navigate, get_page_text, get_page_html,
+           click, type_text, screenshot, fill_form, extract_links,
+           extract_table, wait_for_element, close_browser
+Context manager: async with ARKBrowser() as b: ...
+Done when: Navigate, read, screenshot any website.
 ```
 
----
-
-**Day 44 — Tuesday**
-**Task: Browser Agent**
-
+**Day 44 — Tuesday: Browser Agent**
 ```
-Build the Browser Agent that uses Playwright tools autonomously.
-
 File: workers/phase2/browser_agent.py
-
-Extends: BaseAgent
-Model: gemma4:26b-instruct-qat (local)
-Capabilities: ["WEB_BROWSE", "WEB_SCRAPE", "FORM_FILL", "SCREENSHOT"]
-
-What it does:
-  1. Receives a task with URL + instruction
-  2. Opens browser, navigates to URL
-  3. Decides what actions to take (read, click, fill, extract)
-  4. Executes actions step by step (ReAct loop)
-  5. Returns structured extracted content
-  6. Always takes screenshot as evidence
-
-System prompt:
-  You are the ARK OS Browser Agent. You control a web browser.
-  For each step, output:
-  {"thought": "...", "action": "navigate|click|type|extract|screenshot", "params": {...}}
-  Continue until task is complete.
-
-Done when: Browser Agent can navigate to arXiv, search for a topic,
-           extract paper titles, return them as structured output.
+Model: reads from active-models.json (general tier)
+ReAct loop: thought → action → observe → repeat
+Actions: navigate, click, type, extract, screenshot
+Done when: Navigates arXiv, extracts paper titles autonomously.
 ```
 
----
-
-**Day 45 — Wednesday**
-**Task: Terminal Agent**
-
+**Day 45 — Wednesday: Terminal Agent**
 ```
-Build the Terminal Agent. Runs bash commands safely.
-
-File: workers/phase2/terminal_agent.py
-File: tools/terminal_tools.py
-
-SAFETY RULE: All commands run in Docker sandbox — never on host directly.
-
-tools/terminal_tools.py:
-  run_command(cmd: str, timeout=30, sandbox=True) -> dict
-    → {stdout, stderr, exit_code, duration}
-    → sandbox=True: runs in Docker container
-    → sandbox=False: runs on host (requires explicit permission flag)
-
-  run_script(script_path: str, args=None) -> dict
-  list_processes() -> list
-  kill_process(pid) -> bool
-  check_command_exists(cmd) -> bool
-  get_environment() -> dict
-
-Terminal Agent:
-  Capabilities: ["TERMINAL_EXECUTE", "PROCESS_MANAGE", "INSTALL_PACKAGE"]
-
-  Understands natural language commands:
-    "Install the requests library" → pip install requests (sandboxed)
-    "Check if Python 3.11 is installed" → python3.11 --version
-    "List all running processes" → ps aux
-
-  Parses stdout/stderr intelligently:
-    If exit_code != 0 → analyze stderr, suggest fix
-    If "ModuleNotFoundError" → auto-suggest pip install
-
-Done when: Terminal Agent runs bash commands safely and interprets output.
+File: workers/phase2/terminal_agent.py + tools/terminal_tools.py
+ALL commands run in Docker sandbox — never on host.
+run_command(cmd, timeout=30, sandbox=True)
+Parses ModuleNotFoundError → auto-suggests pip install
+Done when: bash commands run safely, output parsed intelligently.
 ```
 
----
-
-**Day 46 — Thursday**
-**Task: Conflict Resolution — Type 1 (Resource)**
-
+**Day 46 — Thursday: Conflict Resolution — Type 1 (Resource)**
 ```
-Build resource conflict resolution. When two agents want the same tool.
-
 File: kernel/conflict_resolver.py (update)
-
-Type 1: Resource conflict
-  Scenario: Browser Agent + Web Search Agent both try to use Playwright
-
-ToolSemaphore:
-  acquire(tool_name, agent_name, task_id) → bool (got it or queued)
-  release(tool_name, agent_name)
-  get_queue(tool_name) → list of waiting agents
-
-Semaphore rules:
-  - Browser: max 1 concurrent user
-  - Terminal sandbox: max 2 concurrent (2 Docker containers)
-  - arXiv API: max 3 concurrent (rate limit friendly)
-  - Qdrant: unlimited (vector DB handles concurrent reads fine)
-
-Router update:
-  Before dispatching tool-using task → acquire semaphore
-  After task completes → release semaphore
-  Queued agents get notified when slot opens
-
-Tests:
-  - Two Browser tasks → second queued until first releases
-  - Three Terminal tasks → two run, one queues
-  - Release triggers queued agent
-
-Done when: No two agents use the same exclusive tool simultaneously.
+ToolSemaphore: Browser max 1, Terminal max 2, arXiv API max 3
+acquire(tool_name, agent_name) → queued if busy
+release triggers next queued agent
+Done when: No two agents use same exclusive tool simultaneously.
 ```
 
----
-
-**Day 47 — Friday**
-**Task: GitHub Agent**
-
+**Day 47 — Friday: GitHub Agent**
 ```
-Build the GitHub Agent. Manages repos, PRs, and issues.
-
-File: workers/phase2/github_agent.py
-File: tools/github_tools.py
-
-Install: pip install gitpython PyGithub
-
-tools/github_tools.py:
-  clone_repo(url, local_path)
-  get_repo_info(repo_path)            → {name, branches, last_commit}
-  get_open_issues(repo_url)           → list of issues
-  create_branch(repo_path, name)
-  commit_files(repo_path, message, files)
-  create_pull_request(repo, title, body, branch)
-  get_file_content(repo_path, file_path)
-  list_changed_files(repo_path)       → files changed vs main
-
-GitHub Agent:
-  Capabilities: ["GIT_COMMIT", "PR_CREATE", "ISSUE_TRIAGE", "REPO_ANALYSIS"]
-
-  Tasks it handles:
-    "Commit the changes in /ark/outputs/coding/ to feature/rsi-agent branch"
-    "Create a PR for the new research agent implementation"
-    "List all open issues in this repository and triage them"
-
-Done when: GitHub Agent can commit files, create a branch, open a PR.
+File: workers/phase2/github_agent.py + tools/github_tools.py
+pip install gitpython PyGithub
+Functions: clone_repo, get_open_issues, create_branch,
+           commit_files, create_pull_request, list_changed_files
+Done when: Agent commits files, creates branch, opens PR.
 ```
 
----
-
-**Day 48 — Saturday**
-**Task: Coding Agent Self-Repair Evaluation**
-
+**Day 48 — Saturday: Coding Agent Self-Repair Evaluation**
 ```
-Formally evaluate the Coding Agent's self-repair capability.
-This is the Month 3 deliverable.
-
 File: benchmarks/coding_self_repair/run_self_repair_eval.py
-
-Build 10 intentionally broken code tasks:
-  1. Python function with syntax error (missing colon)
-  2. Import of non-existent package
-  3. Off-by-one error in list indexing
-  4. Wrong variable name (undefined variable)
-  5. Division by zero (no guard)
-  6. Infinite loop (no termination condition)
-  7. Type mismatch (str + int)
-  8. Missing return statement
-  9. Incorrect API call (wrong parameter name)
-  10. Logic error (wrong comparison operator)
-
-For each:
-  1. Give broken code to Coding Agent
-  2. Count how many repair attempts needed
-  3. Record: fixed (True/False), attempts_needed, final_score
-
+10 intentionally broken code tasks (syntax, import, logic, type errors)
 Metric: Self-Repair Rate = tasks_fixed / 10
-
-Target: >= 7/10 tasks self-repaired within 3 attempts
-
-File: benchmarks/coding_self_repair/results.json
-  {task, error_type, fixed, attempts, final_score}
-
-Done when: Self-repair evaluation run. Results saved. Report written.
+Target: >= 7/10 within 3 attempts
+Record: agent version used alongside results
+Done when: Evaluation complete. Results saved.
 ```
 
----
-
-**Day 49 — Sunday**
-**Task: Week 7 Review**
-
+**Day 49 — Sunday: Week 7 Review**
 ```
-Checklist:
-  □ Browser Agent navigates, extracts, screenshots
-  □ Terminal Agent runs commands in sandbox
-  □ GitHub Agent commits, branches, PRs
-  □ Resource conflicts resolved via semaphores
-  □ Self-repair evaluation: results recorded
-
 Write: docs/self_repair_evaluation.md
-  Include: per-error-type repair rates, common failure patterns
+Include: per-error-type repair rates, agent version used
 ```
 
 ---
 
-### WEEK 8 — Document + Security + Hardening
+### WEEK 8 — Document + Security + llama.cpp Migration
 
 ---
 
-**Day 50 — Monday**
-**Task: Document Agent**
-
+**Day 50 — Monday: Document Agent**
 ```
-Build the Document Agent. Reads and writes PDFs, DOCX, XLSX.
-
-File: workers/phase2/document_agent.py
-File: tools/document_tools.py
-
-Install: pip install pypdf python-docx openpyxl
-
-tools/document_tools.py:
-  read_pdf(path)              → text content
-  read_docx(path)             → text content
-  read_xlsx(path)             → dict of {sheet_name: [[rows]]}
-  write_docx(path, content)   → create Word document
-  write_pdf(path, content)    → create PDF (via reportlab or weasyprint)
-  write_xlsx(path, data_dict) → create Excel file
-
-Document Agent:
-  Capabilities: ["READ_PDF", "READ_DOCX", "WRITE_REPORT", "PARSE_PAPER"]
-
-  Primary use: Read academic papers (PDF) and write output reports (DOCX/PDF)
-
-Done when: Can read a real PDF research paper and extract clean text.
-           Can write a formatted DOCX report from ARK OS output.
+File: workers/phase2/document_agent.py + tools/document_tools.py
+pip install pypdf python-docx openpyxl reportlab
+Functions: read_pdf, read_docx, read_xlsx, write_docx, write_pdf, write_xlsx
+Done when: Reads real PDF paper. Writes formatted DOCX report.
 ```
 
----
-
-**Day 51 — Tuesday**
-**Task: Security Agent — CVE + Static Analysis**
-
+**Day 51 — Tuesday: Security Agent**
 ```
-Build the Security Agent. Scans for vulnerabilities. Fully local.
-
-File: workers/phase2/security_agent.py
-File: tools/security_tools.py
-
-Install: pip install semgrep bandit python-nmap
-
-tools/security_tools.py:
-  run_semgrep(target_dir, rules="auto")       → list of findings
-  run_bandit(target_file)                     → list of vulnerabilities
-  check_dependencies(requirements_file)       → CVE hits from NVD API
-  check_owasp_top10(target_dir)               → OWASP coverage report
-  generate_audit_report(findings, output_path) → structured HTML report
-
-Security Agent:
-  Capabilities: ["SECURITY_SCAN", "CVE_CHECK", "AUDIT_REPORT"]
-
-  CRITICAL RULE: Never calls external APIs with user code.
-                 All analysis runs locally only.
-
-  On receiving SECURITY_SCAN task:
-    1. Run Semgrep on target directory
-    2. Run Bandit on Python files
-    3. Check requirements.txt against NVD (CVE lookup only, no code sent)
-    4. Generate structured findings report
-    5. Classify each finding: CRITICAL | HIGH | MEDIUM | LOW
-
-Tests:
-  - Scan a file with a known SQL injection pattern → Semgrep finds it
-  - Scan file with hardcoded password → Bandit finds it
-  - Audit report generated as HTML
-
-Done when: Security Agent finds injected vulnerabilities in test code.
+File: workers/phase2/security_agent.py + tools/security_tools.py
+pip install semgrep bandit python-nmap
+CRITICAL: Never sends user code to external APIs.
+Functions: run_semgrep, run_bandit, check_dependencies,
+           check_owasp_top10, generate_audit_report
+Done when: Finds SQL injection + hardcoded credentials in test files.
 ```
 
----
-
-**Day 52 — Wednesday**
-**Task: Neo4j Citation Graph Integration**
-
+**Day 52 — Wednesday: Neo4j Citation Graph**
 ```
-Connect Neo4j to the Research Agent. Citation graph for SAGE Mode.
-
 File: memory/citation_graph.py
-
-Install: pip install neo4j
-
-Schema (Neo4j nodes and relationships):
-  Node: Paper     {arxiv_id, title, authors, year, abstract_embedding_id}
-  Node: Concept   {name, category}
-  Edge: CITES     (Paper)-[:CITES]->(Paper)
-  Edge: MENTIONS  (Paper)-[:MENTIONS]->(Concept)
-  Edge: RELATED   (Concept)-[:RELATED]->(Concept)
-
-Functions:
-  add_paper(paper_dict)
-  add_citation(citing_id, cited_id)
-  add_concept(name, category)
-  link_paper_to_concept(arxiv_id, concept_name)
-  get_paper_citations(arxiv_id)
-  get_citation_network(arxiv_id, depth=2)    → subgraph
-  find_concept_gaps()                         → concepts with few connections
-  find_bridge_concepts(concept_a, concept_b) → concepts connecting two ideas
-
-Update Research Agent to:
-  - After reading each paper → add_paper() + add_citations()
-  - Extract concepts from paper using LLM → add to Neo4j
-
-Done when: After reading 5 papers, Neo4j has a citation graph.
-           find_concept_gaps() returns concepts with sparse coverage.
+pip install neo4j
+Nodes: Paper, Concept
+Edges: CITES, MENTIONS, RELATED
+Functions: add_paper, add_citation, find_concept_gaps,
+           find_bridge_concepts
+Done when: 5 papers produce a queryable citation graph in Neo4j.
 ```
 
----
-
-**Day 53 — Thursday**
-**Task: Conflict Resolution — Type 4 (Memory)**
-
+**Day 53 — Thursday: Conflict Resolution — Type 4 (Memory)**
 ```
-Build memory conflict resolution. When agents write conflicting skills.
-
 File: kernel/conflict_resolver.py (update)
-
-Type 4: Memory conflict
-  Two agents write different approaches to the same skill_id
-
-MemoryConflictResolver:
-  detect_skill_conflict(skill_id_a, skill_id_b) -> bool
-  resolve_skill_conflict(skill_a, skill_b) -> Skill
-    Resolution strategy:
-      Keep BOTH versions tagged with source agent
-      Tag: {version: "A", source: "research_agent", success_rate: 0.82}
-           {version: "B", source: "coding_agent",   success_rate: 0.71}
-    On retrieval: return version with higher success_rate
-    Flag for Reflection Agent: "Conflict detected in skill X, please review"
-
-  merge_skills(skill_a, skill_b) -> Skill
-    → if steps are compatible: merge into unified skill
-    → if incompatible: keep both versions (version_a, version_b)
-
-Tests:
-  - Two agents write same skill_id with different steps
-  - Higher success_rate version used on retrieval
-  - Reflection Agent notified of conflict
-
-Done when: Memory conflicts detected, versioned, and resolved correctly.
+When two agents write conflicting procedural skills:
+  Keep both versions tagged with source + success_rate
+  Retrieval uses higher success_rate version
+  Reflection Agent notified for human review
+Done when: Memory conflicts versioned, best version retrieved.
 ```
 
 ---
 
-**Day 54 — Friday**
-**Task: 14-Agent Integration Test**
+**Day 54 — Friday: llama.cpp Inference Layer**
 
 ```
-Run a complex multi-domain task that uses 14 agents.
+Replace Ollama inference with llama.cpp for 10–30% speed improvement.
+Ollama still used for model management only (pull, list, delete).
 
-Goal:
-  "Find recent papers on code security vulnerabilities, 
-   implement a simple vulnerable web app to demonstrate one,
-   then scan it with the Security Agent and generate a report"
+File: core/llm_backend.py
 
-Agents that should activate:
-  Supervisor, Planner, Memory (always)
-  Research Agent (find CVE papers)
-  Web Search Agent (find recent CVEs)
-  Coding Agent (write vulnerable Flask app)
-  Security Agent (scan it)
-  Document Agent (generate HTML report)
-  Reflection Agent (log what worked)
+from llama_cpp import Llama
+import json
 
-Expected outputs:
-  /outputs/{task_id}/
-    research_summary.md
-    vulnerable_app.py
-    security_audit.html
-    reflection_log.json
+class ARKInferenceBackend:
+    """
+    Replaces direct Ollama API calls with llama.cpp for all local models.
+    Ollama is still used to manage (download, list) models.
+    llama.cpp is used for actual token generation.
+    """
+    def __init__(self):
+        # Load active models from hardware detection
+        with open("config/active-models.json") as f:
+            self.active = json.load(f)
+        self._models = {}   # cache loaded models
 
-Run test, debug every failure, fix issues.
+    def _get_model_path(self, role: str) -> str:
+        """Find GGUF path for the given role (general, code, vision)"""
+        model_name = self.active["models"][role]
+        # Ollama stores models here:
+        base = os.path.expanduser("~/.ollama/models/blobs/")
+        # Map model name to GGUF file
+        # (Ollama pull already downloaded it — we just point llama.cpp at it)
+        return self._find_gguf(base, model_name)
 
-Done when: Full pipeline runs end-to-end. All 7 agents activate correctly.
+    def load(self, role: str) -> Llama:
+        """Load model into memory. Cache after first load."""
+        if role not in self._models:
+            path = self._get_model_path(role)
+            self._models[role] = Llama(
+                model_path=path,
+                n_gpu_layers=-1,    # push ALL layers to GPU (RTX 5060)
+                n_ctx=8192,
+                n_batch=512,
+                verbose=False
+            )
+        return self._models[role]
+
+    def unload(self, role: str):
+        """Free VRAM — important for 8GB GPU hot-swapping."""
+        if role in self._models:
+            del self._models[role]
+            import gc; gc.collect()
+
+    def generate(self, role: str, messages: list, max_tokens=2048,
+                 temperature=0.7) -> str:
+        llm = self.load(role)
+        response = llm.create_chat_completion(
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            stream=False
+        )
+        return response["choices"][0]["message"]["content"]
+
+    def generate_stream(self, role: str, messages: list, **kwargs):
+        """Streaming version — used by CLI for live output."""
+        llm = self.load(role)
+        for chunk in llm.create_chat_completion(messages=messages,
+                                                 stream=True, **kwargs):
+            delta = chunk["choices"][0]["delta"]
+            if "content" in delta:
+                yield delta["content"]
+
+# Hot-swap policy for 8GB VRAM:
+VRAM_SWAP_POLICY = {
+    "supervisor":   "api",       # Claude/Groq — always API
+    "planner":      "api",
+    "evaluation":   "api",
+    "research":     "general",   # local Gemma4
+    "coding":       "code",      # local Qwen-Coder (swap from general)
+    "vision":       "vision",    # local Qwen2-VL (swap from general)
+    "default":      "general"
+}
+
+Update BaseAgent to use ARKInferenceBackend instead of direct Ollama calls.
+
+Before: response = requests.post("http://localhost:11434/api/chat", ...)
+After:  response = self.backend.generate(role, messages)
+
+Performance test:
+  Run 10 Coding Agent tasks with Ollama
+  Run same 10 tasks with llama.cpp
+  Record: tokens/second, latency per task
+  Expected improvement: 10–30% faster generation
+
+File: benchmarks/inference/llama_vs_ollama.py
+
+Done when: llama.cpp generates tokens correctly for all 3 local model roles.
+           Performance test shows improvement. Hot-swap between roles works.
 ```
 
 ---
 
-**Day 55 — Saturday**
-**Task: ARKBench v0.5 — Add 20 More Tasks**
-
+**Day 55 — Saturday: 14-Agent Integration Test**
 ```
-Expand ARKBench to 30 tasks total.
-
-Add 10 security tasks:
-  1. "Scan this Python file for SQL injection vulnerabilities"    (inject one)
-  2. "Check if this requirements.txt has any known CVEs"
-  3. "Find hardcoded credentials in this codebase"
-  4. "Generate an OWASP Top 10 compliance report for this project"
-  5. "Detect path traversal vulnerability in this Flask route"
-  ... (5 more security scenarios)
-
-Add 10 browser/document/terminal tasks:
-  6. "Navigate to arxiv.org and find today's top papers in cs.AI"
-  7. "Read this PDF and extract all figure captions"
-  8. "Create a DOCX report from this JSON data"
-  9. "Clone this GitHub repo and list all Python files"
-  10. "Run this shell script and capture the output"
-  ... (5 more browser/doc/terminal tasks)
-
-Run all 30 tasks. Record scores.
-Compare to Month 1 baseline (should be higher now — more agents available).
-
-Done when: 30 ARKBench tasks run. Results saved as month3_results.json
+Goal: "Find CVE papers, implement vulnerable Flask app, scan it, write report"
+Agents: Supervisor, Planner, Memory, Research, Web Search, Coding,
+        Security, Document, Reflection
+Expected outputs: research_summary.md, vulnerable_app.py,
+                  security_audit.html, reflection_log.json
+Done when: All agents activate. Pipeline completes end-to-end.
 ```
 
----
-
-**Day 56 — Sunday**
-**Task: Month 3 Review**
-
+**Day 56 — Sunday: Month 3 Review**
 ```
-Month 3 complete.
-
 Checklist:
-  □ Browser Agent fully working
-  □ Terminal Agent sandboxed and working
-  □ GitHub Agent commits, PRs working
-  □ Document Agent reads PDFs, writes DOCX
-  □ Security Agent scans with Semgrep + Bandit
-  □ Neo4j citation graph integration working
-  □ Type 1 + Type 4 conflict resolution working
+  □ Browser Agent working
+  □ Terminal Agent sandboxed
+  □ GitHub Agent commits + PRs
+  □ Document Agent reads PDF, writes DOCX
+  □ Security Agent finds injected vulnerabilities
+  □ llama.cpp: performance improvement measured and documented
   □ 14-agent integration test passed
-  □ ARKBench v0.5: 30 tasks scored
 
-Write: docs/month3_results.md
-Paper #1: Add Methods section draft
-Paper #2: Start conflict resolution data collection
+Write: docs/month3_results.md (include llama.cpp benchmark)
+Paper #1: Methods section — inference architecture section added
 ```
 
 ---
 
-# MONTH 4 — PHASE 2 COMPLETE + HARDENING
-## Goal: Finalize all 14 agents + ARKBench security track + Paper #2 data
+# MONTH 4 — HARDENING + ARKBENCH 50 + PAPER #2 DATA
 
 ---
 
-### WEEKS 9–10 (Days 57–70) — Hardening + Paper Data
+### WEEKS 9–10 (Days 57–70)
 
 ---
 
-**Day 57 — Conflict Resolution Type 2 (Output Conflict)**
+**Day 57 — Conflict Type 2 (Output Conflict)**
 ```
-Build the hardest conflict type. Research says X, Code proves not-X.
-File: kernel/conflict_resolver.py
-
-Resolution: Both agents re-run with each other's output as context.
-If still conflicting after 2 rounds → human escalation flag set.
-Collect 5 real conflict examples for Paper #2.
+Hardest conflict type. Research says X, Code proves not-X.
+Resolution: both agents re-run with each other's output as context.
+2 rounds still conflicting → human escalation flag.
+Collect 5 real examples for Paper #2.
 ```
 
-**Day 58 — Security Agent Red-Team Simulation**
+**Day 58 — Security Red-Team Simulation**
 ```
-Add red-team simulation capability to Security Agent.
-File: workers/phase2/security_agent.py
-
-Run OWASP WebGoat (pre-built vulnerable app) locally.
+Run OWASP WebGoat locally (pre-built vulnerable app).
 Security Agent scans it → finds known vulnerabilities.
-Recall metric: % of injected vulnerabilities found.
-Target: >= 0.75 recall on OWASP WebGoat.
+Target recall: >= 0.75 on OWASP WebGoat.
 ```
 
 **Day 59 — Memory TTL + Eviction Policies**
 ```
-Implement memory eviction so ARK OS doesn't grow unbounded.
-File: memory/memory_agent.py
-
-Policies:
-  Working memory: auto-expire after task completion (Redis TTL)
-  Episodic: keep last 10,000 episodes, archive older ones
-  Semantic: evict vectors with zero retrieval in 30 days
-  Procedural: evict skills with success_rate < 0.30
-
+Working: auto-expire after task (Redis TTL)
+Episodic: keep last 10,000 episodes, archive older
+Semantic: evict vectors with 0 retrieval in 30 days
+Procedural: evict skills with success_rate < 0.30
 Test: run 100 tasks, verify memory stays bounded.
 ```
 
 **Day 60 — Performance Optimization**
 ```
-Profile every agent. Find the slowest operations. Fix them.
-
-Tools: cProfile, py-spy, asyncio profiling
-
+Profile with cProfile + py-spy.
 Target latencies:
-  Memory retrieval:     < 100ms
-  Research Agent:       < 2 minutes for 5 papers
-  Coding Agent:         < 3 minutes for medium task
-  Evaluation Agent:     < 30 seconds
-
-Fix top 3 bottlenecks found.
+  Memory retrieval: < 100ms
+  Research Agent:   < 2 min for 5 papers
+  Coding Agent:     < 3 min for medium task
+  Evaluation:       < 30 sec
+Fix top 3 bottlenecks.
 ```
 
-**Day 61 — Error Recovery + Graceful Degradation**
+**Day 61 — Graceful Degradation**
 ```
-What happens when Groq is down? When Redis restarts? When Ollama crashes?
-
-Build fallback handlers:
-  Groq down → use local Qwen2.5-14B via Ollama
-  Redis down → use in-memory dict (lose working memory only)
-  Ollama down → return FAILED with clear error message
-  Qdrant down → use FAISS-only retrieval (degraded semantic search)
-
-Test all failure modes. Verify ARK OS degrades gracefully.
+Groq down      → local Qwen2.5-14B via Ollama
+Redis down     → in-memory dict (lose working memory only)
+Ollama down    → FAILED with clear message
+Qdrant down    → FAISS-only retrieval (degraded)
+Test all failure modes.
 ```
 
-**Day 62 — Dashboard: Task DAG Visualization**
+**Day 62 — Dashboard: DAG + Version Tracker Visualization**
 ```
-Add visual task DAG to web dashboard.
-Show nodes (tasks) and edges (dependencies) as a graph.
-Use React Flow or simple SVG.
-Active task → pulsing animation.
-Completed → green. Failed → red. Running → yellow pulse.
+Add ReactFlow DAG visualization (nodes pulse while running).
+Add Version Tracker panel: per-agent score timeline graph
+showing ARKBench scores across months for each agent version.
+This visualization goes directly into Paper #1 figures.
 ```
 
 **Day 63 — Sunday: Week 9 Review**
+
+**Day 64 — ARKBench v0.5: Add 20 Tasks**
 ```
-14 agents fully operational.
-All conflict types resolved.
-Dashboard shows DAG visualization.
++10 security tasks (CVE-based)
++10 browser/document/terminal tasks
+Run all 30. Month 4 intermediate scores saved with agent versions.
 ```
 
-**Day 64 — Security Benchmark: 10 CVE Tasks**
+**Day 65 — Reflection Quality Analysis**
 ```
-Add 10 CVE-based security tasks to ARKBench.
-Use real CVE-2023 and CVE-2024 entries.
-Measure: recall, precision, F1 for Security Agent.
-```
-
-**Day 65 — Reflection Agent Quality Analysis**
-```
-After 100+ tasks completed, analyze Reflection Agent output.
-Does it produce actionable patterns?
-Are procedural memory skills actually improving agent behavior?
-Write analysis: docs/reflection_quality_analysis.md
+After 100+ tasks: do Reflection patterns actually improve behavior?
+Write: docs/reflection_quality_analysis.md
 ```
 
-**Day 66 — Agent Registry Load Balancing Test**
+**Day 66 — Load Balancing Test**
 ```
-Test load_count-based routing.
-Spawn 2 instances of Research Agent.
-Verify tasks distributed evenly.
-avg_quality_score drops → agent deprioritized.
+Spawn 2 Research Agent instances.
+Verify load_count routing distributes evenly.
+avg_quality_score threshold deprioritizes underperforming agent.
 ```
 
 **Day 67 — Paper #2 Data Collection**
 ```
-Log all conflict events for the past month.
-Classify by type (1, 2, 3, 4).
-Measure: frequency, resolution time, outcome.
-This data is the empirical basis for Paper #2.
+Log all conflict events from past month.
+Classify: Type 1/2/3/4, frequency, resolution time, outcome.
 File: research/conflict_data/conflict_log.json
+This is the empirical basis for Paper #2 (AAMAS 2027).
 ```
 
-**Day 68 — End-to-End Stress Test**
+**Day 68 — Stress Test: 20 Simultaneous Tasks**
 ```
-Run 20 tasks simultaneously.
-Verify:
-  No race conditions in memory writes
-  Semaphores prevent tool conflicts
-  All 20 tasks complete (no deadlocks)
-  Scores are consistent with single-task runs
+No race conditions in memory writes.
+Semaphores hold under load.
+No deadlocks.
+Scores consistent with single-task runs.
 ```
 
-**Day 69 — Complete ARKBench to 50 Tasks**
+**Day 69 — ARKBench Final 50 Tasks**
 ```
-Final 20 tasks added:
-  10 agent coordination (multi-agent chains)
-  10 mixed domain (research + code + security together)
-
-Run all 50 tasks. Month 4 baseline scores saved.
-Target: 5–10% improvement over Month 1 baseline (early self-improvement effect).
++20 tasks: 10 agent coordination + 10 mixed domain
+All 50 tasks run. Month 4 final scores saved.
+Target: 5–10% improvement over Month 2 baseline (early learning effect).
+All scores tagged with agent versions.
 ```
 
 **Day 70 — Month 4 Review**
 ```
-14 agents complete. ARKBench 50 tasks. All conflict types handled.
+14 agents complete. ARKBench 50 tasks. All conflicts handled.
 Write: docs/month4_results.md
 Paper #1: Architecture section complete
-Paper #2: Data collected, analysis started
-Start preparing SAGE Mode components for Month 5.
+Paper #2: Conflict data collected, analysis started
 ```
 
 ---
 
-# MONTH 5 — INTELLIGENCE LAYER + SAGE MODE
-## Goal: 6 new agents + SAGE pipeline + first discovery run
+# MONTH 5 — INTELLIGENCE LAYER + SAGE + CHECKPOINTS + SCHEDULING + ARK-VLM
+## Goal: 20 agents complete + SAGE loop + fault tolerance + custom VLM
 
 ---
 
-### WEEKS 11–14 (Days 71–112)
+### WEEK 11 — Phase 3 Agents
 
 ---
 
-**Day 71 — Vision Agent Setup**
+**Day 71 — Vision Agent**
 ```
-Build the Vision Agent using Qwen2-VL-7B.
 File: workers/phase3/vision_agent.py
+Model: qwen2-vl:7b (via llama.cpp vision pipeline)
 Capabilities: SCREENSHOT_ANALYSIS, IMAGE_UNDERSTANDING, OCR, FIGURE_READING
-Tools: take_screenshot(), analyze_image(), extract_text_from_image()
-Test: analyze a scientific figure, extract numbers from a chart.
+Test: analyze matplotlib figure, extract chart values.
 ```
 
-**Day 72 — Vision Agent: Scientific Figure Analysis**
+**Day 72 — Vision Agent: Scientific Figures**
 ```
-Specialize Vision Agent for scientific plots and figures.
-Understands: line plots, bar charts, confusion matrices, architecture diagrams.
-For SAGE Mode: reads experiment result figures.
-Test: analyze a matplotlib output figure and describe what it shows.
+Specialize for scientific output: line plots, bar charts, confusion matrices.
+For SAGE Mode: read experiment result figures autonomously.
+Test: analyze SAGE-generated plot, write caption.
 ```
 
 **Day 73 — ML Engineer Agent**
 ```
-Build the ML Engineer Agent.
 File: workers/phase3/ml_engineer_agent.py
-Model: qwen2.5-coder:7b (local)
-Capabilities: EXPERIMENT_TRACK, HPO, TRAIN_MODEL, EVALUATE_MODEL
-MLflow integration: every experiment auto-logged.
-Optuna integration: Bayesian HPO runs automatically.
-Test: run 10-trial Optuna study on a simple model, log to MLflow.
+Model: qwen2.5-coder:7b (code tier)
+MLflow: every experiment auto-logged.
+Optuna: Bayesian HPO runs automatically.
+Test: 10-trial Optuna study → results in MLflow dashboard.
 ```
 
-**Day 74 — ML Engineer: Experiment Pipeline**
+**Day 74 — ML Engineer: Full Experiment Pipeline**
 ```
-Build full experiment pipeline in ML Engineer Agent.
 Given: {model, dataset, hyperparameter_ranges}
-Does: run experiment, log metrics, plot results, return best config.
-Uses: Coding Agent to write training code, Terminal Agent to run it.
-Test: full HPO run on sklearn model, MLflow dashboard shows results.
+Does: run experiment → log → plot → return best config
+Uses Coding + Terminal Agents internally.
+Test: sklearn HPO run end-to-end.
 ```
 
 **Day 75 — DevOps Agent**
 ```
-Build the DevOps Agent.
 File: workers/phase3/devops_agent.py
-Model: gemma4:26b-instruct-qat (local)
+Model: general tier from active-models.json
 Capabilities: DOCKER_MANAGE, CI_PIPELINE, DEPLOY
-Tools: docker build/run/stop, write GitHub Actions YAML
-Test: build a Docker image from Coding Agent output, run it.
+Test: build Docker image from Coding Agent output, run it.
 ```
 
 **Day 76 — Data Analysis Agent**
 ```
-Build the Data Analysis Agent.
 File: workers/phase3/data_analysis_agent.py
-Model: gemma4:26b-instruct-qat (local)
-Capabilities: DATA_ANALYZE, VISUALIZE, STATISTICAL_TEST, REPORT
-Tools: pandas operations, matplotlib plots, scipy stats tests
-Test: given a CSV, produce mean/std/correlation + 3 plots + summary.
+Tools: pandas, matplotlib, scipy stats
+Test: given CSV → mean/std/correlation + 3 plots + written summary.
 ```
 
 **Day 77 — Sunday: Week 11 Review**
 ```
 18 agents operational.
-Missing: Self-Improvement (19) + Capability Discovery (20).
-SAGE components start next week.
+All Phase 3 agents use llama.cpp backend.
+Version strings set on all new agents.
 ```
 
-**Day 78 — Hypothesis Engine (SAGE Component 1)**
+---
+
+### WEEK 12 — SAGE Components
+
+---
+
+**Day 78 — Hypothesis Engine**
 ```
-Build the Hypothesis Engine. Extends Planner Agent.
-File: sage/hypothesis_engine.py
-
-Takes: 50+ paper embeddings from Qdrant + Neo4j citation graph
-Does:
-  1. Find concept pairs with no connecting paper (knowledge gaps)
-  2. Find contradictions across papers (two papers claim opposite things)
-  3. Generate hypotheses from gaps and contradictions
-  4. Score each hypothesis: novelty × feasibility
-  5. Return ranked list of top-10 hypotheses
-
-Novelty score: cosine distance from existing paper embeddings
-Feasibility score: LLM judgment (can this be tested computationally?)
-
-Test: given 20 materials science papers → generates 5 ranked hypotheses.
+File: sage/hypothesis_engine.py (extends Planner)
+Input: Qdrant embeddings + Neo4j citation graph
+Output: ranked hypotheses by novelty × feasibility score
+Novelty: cosine distance from existing paper embeddings
+Test: 20 materials science papers → 5 ranked hypotheses.
 ```
 
-**Day 79 — Experiment Designer (SAGE Component 2)**
+**Day 79 — Experiment Designer**
 ```
-Build the Experiment Designer. Extends ML Engineer Agent.
-File: sage/experiment_designer.py
-
-Takes: one hypothesis from Hypothesis Engine
-Outputs: complete experiment specification
-  {
-    "hypothesis": "...",
-    "dataset": "Materials Project API query X",
-    "method": "train regression model to predict Y from features Z",
-    "baseline": "linear regression",
-    "metrics": ["MAE", "R2", "RMSE"],
-    "code_spec": "detailed coding instruction for Coding Agent"
-  }
-
-Coding Agent then implements this spec.
-Test: hypothesis → experiment spec → Coding Agent produces runnable code.
+File: sage/experiment_designer.py (extends ML Engineer)
+Input: one hypothesis
+Output: {hypothesis, dataset, method, baseline, metrics, code_spec}
+Coding Agent implements the code_spec.
+Test: hypothesis → spec → Coding Agent produces runnable code.
 ```
 
-**Day 80 — Scientific Report Generator (SAGE Component 3)**
+**Day 80 — Scientific Report Generator**
 ```
-Build the report generator. Extends Document Agent.
-File: sage/report_generator.py
-
-Takes: hypothesis + experiment spec + results + figures
-Outputs: LaTeX paper draft with:
-  Abstract, Introduction, Related Work, Method, Results, Discussion
-
-Template sections filled with:
-  - Hypothesis Engine output → Introduction/Method
-  - Experiment results → Results section
-  - Paper citations → Related Work (from Neo4j citation graph)
-  - Vision Agent figure analysis → Figure captions
-
-Test: given mock experiment results → produces valid LaTeX file.
+File: sage/report_generator.py (extends Document Agent)
+Input: hypothesis + spec + results + figures
+Output: LaTeX paper draft (Abstract, Intro, Related Work, Method, Results)
+Citations pulled from Neo4j citation graph automatically.
+Test: mock results → valid .tex file.
 ```
 
-**Day 81 — SAGE Loop Wiring**
+---
+
+**Day 81 — SAGE Checkpoint System**
+
 ```
-Wire all SAGE components into the discovery loop.
-File: sage/sage_orchestrator.py
+Problem: SAGE loop runs 8 hours, power cuts at hour 7. All lost.
+Solution: Checkpoint every completed step.
 
-Full loop:
-  Literature → Hypothesis → Experiment → Analysis → Report → Memory → Loop
+File: sage/checkpoint_manager.py
 
-Test: Run one complete SAGE loop on Materials Science topic.
-Each step produces output. Loop continues automatically.
+CheckpointManager:
+  save(loop_id, step_name, data)
+    → sage/checkpoints/{loop_id}/{step_name}.json
+    → also writes {loop_id}/status.json: {step, status, timestamp}
+
+  load(loop_id, step_name) -> dict | None
+    → returns None if checkpoint doesn't exist
+
+  get_resume_point(loop_id) -> str
+    → reads status.json, returns last completed step
+
+  list_checkpoints(loop_id) -> list[str]
+
+  clear(loop_id)
+    → removes all checkpoints after successful loop completion
+
+SAGE loop update (sage/sage_orchestrator.py):
+  Steps: ["literature", "hypothesis", "experiment", "analysis", "report"]
+
+  for step in steps:
+    # Check if already completed in a previous interrupted run
+    checkpoint = cm.load(loop_id, step)
+    if checkpoint:
+        result = checkpoint
+        log(f"Resumed from checkpoint: {step}")
+        continue
+
+    # Run the step
+    result = run_step(step)
+
+    # Save checkpoint immediately after completion
+    cm.save(loop_id, step, result)
+
+On restart:
+  SAGE orchestrator reads status.json
+  Skips completed steps
+  Resumes from last incomplete step
+  User sees: "Resuming SAGE loop ark_sage_001 from step: analysis"
+
+Also add: Checkpoint status to dashboard
+  Shows: current SAGE loop + which step + resume-able or not
+
+CLI:
+  ark sage resume ark_sage_001    → resume from checkpoint
+  ark sage list                   → show all SAGE loops + status
+  ark sage clear ark_sage_001     → delete checkpoints after success
+
+Tests: tests/sage/test_checkpoint_manager.py
+  - Save step, kill process, restart, resume from saved step
+  - All 5 steps checkpointed and resumable
+
+Done when: SAGE loop survives simulated power cut. Resumes correctly.
 ```
 
-**Day 82 — Materials Science API Integration**
+---
+
+**Day 82 — Task Scheduling (Cron-Style)**
+
 ```
-Add Materials Project API tools for SAGE flagship domain.
-File: tools/science/materials_tools.py
+ARK OS is truly autonomous when it decides WHEN to run tasks.
 
-pip install mp-api
+File: core/task_scheduler.py
+pip install apscheduler
 
-Functions:
-  search_materials(formula_or_property)
-  get_material_properties(material_id)
-  get_similar_materials(properties_dict)
-  query_band_gap_range(min_ev, max_ev)
-  get_stability_data(material_id)
+Scheduler (wraps APScheduler):
+  schedule_cron(cron_expr, goal, privacy=False)
+    → "0 2 * * *" = every night at 2 AM
 
-Test: query Materials Project for all solar cell candidate materials
-      with band gap between 1.0–1.7 eV.
+  schedule_interval(interval, goal, privacy=False)
+    → "every 6 hours"
+
+  schedule_once(datetime_iso, goal)
+    → run exactly once at this time
+
+  schedule_on_file_change(path, goal)
+    → watch a file/directory, run on change
+
+  cancel(schedule_id)
+  list_schedules() -> list
+  pause(schedule_id)
+  resume(schedule_id)
+
+Storage: schedules persist in SQLite (survive restarts)
+         file: data/schedules.db
+
+CLI:
+  ark schedule "0 2 * * *" "sage materials science discovery"
+  → Task: ark_sched_001
+  → Runs every night at 2 AM while ARK OS is running
+
+  ark schedule "every 6h" "scan codebase for security issues"
+  → Runs every 6 hours
+
+  ark schedule "watch /src/" "run tests and fix failures"
+  → Runs whenever /src/ directory changes
+
+  ark schedules          → list all active schedules
+  ark schedules cancel ark_sched_001
+
+Dashboard additions:
+  Schedules panel: list of active scheduled tasks + next run time
+
+Why this matters:
+  You submit a schedule, go to class, go to sleep.
+  ARK OS runs automatically at the scheduled time.
+  No need to keep a terminal open.
+  This is the "works while you sleep" feature formalized.
+
+Tests: tests/test_task_scheduler.py
+  - Schedule fires at correct time
+  - File watcher triggers on directory change
+  - Schedules survive process restart
+
+Done when: ark schedule command works. Scheduler survives restart.
 ```
+
+---
 
 **Day 83 — Sunday: Week 12 Review**
 ```
-All SAGE components built.
-Discovery loop runs.
-Materials Science API connected.
-Test one complete Materials Science hypothesis run.
-```
-
-**Day 84–91 — SAGE Loop Testing + Debugging (Week 13)**
-```
-Week 13 is dedicated to running and fixing the SAGE loop.
-
-Day 84: First full SAGE run (expect failures, debug them)
-Day 85: Fix hypothesis engine output format issues
-Day 86: Fix experiment designer code spec quality
-Day 87: Fix LaTeX report generation (citation formatting)
-Day 88: Re-run SAGE loop end-to-end cleanly
-Day 89: Run SAGE on 2nd hypothesis (verify loop repeats)
-Day 90: Vision Agent reads SAGE-generated experiment plots
-Day 91: Sunday review — SAGE loop producing usable output?
-```
-
-**Day 92–98 — Self-Improvement + Capability Discovery (Week 14)**
-```
-Day 92: Self-Improvement Agent (Agent 19)
-        File: workers/phase3/self_improvement_agent.py
-        Month 6 version: prompt A/B testing on ARKBench tasks
-        Reads Reflection logs → finds patterns → proposes prompt changes
-        A/B tests new prompts → if +5% improvement, applies change
-
-Day 93: Capability Discovery Agent (Agent 20)
-        File: workers/phase3/capability_discovery_agent.py
-        Reads Agent Registry + Reflection logs
-        Answers: "Can ARK OS do X?" with confidence score
-        Updates capability map dynamically
-
-Day 94: Voice Interface (faster-whisper)
-        pip install faster-whisper
-        STT pipeline: microphone → text → ARK OS task submission
-        Test: speak a goal, ARK OS executes it
-
-Day 95: All 20 agents integration test
-        Run a task that touches all 20 agents
-        Verify each one activates at least once
-
-Day 96: First SAGE Materials Science paper draft
-        Run complete SAGE loop on: "predict novel solar cell materials"
-        Output: LaTeX draft + experiment code + results
-
-Day 97: ARKBench month 5 run
-        All 50 tasks. Compare to month 1 and month 4.
-        Should see measurable improvement.
-
-Day 98: Sunday — month 5 review
+SAGE components complete.
+Checkpoint system: SAGE is fault-tolerant.
+Task scheduling: ARK OS is truly autonomous.
+Materials Science API tools: pip install mp-api, add tools/science/materials_tools.py
+Test: one full SAGE loop on materials science topic.
 ```
 
 ---
 
-# MONTH 6 — INTEGRATION + EVALUATION + PAPERS
-## Goal: Polish + ARKBench final + Month 1 vs Month 6 comparison + Paper submissions
+### WEEK 13 — SAGE Debugging + ARK-VLM
 
 ---
 
-### WEEKS 15–16 (Days 99–112) — Polish + Self-Improvement Evidence
+**Day 84 — First Full SAGE Run**
+```
+Expect failures. Debug them all.
+Goal: "Predict novel solar cell material candidates"
+Run all 5 steps. Fix whatever breaks.
+```
+
+**Day 85 — Fix Hypothesis Engine Issues**
+```
+Common issues: hallucinated arxiv IDs, low novelty scores,
+too-broad hypotheses. Fix formatting + prompt.
+```
+
+**Day 86 — ARK-VLM: Stage 1 Setup**
+
+```
+Start building the custom VLM: SigLIP + Qwen2.5 + projection bridge.
+This is Paper #5.
+
+File: ark_vlm/model.py
+
+pip install transformers torch sentence-transformers
+
+import torch
+import torch.nn as nn
+from transformers import SiglipVisionModel, Qwen2ForCausalLM
+
+class ARKVisionModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        # Vision encoder: SigLIP-400M (FROZEN — Google pretrained)
+        self.vision_encoder = SiglipVisionModel.from_pretrained(
+            "google/siglip-large-patch16-384"
+        )
+        for p in self.vision_encoder.parameters():
+            p.requires_grad = False   # freeze — never update
+
+        # Language model: Qwen2.5-7B (FROZEN in Stage 1, LoRA in Stage 2)
+        self.language_model = Qwen2ForCausalLM.from_pretrained(
+            "Qwen/Qwen2.5-7B-Instruct",
+            torch_dtype=torch.bfloat16
+        )
+
+        # Projection bridge (YOUR TRAINED LAYER — randomly initialized)
+        # SigLIP outputs 1152-dim → bridge maps to Qwen2.5's 4096-dim
+        self.projection = nn.Sequential(
+            nn.Linear(1152, 4096),
+            nn.GELU(),
+            nn.Linear(4096, 4096),
+            nn.LayerNorm(4096)
+        )
+        # Only this bridge trains in Stage 1
+
+    def encode_image(self, pixel_values):
+        vision_out = self.vision_encoder(pixel_values)
+        image_features = vision_out.last_hidden_state  # (B, 729, 1152)
+        visual_tokens  = self.projection(image_features)# (B, 729, 4096)
+        return visual_tokens
+
+    def forward(self, pixel_values, input_ids, attention_mask, labels=None):
+        visual_tokens  = self.encode_image(pixel_values)
+        text_embeddings = self.language_model.model.embed_tokens(input_ids)
+        combined = torch.cat([visual_tokens, text_embeddings], dim=1)
+        return self.language_model(inputs_embeds=combined,
+                                    attention_mask=attention_mask,
+                                    labels=labels)
+
+File: ark_vlm/train_stage1.py
+  Data: LLaVA-CC3M-Pretrain-595K (image-caption pairs)
+  Trains: ONLY projection bridge (SigLIP + Qwen2.5 frozen)
+  Goal: bridge learns visual → language space mapping
+  Time: ~3 days on RTX 5060 8GB
+
+Start Stage 1 training today. It runs in background while you build other things.
+```
+
+**Day 87 — Fix SAGE Report LaTeX Issues**
+```
+Citation formatting, figure placement, section structure.
+Test with real experiment results from Day 84–86 runs.
+```
+
+**Day 88 — ARK-VLM: Monitor Stage 1 Training**
+```
+Check training loss curve in MLflow.
+Should decrease steadily.
+If loss plateaus early → increase learning rate slightly.
+No code changes — just monitoring.
+```
+
+**Day 89 — SAGE Loop: 2nd Hypothesis Run**
+```
+Run SAGE on a second hypothesis automatically.
+Verify the loop repeats without manual intervention.
+Checkpoint system saves each step.
+```
+
+**Day 90 — SAGE: Vision Agent Reads Experiment Plots**
+```
+After ML Engineer runs experiment:
+  Vision Agent reads the matplotlib output figures
+  Writes auto-generated captions for the LaTeX report
+Test: Vision Agent describes a confusion matrix correctly.
+```
+
+**Day 91 — Sunday: Week 13 Review**
+```
+SAGE loop working end-to-end on 2 hypotheses.
+ARK-VLM Stage 1 training: check loss curve.
+If Stage 1 complete → start Stage 2 training.
+```
+
+---
+
+### WEEK 14 — Self-Improvement + Capability Discovery + ARK-VLM Stage 2
+
+---
+
+**Day 92 — Self-Improvement Agent**
+```
+File: workers/phase3/self_improvement_agent.py
+Model: groq:qwen2.5-72b
+Month 6 implementation (Option A — prompt versioning):
+  Read 50 Reflection logs for target agent
+  Find failure patterns (quality_score < 0.65 runs)
+  Generate improved system prompt via Claude Sonnet
+  A/B test: run both prompts on 10 ARKBench tasks
+  If new_score > old_score + 0.05: apply new prompt, bump version
+  Use AgentVersioner to record the change
+Done when: Self-Improvement correctly versions an agent after improvement.
+```
+
+**Day 93 — Capability Discovery Agent**
+```
+File: workers/phase3/capability_discovery_agent.py
+Model: general tier
+Reads: Agent Registry + Reflection logs + ARKBench results
+Answers: "Can ARK OS do X?" with confidence 0.0–1.0
+Updates live capability map: config/capabilities.json
+Done when: Answers 10 "can it do X?" questions with correct confidence.
+```
+
+**Day 94 — ARK-VLM Stage 2 Setup**
+```
+Stage 1 projection training should be done by now.
+Start Stage 2: train projection + Qwen2.5 LoRA adapters.
+
+File: ark_vlm/train_stage2.py
+Data: LLaVA-Instruct-150K + ARK OS scientific figure dataset
+      (figures collected from SAGE runs in Months 4–5)
+
+from peft import LoraConfig, get_peft_model
+lora = LoraConfig(r=64, lora_alpha=128,
+                  target_modules=["q_proj","k_proj","v_proj",
+                                  "o_proj","gate_proj","up_proj","down_proj"])
+model = get_peft_model(ark_vlm.language_model, lora)
+
+Training time: ~4 days on RTX 5060 8GB
+Start training today. Runs in background.
+```
+
+**Day 95 — Voice Interface**
+```
+pip install faster-whisper
+File: core/voice_input.py
+Pipeline: microphone → faster-whisper → text → ark CLI
+Model: whisper-medium (CPU, no VRAM cost)
+Test: speak "research quantum computing" → task submitted.
+```
+
+**Day 96 — All 20 Agents Integration Test**
+```
+Run one task touching all 20 agents.
+Verify each activates at least once.
+Goal: "Research solar cells, implement prediction model,
+       scan for security, deploy as API, generate paper"
+```
+
+**Day 97 — ARKBench Month 5 Run**
+```
+All 50 tasks. Record scores with agent versions.
+Compare to Month 2 baseline.
+Target: measurable improvement in at least 3 categories.
+```
+
+**Day 98 — Sunday: Month 5 Review**
+```
+20 agents complete.
+SAGE loop: 2+ complete runs.
+Checkpoint system: fault-tolerant.
+Task scheduling: autonomous operation verified.
+ARK-VLM Stage 2: training in progress.
+Voice: works.
+Write: docs/month5_results.md
+```
+
+---
+
+# MONTH 6 — INTEGRATION + EVALUATION + PAPERS + RELEASE
+## Goal: Polish + ARK-VLM + MCP server + ARKBench final + Paper submissions
+
+---
+
+### WEEKS 15–16 (Days 99–112) — Polish + Evidence
 
 ---
 
 **Day 99 — Self-Improvement First Full Run**
 ```
 Run Self-Improvement Agent on all agents with 3+ months of data.
-For each agent:
-  Read 50 Reflection logs
-  Identify failure patterns
-  Generate improved prompt
-  A/B test (10 ARKBench tasks each)
-  Record: old score vs new score
-
 Target: at least 3 agents show >= 5% improvement.
+All changes tracked via AgentVersioner.
 ```
 
-**Day 100 — Dashboard v1.0 Polish**
+**Day 100 — ARK-VLM: Evaluate + Integrate**
 ```
-Production-ready web dashboard.
-Add: SAGE Mode control panel (start/stop loop, view current hypothesis)
-Add: Self-Improvement tracker (scores over time per agent, graph)
-Add: ARKBench results visualization (radar chart across domains)
-Add: Memory stats (live vector count, episode count, skill count)
-Make it presentable for paper screenshots.
+Stage 2 training should be complete.
+Evaluate ARK-VLM on: VQAv2, ScienceQA, ChartQA, TextVQA
+Compare to base Qwen2-VL-7B on same benchmarks.
+If ARK-VLM wins on scientific figures → Paper #5 confirmed.
+
+Convert to GGUF:
+  python llama.cpp/convert_hf_to_gguf.py ark_vlm/ --outtype q4_k_m
+  ollama create ark-vlm -f ark_vlm/Modelfile
+
+Replace Vision Agent's Qwen2-VL-7B with ARK-VLM:
+  Vision Agent now uses the model trained on ARK OS scientific data.
 ```
 
-**Day 101 — ARKBench Final: All 50 Tasks**
+**Day 101 — Dashboard v1.0 Polish**
 ```
-This is the definitive Month 6 run.
-Run all 50 ARKBench tasks with fully matured 20-agent ARK OS.
-Compare to Month 1 baseline.
+Add: SAGE Mode control panel (start/stop/resume loops)
+Add: Self-Improvement tracker (score timeline per agent per version)
+Add: ARKBench radar chart (all domain scores in one view)
+Add: Scheduling panel (active schedules + next run times)
+Add: Hardware tier badge (shows T2 etc from active-models.json)
+Screenshot everything for paper figures.
+```
 
-Expected improvement areas:
-  Research tasks: +10–15% (more papers in Qdrant, better RAG)
-  Coding tasks:   +8–12%  (Self-Improvement has tuned prompts)
-  Security tasks: +5–10%  (procedural memory has accumulated patterns)
-  SAGE tasks:     new category (didn't exist in Month 1)
-
+**Day 102 — ARKBench Final: All 50 Tasks**
+```
+Definitive Month 6 run with all 20 agents + ARK-VLM.
+Every result tagged with agent version.
 Save: benchmarks/arkbench/results/month6_final.json
-Generate: improvement comparison report
 ```
 
-**Day 102 — Month 1 vs Month 6 Analysis**
+**Day 103 — Month 2 vs Month 6 Analysis**
 ```
-This is Metric M5. The proof that ARK OS self-improves.
+Core claim: ARK OS self-improves over time.
 
 Generate comparison table:
-  Task category | Month 1 score | Month 6 score | Delta | % improvement
+  Category | Month 2 | Month 6 | Delta | %Improvement | Agent versions
 
-Plot: line graph of score over months (1, 2, 3, 4, 5, 6) for each category
+Plot: score timeline graph (Months 2,3,4,5,6) per category
+      Annotate with agent version bump events
 
 Write: docs/self_improvement_evidence.md
-  This document is a core section of Paper #1 and Paper #3.
-
-If any category did NOT improve:
-  Investigate why. Document the finding.
-  This is also publishable — honest negative results matter.
+This is the core empirical contribution of Paper #1 and Paper #3.
 ```
 
-**Day 103 — Complete Integration Test**
+**Day 104 — Complete Integration Test (6 hours)**
 ```
-The most complex test. 6 hours. All 20 agents.
-
-Goal: "Research emerging solar cell materials, implement a
-       property prediction model, scan it for security issues,
-       deploy it as a REST API, and generate a research paper"
-
-Expected agent activations:
-  Supervisor, Planner, Memory × many times
-  Research Agent × 2 runs
-  Web Search Agent
-  Hypothesis Engine (SAGE)
-  Experiment Designer (SAGE)
-  Coding Agent × 3 runs
-  Security Agent
-  Evaluation Agent × 5 runs
-  Reflection Agent × 5 runs
-  DevOps Agent
-  ML Engineer Agent
-  Data Analysis Agent
-  Vision Agent
-  Document Agent
-  Scientific Report Generator (SAGE)
-  GitHub Agent (commit outputs)
-
-If it runs end-to-end: you have your flagship demo.
-```
-
-**Day 104–110 — Paper Writing (Week 16)**
-```
-Day 104: Paper #1 — Architecture paper
-         Write: Abstract, Introduction, Related Work, Architecture, Evaluation
-         Include ARKBench comparison tables, self-improvement graph
-
-Day 105: Paper #1 — Method section details
-         AgentSpec v1.0 formal specification
-         Four-tier memory architecture formalization
-         LangGraph state machine diagram
-
-Day 106: Paper #3 — Hypothesis Generation (SAGE)
-         Write: Introduction, Related Work (vs AI Scientist)
-         Include: Materials Science case study results
-         Novelty scoring method formalization
-
-Day 107: ARKBench paper (Paper #4)
-         Benchmark design, task categories, baseline comparisons
-         vs AutoGPT / BabyAGI / MetaGPT on same tasks
-         Submit to arXiv as preprint first
-
-Day 108: Paper #1 final review + co-author review
-         Grammar, citations, figure quality
-         Submit to NeurIPS / ICLR workshop track first
-
-Day 109: GitHub repository preparation
-         Public release: clean README, setup guide, demo GIFs
-         Apache 2.0 LICENSE file
-         CONTRIBUTING.md, CODE_OF_CONDUCT.md
-         Docker Compose one-command setup verified
-
-Day 110: Sunday — Month 6 review
+Goal: "Research solar cell materials, implement property prediction,
+       scan for security, deploy as REST API, generate paper"
+All 20 agents active. This is the flagship demo.
+Record screen. This becomes the demo video.
 ```
 
 ---
 
-### WEEKS 17–18 (Days 111–120) — Release + Submission
+### WEEKS 16–17 (Days 105–115) — Papers + MCP + Release
 
 ---
+
+**Day 105 — Paper #1: Architecture**
+```
+Write: Abstract, Introduction, Related Work, Architecture, Evaluation
+Include: ARKBench comparison, self-improvement timeline graph,
+         version history table, privacy mode evaluation
+Target: NeurIPS / ICLR
+```
+
+**Day 106 — Paper #1: Method Details**
+```
+AgentSpec v1.0 formal specification
+Four-tier memory architecture formalization
+Hardware-adaptive tier system (model-library.json)
+llama.cpp inference layer performance comparison
+LangGraph state machine diagram
+```
+
+**Day 107 — Paper #3: SAGE + Hypothesis Generation**
+```
+Introduction + Related Work (vs AI Scientist)
+Novelty scoring formalization
+Neo4j gap detection method
+Materials Science case study results
+Checkpoint system for reproducibility
+```
+
+**Day 108 — Paper #4: ARKBench**
+```
+Benchmark design, task categories, scoring rubrics
+Baseline comparisons: AutoGPT, BabyAGI, MetaGPT on same tasks
+Version-tagged results enabling reproducibility
+Submit to arXiv as preprint first → immediate citable reference
+```
+
+---
+
+**Day 109 — ARK OS as MCP Server**
+
+```
+MCP = Model Context Protocol (Anthropic standard)
+This connects ARK OS to Claude Code, Cursor, VS Code — millions of users.
+
+File: mcp/ark_mcp_server.py
+pip install mcp
+
+from mcp.server import Server
+from mcp.server.models import InitializationOptions
+import mcp.types as types
+
+app = Server("ark-os")
+
+@app.list_tools()
+async def list_tools():
+    return [
+        types.Tool(
+            name="ark_research",
+            description="Research a topic using ARK OS Research Agent",
+            inputSchema={"type":"object","properties":{
+                "topic":{"type":"string"},
+                "privacy":{"type":"boolean","default":False}
+            },"required":["topic"]}
+        ),
+        types.Tool(
+            name="ark_code",
+            description="Write and test code using ARK OS Coding Agent",
+            inputSchema={"type":"object","properties":{
+                "instruction":{"type":"string"},
+                "language":{"type":"string","default":"python"}
+            },"required":["instruction"]}
+        ),
+        types.Tool(
+            name="ark_security",
+            description="Scan code for security vulnerabilities",
+            inputSchema={"type":"object","properties":{
+                "target_path":{"type":"string"}
+            },"required":["target_path"]}
+        ),
+        types.Tool(
+            name="ark_sage",
+            description="Run SAGE scientific discovery mode",
+            inputSchema={"type":"object","properties":{
+                "domain":{"type":"string"},
+                "topic":{"type":"string"}
+            },"required":["domain","topic"]}
+        ),
+        types.Tool(
+            name="ark_task",
+            description="Submit any goal to ARK OS",
+            inputSchema={"type":"object","properties":{
+                "goal":{"type":"string"},
+                "privacy":{"type":"boolean","default":False}
+            },"required":["goal"]}
+        )
+    ]
+
+@app.call_tool()
+async def call_tool(name: str, arguments: dict):
+    # Route to ARK OS FastAPI backend
+    import httpx
+    async with httpx.AsyncClient() as client:
+        r = await client.post("http://localhost:8000/task",
+                              json={"goal": arguments.get("goal",""),
+                                    "intent": name,
+                                    "privacy": arguments.get("privacy",False)})
+        task_id = r.json()["task_id"]
+        # Wait for completion and return result
+        result = await poll_task(client, task_id)
+    return [types.TextContent(type="text", text=str(result))]
+
+MCP config for Claude Code (~/.claude/settings.json):
+  {
+    "mcpServers": {
+      "ark-os": {
+        "command": "python",
+        "args": ["/path/to/ark-os/mcp/ark_mcp_server.py"]
+      }
+    }
+  }
+
+Users in Claude Code can now type:
+  /ark_research "transformer attention mechanisms"
+  /ark_code "write a FastAPI authentication endpoint"
+  /ark_security "/home/user/myproject"
+  /ark_sage "materials science" "solar cell efficiency"
+
+Why this matters for distribution:
+  Claude Code has millions of users.
+  Zero installation friction — just add to settings.json.
+  ARK OS becomes a tool inside Claude Code, Cursor, VS Code.
+
+Done when: MCP server registered. Tools callable from Claude Code.
+```
+
+---
+
+**Day 110 — Sunday: Week 15 Review**
 
 **Day 111 — Public GitHub Release**
 ```
 Make ark-os repository public.
-Announce on Twitter/LinkedIn.
-Share with SRIHER faculty.
+Clean README with: one-command install, demo GIF, benchmark table.
+Apache 2.0 LICENSE.
+CONTRIBUTING.md + CODE_OF_CONDUCT.md
+docker-compose up verified on clean machine.
 ```
 
 **Day 112 — Paper #1 Submission**
@@ -2544,97 +2158,280 @@ Submit ARK OS Architecture paper to target venue.
 
 **Day 113 — Demo Video**
 ```
-Record a 5-minute demo video:
-  1. Terminal: ark "research quantum computing and implement a circuit simulator"
-  2. Web dashboard showing agents working in real-time
-  3. SAGE mode discovering a materials science hypothesis
-  4. Month 1 vs Month 6 score comparison graph
-
+Record 5-minute demo:
+  1. Terminal: ark "research quantum computing, implement circuit simulator"
+  2. Web dashboard: live agent grid, DAG animation, memory browser
+  3. SAGE mode: hypothesis discovery in materials science
+  4. Privacy mode: ark --privacy "confidential research topic"
+  5. Month 2 vs Month 6 improvement graph
+  6. Claude Code with ARK OS MCP: /ark_code "write auth endpoint"
 Upload to YouTube. Link in README.
 ```
 
-**Day 114 — Paper #4 arXiv Preprint**
+**Day 114 — Paper #4 arXiv Preprint + pip install ark-os**
 ```
-Submit ARKBench paper to arXiv.
-This gives you a citable preprint immediately.
-```
+Submit ARKBench preprint to arXiv → immediate citable reference.
 
-**Day 115 — `pip install ark-os` Setup**
-```
-Publish ARK OS to PyPI.
+Publish to PyPI:
+  pip install ark-os
+
 User flow:
   pip install ark-os
-  ark init          → guided setup (installs Docker, Ollama, pulls models)
-  ark "first task"  → runs immediately
+  ark init           → detects hardware tier, pulls correct models,
+                       starts Docker services, sets API keys
+  ark "first task"   → runs immediately
 
-pyproject.toml: package configuration
-  Entry point: ark = ark_os.cli.ark_cli:main
-```
-
-**Day 116–120 — Buffer Days**
-```
-These 5 days are buffer for anything that slipped.
-Use for:
-  - Bug fixes from public GitHub issues
-  - Paper revision based on advisor feedback
-  - Documentation improvements
-  - Additional ARKBench tasks
-  - SAGE loop improvements
+ark init flow:
+  1. Run scripts/select-model.py → detect GPU tier
+  2. Print: "Detected T2 hardware (8GB VRAM)"
+  3. Pull recommended models via Ollama
+  4. Start Docker services
+  5. Prompt for API keys (optional — can skip for local-only)
+  6. Run quick test task
+  7. Print: "ARK OS ready. Try: ark 'research quantum computing'"
 ```
 
 ---
 
-# SUMMARY TABLE
+### WEEK 18 (Days 115–120) — Extras + Buffer
 
+---
+
+**Day 115 — Paper #5 Draft: ARK-VLM**
 ```
-Month  Weeks  Agents Built   Key Deliverable
-──────────────────────────────────────────────────────────────────────
-1      1–4    6 (kernel)     Memory Agent + MVP loop + first e2e test
-2      5–6    8 (+ web, FS)  ARKBench v0.1 + dashboard + CLI
-3      7–8    11 (+browser,  Self-repair evaluation + 14-agent test
-               terminal,
-               github)
-4      9–10   14 (+doc,      ARKBench 50 tasks + conflict resolution
-               security,      data for Paper #2
-               reflection)
-5      11–14  20 (all)       SAGE loop + Materials Science paper draft
-6      15–18  20 (polished)  Month 1 vs 6 comparison + paper submissions
-                             Public GitHub release + pip package
+Write: ARK-VLM architecture, training stages, benchmark results.
+"ARK-VLM: A Domain-Specialized Vision-Language Model
+ for Scientific Discovery via Combined Encoder Architecture"
+Submit as arXiv preprint.
+```
+
+**Day 116 — Paper #2: Conflict Resolution**
+```
+Write Paper #2 using conflict_log.json data.
+4 conflict types, frequency analysis, resolution protocol, evaluation.
+Target: AAMAS 2027.
 ```
 
 ---
 
-# DAILY RULES (Apply Every Day)
+**Day 117 — Obsidian / Notion Export**
 
 ```
-1. One primary deliverable per day. Do not start Day N+1 deliverable
-   if Day N is not complete. Carry it forward.
+Researchers keep notes in Obsidian or Notion.
+ARK OS produces knowledge. Connect them so output is actually used.
 
-2. Write tests before or alongside the code. Not after.
+File: tools/export_tools.py
 
-3. Every new file must have a corresponding test file.
+Obsidian export (markdown files):
+  export_to_obsidian(output_dir, obsidian_vault_path)
+    → After each Research Agent run:
+       Creates one .md file per paper in the vault
+       [[wiki-links]] connect related papers automatically
+       Front matter: arxiv_id, authors, year, tags
+       Body: ARK OS summary + key findings
 
-4. Run the full test suite every Friday before the weekend.
+    → After each SAGE hypothesis run:
+       Creates hypothesis.md with linked papers
+       Experiment results as child notes
+       Citation graph visible in Obsidian graph view
 
-5. Memory Agent is sacred. If you break it, fix it before touching
-   anything else.
+Notion export (via Notion API):
+  export_to_notion(task_output, notion_db_id)
+    → Each SAGE loop creates a Notion database entry
+    → Hypothesis, experiment, results, status all in one page
+    → Auto-updates as SAGE loop progresses
 
-6. Commit to git every day, even if incomplete.
-   Commit message format: "[Day NN] AgentName: what was built"
+CLI:
+  ark config set export.obsidian_vault ~/Documents/ResearchNotes
+  ark config set export.notion_token your_token_here
+  ark config set export.notion_db_id your_db_id_here
+  → ARK OS auto-exports all research outputs to both targets
 
-7. Sunday is review + documentation only. No new features.
+Config: config/export_config.json
+  {
+    "obsidian_vault": "/home/user/Documents/Research",
+    "notion_enabled": false,
+    "notion_token": "",
+    "auto_export": true
+  }
 
-8. If a week's work is running 2+ days late, do not try to rush.
-   Drop the lowest-priority item for that week and move forward.
-
-9. ARKBench scores must be recorded every month. This is non-negotiable.
-   The Month 1 vs Month 6 comparison is a core paper claim.
-
-10. Never change ARKMessage schema after Day 4. AgentSpec v1.0 is frozen.
+Done when: After a Research Agent run, notes appear in Obsidian vault.
+           Paper connections shown in Obsidian graph view.
 ```
 
 ---
 
-*ARK OS — Day-by-Day Build Plan v1.0*
+**Day 118 — 24/7 Deployment Guide**
+
+```
+Write the complete guide for running ARK OS when laptop is off.
+
+File: docs/deployment_guide.md
+
+OPTION A — Keep Laptop Running (Simplest)
+  Power settings: never sleep when lid closed
+  Cost: ~₹8-12/night electricity
+  Suitable for: occasional overnight runs
+
+OPTION B — Raspberry Pi as Always-On Brain (Smart, ₹6,000 one-time)
+  Pi runs: Supervisor + Planner + Memory + Task Queue + FastAPI + Dashboard
+  Heavy compute: dispatched to laptop when on, or cloud GPU on demand
+  Power: 5W → ~₹30/month
+  Setup guide included in docs/deployment_guide.md
+
+  Pi install script: installers/raspberry_pi/install.sh
+    Installs: Python 3.11, Redis, SQLite, Qdrant (ARM), FastAPI
+    Skips: Ollama (no GPU on Pi) — uses API for all LLM calls
+    Starts: supervisord to keep all services alive
+
+OPTION C — Cloud GPU (Best for 24/7 SAGE, ~₹2,500/month)
+  Recommended: Vast.ai RTX 3090 instance
+  Docker Compose works identically on cloud as local
+  SAGE loop runs continuously without touching laptop
+  Access via terminal or web dashboard from anywhere
+
+  Cloud deploy script: installers/cloud/deploy_vastai.sh
+    Provisions instance, copies docker-compose.yml, starts services
+    Sets up SSH tunnel for dashboard access
+
+OPTION D — Home Mini PC (Best long-term)
+  Beelink SER7 (AMD 780M iGPU, 32GB RAM) ~₹35,000 one-time
+  Runs ARK OS 24/7, all agents local
+  Access remotely via SSH or dashboard
+
+ARK OS 24/7 Stack on any always-on machine:
+  Process manager: supervisord (restarts services after crash)
+  Log rotation: logrotate
+  Monitoring: dashboard accessible from phone browser
+  Scheduled SAGE: runs every night at 2 AM via task scheduler
+
+Done when: Deployment guide covers all 4 options with step-by-step commands.
+```
+
+---
+
+**Day 119 — Bug Fix + Documentation**
+```
+Fix any bugs reported from public GitHub.
+Improve docstrings across all agents.
+Write: ARCHITECTURE.md — one-page visual summary of all components.
+Update README with ARK-VLM results + MCP setup instructions.
+```
+
+**Day 120 — Final Day**
+```
+Tag release: git tag v1.0.0
+Write CHANGELOG.md covering all 120 days.
+Post on Hacker News, Reddit r/MachineLearning, Twitter.
+Email SRIHER faculty with GitHub link + demo video.
+Submit Paper #3 (SAGE / hypothesis generation).
+
+Done. ARK OS v1.0.0 is shipped.
+```
+
+---
+
+# FULL SUMMARY TABLE
+
+```
+Month  Days    Agents  Key Deliverables
+────────────────────────────────────────────────────────────────────────
+1      1–28    6       Hardware auto-detection, Memory Agent,
+                       Kernel, MVP loop, ARKBench baseline
+
+2      29–42   8+      Agent versioning, Privacy mode,
+                       Dashboard, ARKBench v0.1
+
+3      43–56   11+     Browser, Terminal, GitHub agents,
+                       llama.cpp inference (10–30% faster)
+
+4      57–70   14+     All conflicts handled, ARKBench 50 tasks,
+                       Paper #2 data collected
+
+5      71–98   20      SAGE + checkpoints + task scheduling,
+                       ARK-VLM training (Stage 1+2), Voice
+
+6      99–120  20+VLM  Self-improvement evidence, MCP server,
+                       Obsidian export, 24/7 deploy guide,
+                       pip install ark-os, 3 papers submitted
+```
+
+---
+
+# ALL FEATURES BUILT (Complete List)
+
+```
+Core System:
+  ✅ 20 specialized agents
+  ✅ 4-tier persistent memory (Redis + SQLite + Qdrant + FAISS)
+  ✅ AgentSpec v1.0 frozen protocol
+  ✅ LangGraph state machine orchestration
+  ✅ llama.cpp inference (faster than Ollama alone)
+  ✅ Redis Pub/Sub message bus
+  ✅ 4 conflict resolution types
+  ✅ Self-repair loop (Coding Agent)
+  ✅ Evaluation rubrics (5 output types)
+  ✅ ARKBench 50-task evaluation suite
+
+New Additions (v2.0):
+  ✅ Hardware auto-detection (T1–T6 tier system)
+  ✅ model-library.json (all GPU configs)
+  ✅ Windows PowerShell installer (tier-map.ps1)
+  ✅ Agent versioning (semantic versions + history)
+  ✅ Privacy mode (--privacy flag, zero API calls)
+  ✅ Airgap mode (--airgap, zero internet)
+  ✅ SAGE checkpoint system (fault-tolerant loops)
+  ✅ Task scheduling (cron-style, file watchers)
+  ✅ ARK-VLM (SigLIP + Qwen2.5 custom model)
+  ✅ MCP server (Claude Code / Cursor / VS Code)
+  ✅ Obsidian + Notion export
+  ✅ 24/7 deployment guide (Pi + cloud + mini PC)
+  ✅ pip install ark-os (PyPI package)
+  ✅ Voice interface (faster-whisper, CPU-only)
+
+Interfaces:
+  ✅ Terminal CLI (ark command)
+  ✅ Web dashboard (React, WebSocket)
+  ✅ FastAPI REST backend
+  ✅ MCP server (Claude Code integration)
+  ✅ Voice input (faster-whisper)
+
+Publications:
+  📄 Paper #1  ARK OS Architecture         → NeurIPS / ICLR
+  📄 Paper #2  Conflict Resolution          → AAMAS 2027
+  📄 Paper #3  SAGE Hypothesis Generation   → Nature Machine Intelligence
+  📄 Paper #4  ARKBench                     → arXiv preprint + ACL
+  📄 Paper #5  ARK-VLM Custom Model         → arXiv preprint
+```
+
+---
+
+# DAILY RULES
+
+```
+1.  One primary deliverable per day. Carry over if incomplete.
+2.  Write tests alongside code — never after.
+3.  Every new file needs a test file.
+4.  Run full test suite every Friday.
+5.  Memory Agent is sacred — break it, fix it before anything else.
+6.  Commit to git every day.
+    Format: "[Day NN] Component: what was built"
+7.  Sunday = review + docs only. No new code.
+8.  If 2+ days behind: drop lowest-priority item, move forward.
+9.  ARKBench scores recorded every month with agent versions. Non-negotiable.
+10. ARKMessage schema frozen after Day 4. Never change it.
+11. Hardware tier loaded from active-models.json — never hardcode model names.
+12. Privacy mode must be respected by EVERY agent, no exceptions.
+13. Every SAGE step saves a checkpoint immediately after completion.
+14. Agent versions bump when Self-Improvement makes any prompt change.
+15. STATE.md is updated after every task — it must always reflect the current system state.
+16. Use --until for any goal where success is measurable. Never let the model self-grade its own completion.
+```
+
+---
+
+*ARK OS — Day-by-Day Build Plan v2.0*
 *Kabilash (E0323036) · SRIHER Chennai · 2026*
-*6 months · 20 agents · 120 planned build days*
+*6 months · 20 agents + ARK-VLM · 120 build days*
+*Updated: hardware detection, llama.cpp, versioning, privacy, checkpoints,*
+*scheduling, ARK-VLM, MCP server, Obsidian export, 24/7 deploy*
