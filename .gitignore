@@ -8,3 +8,4 @@ dist/
 *.egg-info/
 .uv/
 config/active-models.json
+data/
