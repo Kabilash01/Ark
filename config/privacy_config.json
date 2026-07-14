@@ -1,0 +1,8 @@
+{
+  "privacy_mode": false,
+  "airgap_mode": false,
+  "allowed_external": [
+    "api.semanticscholar.org",
+    "export.arxiv.org"
+  ]
+}

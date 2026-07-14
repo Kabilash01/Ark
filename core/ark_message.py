@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from typing import TypedDict
@@ -64,7 +65,7 @@ def create_ark_message(
 ) -> ARKMessage:
     now = datetime.now(timezone.utc)
     return ARKMessage(
-        task_id=f"ark_{now.strftime('%Y%m%d_%H%M%S')}",
+        task_id=f"ark_{now.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}",
         sender=sender,
         receiver=receiver,
         parent_task_id=parent_task_id,
