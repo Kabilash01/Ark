@@ -1,30 +1,45 @@
 services:
-  # ── Day 3 populates qdrant, redis, neo4j, mlflow, ark-sandbox here ──────────
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
 
-  # ── Phase 2 placeholders ────────────────────────────────────────────────────
-  # postgres:
-  #   image: postgres:16-alpine
-  #   environment:
-  #     POSTGRES_DB: ark
-  #     POSTGRES_USER: ark
-  #     POSTGRES_PASSWORD: changeme
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
 
-  # redis:
-  #   image: redis:7-alpine
-  #   ports:
-  #     - "6379:6379"
+  neo4j:
+    image: neo4j:5.15-community
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/ark_os_password
+    volumes:
+      - neo4j_data:/data
 
-  # qdrant:
-  #   image: qdrant/qdrant:latest
-  #   ports:
-  #     - "6333:6333"
-  #   volumes:
-  #     - qdrant_data:/qdrant/storage
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    ports:
+      - "5000:5000"
+    command: mlflow server --host 0.0.0.0
+    volumes:
+      - mlflow_data:/mlflow
 
-# volumes:
-#   postgres_data:
-#   qdrant_data:
+  ark-sandbox:
+    build: ./docker/sandbox/
+    # Isolated Python environment for the Coding Agent — never runs generated code on the host.
+
+  # ark-api and ark-ui added in Month 2
+
+volumes:
+  qdrant_data:
+  redis_data:
+  neo4j_data:
+  mlflow_data:
