@@ -1,20 +1,5 @@
 services:
-  backend:
-    build: .
-    ports:
-      - "8000:8000"
-    volumes:
-      - .:/app
-    env_file:
-      - .env
-    # Required on Linux so the container can reach Ollama running on the host.
-    # macOS/Windows Docker Desktop provides host.docker.internal automatically.
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    environment:
-      # Override so the container points to host Ollama
-      OLLAMA_BASE_URL: "http://host.docker.internal:11434"
-    restart: unless-stopped
+  # ── Day 3 populates qdrant, redis, neo4j, mlflow, ark-sandbox here ──────────
 
   # ── Phase 2 placeholders ────────────────────────────────────────────────────
   # postgres:

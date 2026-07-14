@@ -1,0 +1,54 @@
+{
+  "tiers": {
+    "T1": {
+      "vram_min_gb": 3,
+      "vram_max_gb": 5,
+      "models": {
+        "general": "qwen2.5:3b",
+        "code": "qwen2.5-coder:3b",
+        "vision": null,
+        "orchestration": "groq_required"
+      }
+    },
+    "T2": {
+      "vram_min_gb": 6,
+      "vram_max_gb": 10,
+      "models": {
+        "general": "qwen2.5:7b",
+        "code": "qwen2.5-coder:7b",
+        "vision": "qwen2.5vl:7b",
+        "orchestration": "groq_preferred"
+      }
+    },
+    "T3": {
+      "vram_min_gb": 14,
+      "vram_max_gb": 20,
+      "models": {
+        "general": "qwen2.5:14b",
+        "code": "qwen2.5-coder:14b",
+        "vision": "qwen2.5vl:7b",
+        "orchestration": "local_capable"
+      }
+    },
+    "T4": {
+      "vram_min_gb": 22,
+      "vram_max_gb": 9999,
+      "models": {
+        "general": "qwen2.5:32b",
+        "code": "qwen2.5-coder:32b",
+        "vision": "qwen2.5vl:72b",
+        "orchestration": "fully_local"
+      }
+    },
+    "T5": {
+      "vram_min_gb": 0,
+      "vram_max_gb": 0,
+      "models": {
+        "general": "phi3:mini",
+        "code": "phi3:mini",
+        "vision": null,
+        "orchestration": "groq_required"
+      }
+    }
+  }
+}
