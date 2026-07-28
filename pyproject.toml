@@ -13,6 +13,9 @@ dependencies = [
   "redis>=5.0",
   "qdrant-client>=1.10",
   "sentence-transformers>=3.0",
+  "faiss-cpu>=1.8",
+  "numpy>=1.26",
+  "langgraph>=0.2",
 ]
 
 [project.optional-dependencies]
@@ -35,3 +38,6 @@ packages = ["core", "memory", "kernel", "workers", "sage", "tools", "api", "cli"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+  "live_llm: hits a real hosted LLM API (Groq) -- costs a little, non-deterministic, needs network + a valid key. Skip with -m \"not live_llm\" for fast local runs.",
+]
