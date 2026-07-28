@@ -1,16 +1,9 @@
 import pytest
 from qdrant_client import QdrantClient
-from sentence_transformers import SentenceTransformer
 
-from memory.semantic_memory import EMBEDDING_MODEL, SemanticMemory
+from memory.semantic_memory import SemanticMemory
 
 TEST_COLLECTION = "test_ark_semantic_memory"
-
-
-@pytest.fixture(scope="module")
-def encoder():
-    """Loaded once per test module -- downloading/loading this model is slow."""
-    return SentenceTransformer(EMBEDDING_MODEL)
 
 
 @pytest.fixture

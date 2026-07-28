@@ -20,7 +20,9 @@ class SemanticMemory:
         collection_name: str = COLLECTION_NAME,
     ):
         self._client = client or QdrantClient(host="localhost", port=6333)
-        self._encoder = encoder or SentenceTransformer(EMBEDDING_MODEL)
+        # CPU by default -- this shares the 8GB VRAM budget with the local
+        # LLMs (Ollama), which need it far more than a short-text encoder does.
+        self._encoder = encoder or SentenceTransformer(EMBEDDING_MODEL, device="cpu")
         self._collection_name = collection_name
         self._ensure_collection()
 
