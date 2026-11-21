@@ -23,6 +23,12 @@ std::string hex(const unsigned char* data, std::size_t count) {
     return result;
 }
 
+std::string format_uuid(const unsigned char* bytes) {
+    const auto data = hex(bytes, 16);
+    return data.substr(0, 8) + "-" + data.substr(8, 4) + "-" + data.substr(12, 4)
+           + "-" + data.substr(16, 4) + "-" + data.substr(20);
+}
+
 std::string utc(const char* format) {
     const auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::tm parts{};
@@ -84,9 +90,17 @@ std::string point_id(std::string_view url) {
     }
     digest[6] = (digest[6] & 0x0f) | 0x50;
     digest[8] = (digest[8] & 0x3f) | 0x80;
-    const auto data = hex(digest.data(), 16);
-    return data.substr(0, 8) + "-" + data.substr(8, 4) + "-" + data.substr(12, 4)
-           + "-" + data.substr(16, 4) + "-" + data.substr(20);
+    return format_uuid(digest.data());
+}
+
+std::string random_uuid() {
+    std::array<unsigned char, 16> bytes{};
+    if (RAND_bytes(bytes.data(), bytes.size()) != 1) {
+        throw std::runtime_error("Could not generate UUID");
+    }
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    return format_uuid(bytes.data());
 }
 
 } // namespace ark

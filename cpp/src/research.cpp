@@ -1,5 +1,6 @@
 #include "ark/research.hpp"
 #include "ark/kernel.hpp"
+#include "ark/vector_memory.hpp"
 
 #include <libxml/parser.h>
 #include <libxml/tree.h>
@@ -140,11 +141,6 @@ Json parse_arxiv(const std::string& body) {
                           {"abstract", element_text(node, "summary")}});
     }
     return papers;
-}
-
-Response send_json(const Transport& transport, std::string url, std::string method, const Json& payload,
-                   std::chrono::seconds timeout = std::chrono::seconds(30)) {
-    return transport({std::move(url), std::move(method), payload.dump(), {"Content-Type: application/json"}, timeout});
 }
 
 Json validate_summary(const std::string& query, const Json& response, const Json& citations) {
@@ -347,51 +343,17 @@ Json ResearchAgent::run_research(const Json& payload) {
 }
 
 void ResearchAgent::persist(const Json& sources) {
-    auto texts = Json::array();
+    std::vector<SemanticRecord> records;
     for (const auto& paper : sources) {
-        texts.push_back(paper.at("abstract"));
+        auto metadata = paper;
+        metadata.erase("abstract");
+        metadata["source"] = "arxiv";
+        const auto url = std::string(citation_url) + paper.at("arxiv_id").get<std::string>();
+        metadata["url"] = url;
+        records.push_back({point_id(url), paper.at("abstract").get<std::string>(), std::move(metadata)});
     }
-    const auto embedded = send_json(transport_, config_.ollama_url + "/api/embed", "POST", {
-        {"model", config_.embedding_model}, {"input", texts},
-    }, std::chrono::seconds(120));
-    embedded.require_success("Local embedding");
-    const auto vectors = Json::parse(embedded.body).at("embeddings");
-    if (!vectors.is_array() || vectors.size() != sources.size() || !vectors.front().is_array()
-        || vectors.front().empty()) {
-        throw std::runtime_error("Embedding response did not contain one vector per abstract");
-    }
-    const auto dimensions = vectors.front().size();
-
-    // Keep vectors from this engine/model apart from the Python encoder's vectors.
-    const auto collection = config_.qdrant_url + "/collections/ark_cpp_" + point_id(config_.embedding_model);
-    auto points = Json::array();
-    for (std::size_t i = 0; i < sources.size(); ++i) {
-        if (!vectors[i].is_array() || vectors[i].size() != dimensions
-            || !std::all_of(vectors[i].begin(), vectors[i].end(), [](const Json& value) { return value.is_number(); })) {
-            throw std::runtime_error("Embedding response contained an invalid vector");
-        }
-        auto payload = sources[i];
-        payload["text"] = payload.at("abstract");
-        payload.erase("abstract");
-        payload["source"] = "arxiv";
-        const auto url = std::string(citation_url) + payload.at("arxiv_id").get<std::string>();
-        payload["url"] = url;
-        points.push_back({{"id", point_id(url)}, {"payload", payload}, {"vector", vectors[i]}});
-    }
-
-    auto existing = transport_({collection});
-    if (existing.status == 404) {
-        const auto created = send_json(transport_, collection, "PUT", {
-            {"vectors", {{"size", dimensions}, {"distance", "Cosine"}}},
-        });
-        if (created.status != 409) {
-            created.require_success("Qdrant collection creation");
-        }
-    } else {
-        existing.require_success("Qdrant collection lookup");
-    }
-    const auto written = send_json(transport_, collection + "/points?wait=true", "PUT", {{"points", points}});
-    written.require_success("Qdrant abstract upsert");
+    Embeddings encoder(transport_, config_.ollama_url, config_.embedding_model);
+    SemanticMemory(transport_, config_.qdrant_url, std::move(encoder)).store(records);
 }
 
 } // namespace ark

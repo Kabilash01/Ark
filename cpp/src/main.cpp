@@ -1,6 +1,7 @@
 #include "ark/kernel.hpp"
 #include "ark/research.hpp"
 #include "ark/storage.hpp"
+#include "ark/vector_memory.hpp"
 
 #include <algorithm>
 #include <cstdlib>
@@ -15,11 +16,11 @@ std::string env(const char* name, std::string fallback = "") {
     return value && *value ? value : std::move(fallback);
 }
 
-ark::ResearchConfig config() {
+ark::ResearchConfig config(bool chat_required = true) {
     ark::ResearchConfig config;
     const std::filesystem::path dir = env("ARK_CONFIG_DIR", "config");
     config.model = env("ARK_MODEL");
-    if (config.model.empty()) {
+    if (config.model.empty() && chat_required) {
         config.model = ark::read_json(dir / "active-models.json").at("models").at("general").get<std::string>();
     }
     const auto privacy = dir / "privacy_config.json";
@@ -31,6 +32,20 @@ ark::ResearchConfig config() {
     config.qdrant_url = env("ARK_QDRANT_URL", config.qdrant_url);
     config.scholar_key = env("SEMANTIC_SCHOLAR_API_KEY");
     return config;
+}
+
+std::filesystem::path skills_path() { return env("ARK_PROCEDURAL_DB", "data/procedural_cpp.db"); }
+
+ark::Json recall(const ark::ResearchConfig& settings, std::string_view goal) {
+    ark::CurlTransport http;
+    const ark::Embeddings encoder(std::ref(http), settings.ollama_url, settings.embedding_model);
+    ark::SemanticMemory semantic(std::ref(http), settings.qdrant_url, encoder);
+    const auto path = skills_path();
+    std::unique_ptr<ark::ProceduralMemory> skills;
+    if (std::filesystem::exists(path)) {
+        skills = std::make_unique<ark::ProceduralMemory>(path, encoder);
+    }
+    return ark::memory_context("", goal, nullptr, semantic, skills.get());
 }
 
 int dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, std::string_view intent = "PLAN") {
@@ -58,6 +73,7 @@ int dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, std::str
             {"instruction", task.instruction}, {"privacy", dag.value("privacy", false)},
             {"airgap_mode", dag.value("airgap_mode", false)},
         }, parent_id);
+        message["memory_context"] = dag.value("memory_context", ark::Json::array());
         if (!dependencies.empty()) {
             message["memory_context"].push_back({{"tier", "dependencies"}, {"data", dependencies}});
         }
@@ -110,6 +126,8 @@ int main(int argc, char** argv) {
                      "       ark-cpp classify|plan|run <goal>\n"
                      "       ark-cpp dispatch < dag.json\n"
                      "       ark-cpp audit|episodes\n"
+                     "       ark-cpp memory <query>\n"
+                     "       ark-cpp skill-add < skill.json\n"
                      "Research without an instruction reads an ARKMessage from stdin.\n";
         return argc < 2 ? 2 : 0;
     }
@@ -139,6 +157,21 @@ int main(int argc, char** argv) {
             std::cout << entries.dump(2) << '\n';
             return 0;
         }
+        if (command == "memory" && argc == 3) {
+            std::cout << recall(config(false), argv[2]).dump(2) << '\n';
+            return 0;
+        }
+        if (command == "skill-add" && argc == 2) {
+            const auto input = ark::Json::parse(std::cin);
+            const auto settings = config(false);
+            ark::CurlTransport http;
+            ark::Embeddings encoder(std::ref(http), settings.ollama_url, settings.embedding_model);
+            ark::ProceduralMemory skills(skills_path(), std::move(encoder));
+            const auto id = skills.add(input.at("intent").get<std::string>(), input.at("description").get<std::string>(),
+                                       input.at("steps"), input.value("source", "manual"));
+            std::cout << skills.get(id).dump(2) << '\n';
+            return 0;
+        }
         if ((command == "classify" || command == "plan" || command == "run") && argc == 3) {
             const auto settings = config();
             ark::CurlTransport http;
@@ -155,7 +188,10 @@ int main(int argc, char** argv) {
             if (intent != "RESEARCH" && intent != "SEARCH") {
                 throw std::invalid_argument("No native worker available for intent " + intent);
             }
-            return dispatch(planner.plan(argv[2], {"research_agent"}), settings, intent);
+            const auto context = recall(settings, argv[2]);
+            auto dag = planner.plan(argv[2], {"research_agent"}, context);
+            dag["memory_context"] = context;
+            return dispatch(dag, settings, intent);
         }
         std::cerr << "Invalid command or arguments. See ark-cpp --help.\n";
         return 2;

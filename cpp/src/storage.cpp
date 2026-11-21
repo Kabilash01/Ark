@@ -1,9 +1,12 @@
 #include "ark/storage.hpp"
+#include "ark/vector_memory.hpp"
 
 #include <hiredis/hiredis.h>
 #include <sqlite3.h>
 
+#include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <ctime>
 #include <iomanip>
 #include <mutex>
@@ -105,6 +108,23 @@ void bind_text(sqlite3* db, sqlite3_stmt* statement, int index, const std::strin
 std::string sqlite_text(sqlite3_stmt* statement, int column) {
     const auto* text = sqlite3_column_text(statement, column);
     return text ? std::string(reinterpret_cast<const char*>(text), sqlite3_column_bytes(statement, column)) : "";
+}
+
+using Database = std::unique_ptr<sqlite3, decltype(&sqlite3_close)>;
+
+Database open_database(const std::filesystem::path& db) {
+    if (!db.parent_path().empty()) {
+        std::filesystem::create_directories(db.parent_path());
+    }
+    sqlite3* connection = nullptr;
+    const int result = sqlite3_open(db.string().c_str(), &connection);
+    Database result_connection(connection, sqlite3_close);
+    if (!connection) {
+        throw std::runtime_error("SQLite failed to allocate a connection");
+    }
+    sqlite_check(result, connection);
+    sqlite_check(sqlite3_busy_timeout(connection, 5000), connection);
+    return result_connection;
 }
 
 } // namespace
@@ -375,17 +395,8 @@ struct EpisodicMemory::Impl {
 };
 
 EpisodicMemory::EpisodicMemory(const std::filesystem::path& db) : impl_(std::make_unique<Impl>()) {
-    if (!db.parent_path().empty()) {
-        std::filesystem::create_directories(db.parent_path());
-    }
-    sqlite3* connection = nullptr;
-    const int result = sqlite3_open(db.string().c_str(), &connection);
-    impl_->connection.reset(connection);
-    if (!connection) {
-        throw std::runtime_error("SQLite failed to allocate a connection");
-    }
-    sqlite_check(result, connection);
-    sqlite_check(sqlite3_busy_timeout(connection, 5000), connection);
+    impl_->connection = open_database(db);
+    auto* connection = impl_->connection.get();
     constexpr auto sql = R"sql(
         CREATE TABLE IF NOT EXISTS episodes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -465,6 +476,181 @@ Json EpisodicMemory::by_time(std::string_view start, std::string_view end, int l
 }
 Json EpisodicMemory::search(std::string_view keyword, int limit) {
     return query("summary LIKE ?", {"%" + std::string(keyword) + "%"}, limit);
+}
+
+namespace {
+
+constexpr auto skill_fields = "id,intent,description,steps,success_rate,use_count,last_used,source";
+
+Json skill(sqlite3_stmt* statement) {
+    return {
+        {"skill_id", sqlite_text(statement, 0)}, {"intent", sqlite_text(statement, 1)},
+        {"description", sqlite_text(statement, 2)}, {"steps", Json::parse(sqlite_text(statement, 3))},
+        {"success_rate", sqlite3_column_double(statement, 4)}, {"use_count", sqlite3_column_int64(statement, 5)},
+        {"last_used", sqlite3_column_type(statement, 6) == SQLITE_NULL ? Json(nullptr) : Json(sqlite_text(statement, 6))},
+        {"source", sqlite_text(statement, 7)},
+    };
+}
+
+std::vector<float> normalized(const Embeddings& embeddings, std::string_view text) {
+    auto vector = embeddings.encode({std::string(text)}).at(0);
+    double squares = 0.0;
+    for (const float value : vector) {
+        squares += static_cast<double>(value) * value;
+    }
+    if (squares <= 0.0 || !std::isfinite(squares)) {
+        throw std::runtime_error("Skill embedding has invalid magnitude");
+    }
+    const auto length = std::sqrt(squares);
+    for (auto& value : vector) {
+        value = static_cast<float>(value / length);
+    }
+    return vector;
+}
+
+} // namespace
+
+struct ProceduralMemory::Impl {
+    explicit Impl(const std::filesystem::path& path) : db(open_database(path)) {}
+    Database db;
+    std::mutex mutex;
+};
+
+ProceduralMemory::ProceduralMemory(const std::filesystem::path& path, Embeddings encoder)
+    : impl_(std::make_unique<Impl>(path)), encoder_(std::move(encoder)) {
+    constexpr auto schema = R"sql(
+        CREATE TABLE IF NOT EXISTS skills (
+            id TEXT PRIMARY KEY, model TEXT NOT NULL, intent TEXT NOT NULL, description TEXT NOT NULL,
+            steps TEXT NOT NULL, success_rate REAL NOT NULL DEFAULT 0.5, use_count INTEGER NOT NULL DEFAULT 0,
+            last_used TEXT, source TEXT NOT NULL, vector BLOB NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS skills_model ON skills (model);
+    )sql";
+    auto* db = impl_->db.get();
+    sqlite_check(sqlite3_exec(db, schema, nullptr, nullptr, nullptr), db);
+}
+
+ProceduralMemory::~ProceduralMemory() = default;
+
+std::string ProceduralMemory::add(std::string_view intent, std::string_view description, const Json& steps,
+                                  std::string_view source) {
+    if (intent.empty() || description.empty() || !steps.is_array()
+        || !std::all_of(steps.begin(), steps.end(), [](const Json& step) { return step.is_string(); })) {
+        throw std::invalid_argument("Skill requires intent, description, and a list of step strings");
+    }
+    const auto vector = normalized(encoder_, description);
+    const auto id = random_uuid();
+    const std::lock_guard lock(impl_->mutex);
+    auto* db = impl_->db.get();
+    auto statement = prepare(db, "INSERT INTO skills (id,model,intent,description,steps,source,vector) "
+                                 "VALUES (?,?,?,?,?,?,?)");
+    bind_text(db, statement.get(), 1, id);
+    bind_text(db, statement.get(), 2, encoder_.model());
+    bind_text(db, statement.get(), 3, std::string(intent));
+    bind_text(db, statement.get(), 4, std::string(description));
+    bind_text(db, statement.get(), 5, steps.dump());
+    bind_text(db, statement.get(), 6, std::string(source));
+    sqlite_check(sqlite3_bind_blob64(statement.get(), 7, vector.data(), vector.size() * sizeof(float), SQLITE_TRANSIENT), db);
+    sqlite_check(sqlite3_step(statement.get()), db);
+    return id;
+}
+
+Json ProceduralMemory::get(std::string_view id) {
+    const std::lock_guard lock(impl_->mutex);
+    auto* db = impl_->db.get();
+    auto statement = prepare(db, std::string("SELECT ") + skill_fields + " FROM skills WHERE id = ? AND model = ?");
+    bind_text(db, statement.get(), 1, std::string(id));
+    bind_text(db, statement.get(), 2, encoder_.model());
+    const auto result = sqlite3_step(statement.get());
+    sqlite_check(result, db);
+    return result == SQLITE_ROW ? skill(statement.get()) : Json(nullptr);
+}
+
+Json ProceduralMemory::all() {
+    const std::lock_guard lock(impl_->mutex);
+    auto* db = impl_->db.get();
+    auto statement = prepare(db, std::string("SELECT ") + skill_fields + " FROM skills WHERE model = ? ORDER BY rowid");
+    bind_text(db, statement.get(), 1, encoder_.model());
+    auto entries = Json::array();
+    for (int result; (result = sqlite3_step(statement.get())) != SQLITE_DONE;) {
+        sqlite_check(result, db);
+        entries.push_back(skill(statement.get()));
+    }
+    return entries;
+}
+
+Json ProceduralMemory::retrieve(std::string_view query, std::size_t top_k, std::size_t candidate_pool) {
+    if (!top_k || !candidate_pool) {
+        return Json::array();
+    }
+    auto* db = impl_->db.get();
+    {
+        const std::lock_guard lock(impl_->mutex);
+        auto exists = prepare(db, "SELECT 1 FROM skills WHERE model = ? LIMIT 1");
+        bind_text(db, exists.get(), 1, encoder_.model());
+        const auto row = sqlite3_step(exists.get());
+        sqlite_check(row, db);
+        if (row == SQLITE_DONE) {
+            return Json::array();
+        }
+    }
+    const auto query_vector = normalized(encoder_, query);
+    std::vector<float> candidate(query_vector.size());
+
+    struct Match { double cosine; Json entry; };
+    const auto higher = [](const Match& left, const Match& right) { return left.cosine > right.cosine; };
+    std::vector<Match> matches;
+    {
+        const std::lock_guard lock(impl_->mutex);
+        auto statement = prepare(db, std::string("SELECT ") + skill_fields + ",vector FROM skills WHERE model = ?");
+        bind_text(db, statement.get(), 1, encoder_.model());
+        for (int result; (result = sqlite3_step(statement.get())) != SQLITE_DONE;) {
+            sqlite_check(result, db);
+            const auto bytes = candidate.size() * sizeof(float);
+            if (static_cast<std::size_t>(sqlite3_column_bytes(statement.get(), 8)) != bytes) {
+                throw std::runtime_error("Procedural memory embedding dimension changed");
+            }
+            std::memcpy(candidate.data(), sqlite3_column_blob(statement.get(), 8), bytes);
+            double cosine = 0.0;
+            for (std::size_t i = 0; i < candidate.size(); ++i) {
+                cosine += static_cast<double>(query_vector[i]) * candidate[i];
+            }
+            if (matches.size() < candidate_pool) {
+                matches.push_back({cosine, skill(statement.get())});
+                std::push_heap(matches.begin(), matches.end(), higher);
+            } else if (cosine > matches.front().cosine) {
+                std::pop_heap(matches.begin(), matches.end(), higher);
+                matches.back() = {cosine, skill(statement.get())};
+                std::push_heap(matches.begin(), matches.end(), higher);
+            }
+        }
+    }
+    for (auto& match : matches) {
+        match.cosine *= match.entry.at("success_rate").get<double>();
+    }
+    std::sort(matches.begin(), matches.end(), higher);
+    auto results = Json::array();
+    for (std::size_t i = 0; i < std::min(top_k, matches.size()); ++i) {
+        results.push_back(std::move(matches[i].entry));
+    }
+    return results;
+}
+
+Json ProceduralMemory::record_use(std::string_view id, bool success) {
+    {
+        const std::lock_guard lock(impl_->mutex);
+        auto* db = impl_->db.get();
+        auto statement = prepare(db, R"sql(
+            UPDATE skills SET success_rate = (success_rate * use_count + ?) / (use_count + 1),
+            use_count = use_count + 1, last_used = ? WHERE id = ? AND model = ?
+        )sql");
+        sqlite_check(sqlite3_bind_double(statement.get(), 1, success ? 1.0 : 0.0), db);
+        bind_text(db, statement.get(), 2, utc_timestamp());
+        bind_text(db, statement.get(), 3, std::string(id));
+        bind_text(db, statement.get(), 4, encoder_.model());
+        sqlite_check(sqlite3_step(statement.get()), db);
+    }
+    return get(id);
 }
 
 } // namespace ark

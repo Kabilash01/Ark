@@ -42,6 +42,14 @@ episode rows use the existing Python key and column formats. The storage tests
 always exercise SQLite restart persistence. Set `ARK_TEST_REDIS_PORT` to the
 port of a Redis instance dedicated to tests to include live Redis checks.
 
+`ark-cpp memory <query>` retrieves relevant abstracts and procedures. Use
+`ark-cpp skill-add < skill.json` with an `intent`, a `description`, and a
+`steps` string array. `ARK_PROCEDURAL_DB` selects the native skill database.
+The native store uses an exact cosine scan with a bounded candidate heap and
+weights the candidates by their success rate. SQLite keeps each skill and its
+vector in one transaction. The previous Python FAISS index needs a re-embedding
+step to migrate because the native runtime uses the Ollama encoder.
+
 `ARK_MODEL` overrides the general model from the active model file.
 `ARK_CONFIG_DIR`, `ARK_OLLAMA_URL`, `ARK_QDRANT_URL`, and
 `ARK_EMBEDDING_MODEL` override the config directory, loopback service addresses,
@@ -77,7 +85,6 @@ The same topic also passed through `ark-cpp run` from classification and
 planning to the cited research result.
 
 The native router currently runs the Research Agent. The Redis bus, registry,
-working memory, and SQLite episodic memory have native implementations. The
-procedural tier, general semantic retrieval, API, and milestones beyond Day 23
-still need native implementations before the Python reference can be retired.
-The current worker uses abstracts and metadata.
+and all four memory tiers have native implementations. The API and milestones
+beyond Day 23 still need native implementations before the Python reference can
+be retired. The current worker uses abstracts and metadata.

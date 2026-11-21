@@ -36,7 +36,8 @@ public:
     Planner(Transport transport, std::string local_url, std::string model);
 
     std::string classify(std::string_view goal) const;
-    Json plan(std::string_view goal, const std::vector<std::string>& agents) const;
+    Json plan(std::string_view goal, const std::vector<std::string>& agents,
+              const Json& context = Json::array()) const;
 
 private:
     Transport transport_;
