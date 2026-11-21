@@ -1,3 +1,4 @@
+#include "ark/coding.hpp"
 #include "ark/kernel.hpp"
 #include "ark/research.hpp"
 #include "ark/runtime_files.hpp"
@@ -19,14 +20,21 @@ std::string env(const char* name, std::string fallback = "") {
     return value && *value ? value : std::move(fallback);
 }
 
+std::filesystem::path config_dir() { return env("ARK_CONFIG_DIR", "config"); }
+
+std::string configured_model(const char* override, const char* role) {
+    const auto selected = env(override);
+    return selected.empty()
+        ? ark::read_json(config_dir() / "active-models.json").at("models").at(role).get<std::string>()
+        : selected;
+}
+
 ark::ResearchConfig config(bool chat_required = true) {
     ark::ResearchConfig config;
-    const std::filesystem::path dir = env("ARK_CONFIG_DIR", "config");
-    config.model = env("ARK_MODEL");
-    if (config.model.empty() && chat_required) {
-        config.model = ark::read_json(dir / "active-models.json").at("models").at("general").get<std::string>();
+    if (chat_required) {
+        config.model = configured_model("ARK_MODEL", "general");
     }
-    const auto privacy = dir / "privacy_config.json";
+    const auto privacy = config_dir() / "privacy_config.json";
     if (std::filesystem::exists(privacy)) {
         config.privacy = ark::read_json(privacy);
     }
@@ -40,7 +48,7 @@ ark::ResearchConfig config(bool chat_required = true) {
 std::filesystem::path skills_path() { return env("ARK_PROCEDURAL_DB", "data/procedural_cpp.db"); }
 
 int choose_models(const char* override_vram) {
-    const std::filesystem::path dir = env("ARK_CONFIG_DIR", "config");
+    const auto dir = config_dir();
     double vram = 0;
     if (override_vram) {
         std::size_t end = 0;
@@ -82,6 +90,14 @@ int run_sandbox() {
     return output.exit_code == 0 ? 0 : output.timed_out ? 124 : 1;
 }
 
+ark::Json run_coding(ark::CurlTransport& http, const ark::ResearchConfig& settings, ark::Json message) {
+    const ark::DockerSandbox sandbox(std::ref(http), env("ARK_DOCKER_SOCKET", "/var/run/docker.sock"),
+                                     env("ARK_SANDBOX_IMAGE", "python:3.11-slim"));
+    const ark::CodingAgent worker(std::ref(http), settings.ollama_url, configured_model("ARK_CODE_MODEL", "code"),
+                                  [&](const auto& workspace) { return sandbox.run_tests(workspace); });
+    return worker.run(std::move(message));
+}
+
 ark::Json recall(const ark::ResearchConfig& settings, std::string_view goal) {
     ark::CurlTransport http;
     const ark::Embeddings encoder(std::ref(http), settings.ollama_url, settings.embedding_model);
@@ -115,13 +131,16 @@ int dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, std::str
         if (registry.get("research_agent").is_null()) {
             registry.add("research_agent", {"RESEARCH", "SEARCH"}, settings.model, "1.0.0");
         }
+        if (registry.get("coding_agent").is_null()) {
+            const auto model = env("ARK_CODE_MODEL", "active-models.json:code");
+            registry.add("coding_agent", {"CODE"}, model, "1.0.0");
+        }
     }
     if (!episode_path.empty()) {
         episodes = std::make_unique<ark::EpisodicMemory>(episode_path);
     }
     const auto results = ark::dispatch_plan(dag, [&](const ark::Task& task, const ark::Json& dependencies) {
         ark::CurlTransport http;
-        ark::ResearchAgent agent(std::ref(http), settings);
         auto message = ark::make_message("router", task.agent, task.intent, {
             {"instruction", task.instruction}, {"privacy", dag.value("privacy", false)},
             {"airgap_mode", dag.value("airgap_mode", false)},
@@ -135,7 +154,9 @@ int dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, std::str
             ark::MessageBus(worker_bus).log({{"event", "worker_start"}, {"task_id", message.at("task_id")},
                                             {"parent_task_id", parent_id}, {"agent", task.agent}});
         }
-        auto result = agent.run(std::move(message));
+        auto result = task.agent == "coding_agent"
+            ? run_coding(http, settings, std::move(message))
+            : ark::ResearchAgent(std::ref(http), settings).run(std::move(message));
         {
             const std::lock_guard lock(state_mutex);
             last = {{"agent", task.agent}, {"task", task.id}, {"version", result.at("agent_version")}};
@@ -156,7 +177,7 @@ int dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, std::str
         }
         return result;
     }, [&](std::string_view name) {
-        if (name != "research_agent") {
+        if (name != "research_agent" && name != "coding_agent") {
             return false;
         }
         if (!redis) {
@@ -186,6 +207,7 @@ int dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, std::str
 int main(int argc, char** argv) {
     if (argc < 2 || std::string_view(argv[1]) == "--help") {
         std::cout << "Usage: ark-cpp research [instruction]\n"
+                     "       ark-cpp code [instruction]\n"
                      "       ark-cpp models [vram-gib]\n"
                      "       ark-cpp classify|plan|run <goal>\n"
                      "       ark-cpp dispatch < dag.json\n"
@@ -211,6 +233,15 @@ int main(int argc, char** argv) {
             ark::CurlTransport http;
             ark::ResearchAgent agent(std::ref(http), config());
             const auto result = agent.run(std::move(message));
+            std::cout << result.dump(2) << '\n';
+            return result.at("status") == "DONE" ? 0 : 1;
+        }
+        if (command == "code" && argc <= 3) {
+            auto message = argc == 3
+                ? ark::make_message("user", "coding_agent", "CODE", {{"instruction", argv[2]}})
+                : ark::Json::parse(std::cin);
+            ark::CurlTransport http;
+            const auto result = run_coding(http, config(false), std::move(message));
             std::cout << result.dump(2) << '\n';
             return result.at("status") == "DONE" ? 0 : 1;
         }
@@ -256,11 +287,11 @@ int main(int argc, char** argv) {
                 return 0;
             }
             const auto intent = planner.classify(argv[2]);
-            if (intent != "RESEARCH" && intent != "SEARCH") {
+            if (intent != "RESEARCH" && intent != "SEARCH" && intent != "CODE") {
                 throw std::invalid_argument("No native worker available for intent " + intent);
             }
             const auto context = recall(settings, argv[2]);
-            auto dag = planner.plan(argv[2], {"research_agent"}, context);
+            auto dag = planner.plan(argv[2], {"research_agent", "coding_agent"}, context);
             dag["goal"] = argv[2];
             dag["memory_context"] = context;
             return dispatch(dag, settings, intent);

@@ -76,7 +76,7 @@ BROWSE (use a specific website), SECURITY (defensive code audit), VISION (analyz
 
 constexpr std::string_view planner =
     R"(Build a directed acyclic task plan for the supplied goal. Use only the provided available_agents.
-The only task intents are RESEARCH or SEARCH for research_agent, CODE or EXECUTE for coding_agent,
+The only task intents are RESEARCH or SEARCH for research_agent, CODE for coding_agent,
 EVALUATE for evaluation_agent, and STORE or SEARCH for memory_agent. Include synthesis in a RESEARCH task.
 Return JSON with a tasks array. Each task has string fields
 task_id, agent, intent, instruction, and arrays depends_on and parallel_with containing task IDs.

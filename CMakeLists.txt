@@ -25,6 +25,7 @@ if(NOT nlohmann_json_FOUND)
 endif()
 
 add_library(ark_native
+    cpp/src/coding.cpp
     cpp/src/http.cpp
     cpp/src/kernel.cpp
     cpp/src/message.cpp
@@ -63,4 +64,7 @@ if(BUILD_TESTING)
     add_executable(ark_sandbox_tests cpp/tests/sandbox_test.cpp)
     target_link_libraries(ark_sandbox_tests PRIVATE ark_native)
     add_test(NAME ark_sandbox_tests COMMAND ark_sandbox_tests)
+    add_executable(ark_coding_tests cpp/tests/coding_test.cpp)
+    target_link_libraries(ark_coding_tests PRIVATE ark_native)
+    add_test(NAME ark_coding_tests COMMAND ark_coding_tests)
 endif()

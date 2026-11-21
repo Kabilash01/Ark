@@ -88,9 +88,9 @@ run with arXiv, Qwen3-4B, BGE, and Qdrant returned a structured summary citing
 The same topic also passed through `ark-cpp run` from classification and
 planning to the cited research result.
 
-The native router currently runs the Research Agent. The Redis bus, registry,
+The native router currently runs the Research and Coding Agents. The Redis bus, registry,
 and all four memory tiers have native implementations. The API and milestones
-beyond Day 24 still need native implementations before the Python reference can
+beyond Day 25 still need native implementations before the Python reference can
 be retired. The research worker uses abstracts and metadata.
 
 ## Day 24 sandbox
@@ -111,3 +111,13 @@ Use `ARK_SANDBOX_IMAGE` to select a prepared image and `ARK_DOCKER_SOCKET`
 for a different local socket. Package requirements use only wheels bundled
 under `/wheels` in the image. Set `ARK_TEST_DOCKER_SOCKET` when running CTest to
 verify the real timeout, host filesystem isolation, and unittest execution.
+
+## Day 25 coding
+
+`ark-cpp code <instruction>` uses the local coding model from the active models
+file. Override it with `ARK_CODE_MODEL`. The worker returns Python source and
+unittest files in its ARKMessage. Run `ark-cpp code < message.json` to supply
+trusted `payload.test_files`. Those files stay fixed throughout the repair
+loop. The C++ worker sends actual Docker test output back to the model and
+attempts at most three repairs. The Docker integration test injects a subtraction
+bug, observes the failed test, and verifies that the repair passes the same test.
