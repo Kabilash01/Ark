@@ -29,7 +29,7 @@ Json dispatch_plan(const Json& dag, const TaskHandler& execute,
                    const AgentAvailable& available, std::size_t max_workers = 4);
 
 std::string chat_local(const Transport& transport, std::string_view url, std::string_view model,
-                       std::string_view prompt, std::string_view content, bool json_format);
+                       std::string_view prompt, std::string_view content, const Json& format = "json");
 
 class Planner {
 public:

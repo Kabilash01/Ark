@@ -80,14 +80,24 @@ Json EvaluationAgent::run(Json message) const {
         const bool sandbox_evidence = !payload.contains("artifact") && type == "code"
             && artifact.is_object() && artifact.contains("passed")
             && artifact.contains("test_result");
+        auto properties = Json::object();
+        auto required = Json::array();
         for (const auto& [key, weight] : found->second) {
             if (!sandbox_evidence || (key != "tests_pass" && key != "syntax")) {
                 criteria.push_back({{"name", key}, {"weight", weight}});
+                properties[key] = {{"type", "number"}, {"minimum", 0}, {"maximum", 1}};
+                required.push_back(key);
             }
         }
+        const Json score_format{{"type", "object"}, {"additionalProperties", false},
+            {"required", {"scores", "feedback"}}, {"properties", {
+                {"scores", {{"type", "object"}, {"additionalProperties", false},
+                            {"properties", std::move(properties)}, {"required", std::move(required)}}},
+                {"feedback", {{"type", "string"}}},
+            }}};
         const auto input = Json{{"instruction", payload.value("instruction", "Evaluate the artifact")},
                                 {"type", type}, {"criteria", criteria}, {"artifact", std::move(artifact)}};
-        const auto judged = Json::parse(chat_local(transport_, url_, model_, prompt, input.dump(), true));
+        const auto judged = Json::parse(chat_local(transport_, url_, model_, prompt, input.dump(), score_format));
         const auto& judged_scores = judged.at("scores");
         auto scores = Json::object();
         double total = 0;

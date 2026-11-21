@@ -23,14 +23,17 @@ void check(bool condition, std::string_view reason) {
 ark::Response model(const ark::Request& request, int& calls, bool repair) {
     const auto body = Json::parse(request.body);
     check(body.at("model") == "fixture-coder", "wrong configured coder");
+    check(body.at("format").at("required").at(1) == "source" && body.at("think") == false,
+          "missing structured response and bounded model options");
     const auto input = Json::parse(body.at("messages").at(1).at("content").get<std::string>());
     if (calls > 0) {
+        check(!body.at("format").at("properties").contains("test_source"), "repairs should not generate tests");
         check(input.at("locked_tests").at("test_solution.py") == tests, "repair changed original tests");
         check(input.at("test_result").at("exit_code") == 1, "missing failure diagnostics");
     }
-    const Json output{{"files", {{"solution.py", (calls++ > 0 && repair) ? good_solution : bad_solution},
-                                 {"test_solution.py", "untrusted duplicate"}}},
-                      {"tests", {{"test_solution.py", calls == 1 ? tests : "weakened test"}}}};
+    const bool first = calls++ == 0;
+    const Json output{{"filename", "solution"}, {"source", (!first && repair) ? good_solution : bad_solution},
+                      {"test_source", first ? tests : "weakened test"}};
     return {200, Json{{"message", {{"content", output.dump()}}}}.dump()};
 }
 

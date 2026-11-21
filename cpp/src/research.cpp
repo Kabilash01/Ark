@@ -222,7 +222,7 @@ Json ResearchAgent::run(Json message) {
 
 Json ResearchAgent::chat(std::string_view prompt, const std::string& content) {
     const auto output = Json::parse(chat_local(transport_, config_.ollama_url, config_.model,
-                                               prompt, content, true));
+                                               prompt, content));
     if (!output.is_object()) {
         throw std::runtime_error("Local model must return a JSON object");
     }
@@ -274,14 +274,6 @@ Json ResearchAgent::run_research(const Json& payload) {
     if (instruction.empty()) {
         throw std::invalid_argument("ResearchAgent requires payload.instruction or payload.query");
     }
-    if (!payload.contains("query") || payload.at("query").is_null()) {
-        query = string_field(chat(query_prompt, instruction), "query");
-    }
-    if (query.empty() || query.size() > 512) {
-        throw std::invalid_argument("Research queries must contain 1 to 512 bytes");
-    }
-
-    const auto search = read_arxiv("search_query=" + url_encode(query) + "&max_results=5&start=0&sortBy=relevance");
     std::vector<std::string> requested;
     const auto add_id = [&requested](const std::string& id) {
         if (requested.size() < max_papers && valid_arxiv_id(id)
@@ -289,8 +281,24 @@ Json ResearchAgent::run_research(const Json& payload) {
             requested.push_back(id);
         }
     };
-    for (const auto& paper : search) {
-        add_id(paper.at("arxiv_id").get<std::string>());
+    if (!payload.contains("query") || payload.at("query").is_null()) {
+        static const std::regex explicit_paper(
+            R"((?:arxiv\s*:\s*|https?://arxiv\.org/abs/)((?:[0-9]{4}\.[0-9]{4,5}|[a-zA-Z.-]+/[0-9]{7})(?:v[0-9]+)?))",
+            std::regex::icase);
+        for (std::sregex_iterator match(instruction.begin(), instruction.end(), explicit_paper), end;
+             match != end; ++match) {
+            add_id((*match)[1]);
+        }
+        query = requested.empty() ? string_field(chat(query_prompt, instruction), "query") : "arXiv:" + requested.front();
+    }
+    if (query.empty() || query.size() > 512) {
+        throw std::invalid_argument("Research queries must contain 1 to 512 bytes");
+    }
+    if (requested.empty()) {
+        const auto search = read_arxiv("search_query=" + url_encode(query) + "&max_results=5&start=0&sortBy=relevance");
+        for (const auto& paper : search) {
+            add_id(paper.at("arxiv_id").get<std::string>());
+        }
     }
     if (requested.empty() && (!private_mode || allows(config_.privacy, "api.semanticscholar.org"))) {
         static const std::regex operators(R"(\b[a-z]+:|\b(?:AND|OR|NOT)\b|["()])");

@@ -71,6 +71,9 @@ void trusts_docker_results_for_code() {
     ark::EvaluationAgent evaluator([](const ark::Request& request) {
         const auto input = request_input(request);
         check(input.at("criteria").size() == 2, "judge should only score style and security after real tests");
+        const auto format = Json::parse(request.body).at("format");
+        check(format.at("properties").at("scores").at("required") == Json::array({"style", "security"}),
+              "judge response must require both criteria");
         return judgment({{"tests_pass", 0.0}, {"syntax", 0.0}, {"style", 0.5}, {"security", 0.5}});
     }, "http://localhost:11434", "test-judge");
     auto message = ark::make_message("router", "evaluation_agent", "EVALUATE", {{"instruction", "Score code"}});

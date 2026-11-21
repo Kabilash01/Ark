@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.24)
 project(ark_os_cpp VERSION 0.1.0 LANGUAGES CXX)
 
 include(CTest)
+option(ARK_ENABLE_LIVE_MVP "Run the full ARK MVP against local services and arXiv" OFF)
 include(FetchContent)
 find_package(CURL 7.85 REQUIRED)
 find_package(LibXml2 REQUIRED)
@@ -15,6 +16,16 @@ if(TARGET SQLite3::SQLite3)
 else()
     set(ARK_SQLITE_TARGET SQLite::SQLite3)
 endif()
+
+set(HTTPLIB_USE_OPENSSL_IF_AVAILABLE OFF CACHE BOOL "" FORCE)
+set(HTTPLIB_USE_ZLIB_IF_AVAILABLE OFF CACHE BOOL "" FORCE)
+set(HTTPLIB_USE_ZSTD_IF_AVAILABLE OFF CACHE BOOL "" FORCE)
+set(HTTPLIB_USE_BROTLI_IF_AVAILABLE OFF CACHE BOOL "" FORCE)
+set(HTTPLIB_INSTALL OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(httplib
+    URL https://codeload.github.com/yhirose/cpp-httplib/tar.gz/refs/tags/v0.67.0
+    URL_HASH SHA256=be711ddaf7a3655d8f23aa5655709250b24d247aedd4b2629989d18b6164e5be)
+FetchContent_MakeAvailable(httplib)
 find_package(nlohmann_json 3.12 QUIET)
 if(NOT nlohmann_json_FOUND)
     set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
@@ -42,8 +53,11 @@ target_link_libraries(ark_native PUBLIC nlohmann_json::nlohmann_json
     ${ARK_SQLITE_TARGET} PkgConfig::HIREDIS)
 set_target_properties(ark_native PROPERTIES CXX_EXTENSIONS OFF)
 
+add_library(ark_api STATIC cpp/src/api_server.cpp)
+target_link_libraries(ark_api PUBLIC ark_native PRIVATE httplib::httplib)
+
 add_executable(ark-cpp cpp/src/main.cpp)
-target_link_libraries(ark-cpp PRIVATE ark_native)
+target_link_libraries(ark-cpp PRIVATE ark_api)
 install(TARGETS ark-cpp RUNTIME DESTINATION bin)
 
 if(BUILD_TESTING)
@@ -71,4 +85,14 @@ if(BUILD_TESTING)
     add_executable(ark_evaluation_tests cpp/tests/evaluation_test.cpp)
     target_link_libraries(ark_evaluation_tests PRIVATE ark_native)
     add_test(NAME ark_evaluation_tests COMMAND ark_evaluation_tests)
+    add_executable(ark_api_tests cpp/tests/api_test.cpp)
+    target_link_libraries(ark_api_tests PRIVATE ark_api httplib::httplib)
+    add_test(NAME ark_api_tests COMMAND ark_api_tests)
+    set_tests_properties(ark_api_tests PROPERTIES TIMEOUT 15)
+    if(ARK_ENABLE_LIVE_MVP)
+        add_test(NAME ark_live_mvp COMMAND ${CMAKE_COMMAND}
+            -Dark=$<TARGET_FILE:ark-cpp> -Dsource_dir=${CMAKE_SOURCE_DIR}
+            -P ${CMAKE_SOURCE_DIR}/cpp/tests/mvp_live.cmake)
+        set_tests_properties(ark_live_mvp PROPERTIES TIMEOUT 330 LABELS live)
+    endif()
 endif()

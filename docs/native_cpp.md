@@ -8,7 +8,7 @@ can be checked against the same tasks during the transition.
 Install a C++20 compiler, CMake 3.24 or newer, pkg-config, and the development
 packages for libcurl (7.85+), libxml2, OpenSSL, SQLite, and hiredis. CMake uses
 system nlohmann/json when available and otherwise downloads the pinned release
-archive.
+archive. The API uses a pinned cpp-httplib release.
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -88,10 +88,9 @@ run with arXiv, Qwen3-4B, BGE, and Qdrant returned a structured summary citing
 The same topic also passed through `ark-cpp run` from classification and
 planning to the cited research result.
 
-The native router runs the Research, Coding, and Evaluation Agents. The Redis bus, registry,
-and all four memory tiers have native implementations. The API and milestones
-beyond Day 26 still need native implementations before the Python reference can
-be retired. The research worker uses abstracts and metadata.
+The native router runs the Research, Coding, and Evaluation Agents. The Redis
+bus, registry, all four memory tiers, and the REST and WebSocket API have
+native implementations. The research worker uses abstracts and metadata.
 
 ## Day 24 sandbox
 
@@ -134,3 +133,41 @@ pass with a warning. `ark-cpp run` adds an evaluation task to the plan.
 For a standalone evaluation, submit an ARKMessage with receiver
 `evaluation_agent`, intent `EVALUATE`, and an `artifact` and `output_type` in
 the payload via `ark-cpp evaluate < message.json`.
+
+## Native REST and WebSocket API
+
+Start the server with `build/ark-cpp serve 8000`. It binds to loopback and
+uses the same workflow as `ark-cpp run`. Redis and the episodic SQLite store
+are enabled by default for API jobs. Set `ARK_REDIS_PORT`, `ARK_REDIS_DB`,
+or `ARK_EPISODIC_DB` to select local storage. Task responses stay in the
+server's in-memory history. Persistent outcomes remain in the memory stores.
+
+```bash
+curl http://127.0.0.1:8000/task -H 'Content-Type: application/json' \\
+  -d '{"goal":"Summarize arXiv:1706.03762","privacy":true}'
+```
+
+Poll `GET /task/{task_id}` or subscribe to `/ws` for task events. The API
+also exposes agent records, version history, all four memory tiers, and
+privacy settings. `DELETE /task/{task_id}` cancels a queued job. A running
+job stays in the workflow until it reaches a terminal result. Set `test_files`
+in the request body to give coding jobs a fixed set of tests.
+
+## Day 27 live verification
+
+Build with `-DARK_ENABLE_LIVE_MVP=ON`, then run the `live` label with local
+Ollama, Qdrant, Docker, and a Redis instance dedicated to testing. The test
+uses Redis database 15 and writes inspectable artifacts under `build/mvp-*`.
+Set `ARK_MODEL` and `ARK_CODE_MODEL` to installed models and set
+`ARK_REDIS_PORT` to the test instance's port.
+
+```bash
+cmake -S . -B build -DARK_ENABLE_LIVE_MVP=ON
+cmake --build build --parallel
+ARK_REDIS_PORT=16379 ctest --test-dir build -L live --output-on-failure
+```
+
+The guided Fibonacci scenario names arXiv paper 1803.07199 and supplies the
+fast-doubling recurrence and a fixed contract suite. The runtime still
+classifies, builds the DAG, reads the paper, writes code, evaluates it, and
+persists the outcome. A second test suite runs independently in Docker.

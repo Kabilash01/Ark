@@ -93,8 +93,12 @@ void model_plans_are_validated() {
     ark::Planner planner([&](const ark::Request& request) {
         check(request.url == "http://localhost:11434/api/chat", "unexpected model URL");
         const auto body = Json::parse(request.body);
-        check(body.at("model") == "local-test" && body.at("format") == "json", "wrong model configuration");
+        check(body.at("model") == "local-test", "wrong model configuration");
         const auto input = body.at("messages").at(1).at("content").get<std::string>();
+        if (input != "goal") {
+            check(body.at("format").at("properties").at("tasks").at("items").at("properties").at("agent").at("enum")
+                      == Json::array({"research_agent"}), "planner must constrain models to available agents");
+        }
         const Json response = input == "goal"
             ? Json{{"intent", "RESEARCH"}}
             : Json{{"tasks", {task("t1", Json::array(), available ? "research_agent" : "memory_agent")}}};

@@ -153,6 +153,16 @@ void fallback() {
     check(services.calls.at(1) == "scholar" && services.memory.size() == 1, "Scholar fallback was not used");
 }
 
+void explicit_paper_bypasses_search() {
+    Services services;
+    services.discovery = Services::Discovery::Scholar;
+    ark::ResearchAgent agent(std::ref(services), config());
+    const auto result = agent.run(request({{"instruction", "Summarize arXiv:1706.03762"}}));
+    check(result.at("status") == "DONE", result.dump());
+    check(services.calls == std::vector<std::string>{"fetch", "embed", "upsert", "synthesis"},
+          "explicit paper ID should skip discovery requests");
+}
+
 void blocks_disallowed_network() {
     auto settings = config();
     settings.privacy["airgap_mode"] = true;
@@ -203,6 +213,7 @@ int main() {
     try {
         native_workflow();
         fallback();
+        explicit_paper_bypasses_search();
         blocks_disallowed_network();
         rejects_untrusted_responses();
     } catch (const std::exception& error) {
