@@ -76,8 +76,9 @@ BROWSE (use a specific website), SECURITY (defensive code audit), VISION (analyz
 
 constexpr std::string_view planner =
     R"(Build a directed acyclic task plan for the supplied goal. Use only the provided available_agents.
-research_agent handles RESEARCH and SEARCH. coding_agent implements code. evaluation_agent scores results.
-memory_agent stores or retrieves results. Return JSON with a tasks array. Each task has string fields
+The only task intents are RESEARCH or SEARCH for research_agent, CODE or EXECUTE for coding_agent,
+EVALUATE for evaluation_agent, and STORE or SEARCH for memory_agent. Include synthesis in a RESEARCH task.
+Return JSON with a tasks array. Each task has string fields
 task_id, agent, intent, instruction, and arrays depends_on and parallel_with containing task IDs.
 Define each dependency explicitly. Use short, unique IDs such as t1, t2. Keep simple goals to one task.)";
 
@@ -100,7 +101,8 @@ std::vector<TaskLayer> order_tasks(const Json& dag) {
             throw std::invalid_argument("Duplicate task ID " + task.id);
         }
         if (!contains(workers, task.agent) || !contains(intents, task.intent)) {
-            throw std::invalid_argument("Unknown worker or intent for task " + task.id);
+            throw std::invalid_argument("Unknown worker or intent for task " + task.id + ": "
+                                        + task.agent + " / " + task.intent);
         }
         (void)ids(raw, "parallel_with");
         tasks.push_back(std::move(task));

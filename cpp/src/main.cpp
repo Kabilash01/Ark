@@ -1,10 +1,12 @@
 #include "ark/kernel.hpp"
 #include "ark/research.hpp"
+#include "ark/storage.hpp"
 
 #include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <memory>
 
 namespace {
 
@@ -33,22 +35,69 @@ ark::ResearchConfig config() {
 
 int dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, std::string_view intent = "PLAN") {
     const auto parent = ark::make_message("user", "supervisor_agent", intent, ark::Json::object());
+    const auto& parent_id = parent.at("task_id").get_ref<const std::string&>();
+    const auto redis_port = env("ARK_REDIS_PORT");
+    const auto episode_path = env("ARK_EPISODIC_DB");
+    std::unique_ptr<ark::Redis> redis;
+    std::unique_ptr<ark::EpisodicMemory> episodes;
+    if (!redis_port.empty()) {
+        redis = std::make_unique<ark::Redis>(std::stoi(redis_port));
+        ark::MessageBus(*redis).log({{"event", "dispatch_start"}, {"task_id", parent_id}});
+        ark::AgentRegistry registry(*redis);
+        if (registry.get("research_agent").is_null()) {
+            registry.add("research_agent", {"RESEARCH", "SEARCH"}, settings.model, "1.0.0");
+        }
+    }
+    if (!episode_path.empty()) {
+        episodes = std::make_unique<ark::EpisodicMemory>(episode_path);
+    }
     const auto results = ark::dispatch_plan(dag, [&](const ark::Task& task, const ark::Json& dependencies) {
         ark::CurlTransport http;
         ark::ResearchAgent agent(std::ref(http), settings);
         auto message = ark::make_message("router", task.agent, task.intent, {
             {"instruction", task.instruction}, {"privacy", dag.value("privacy", false)},
             {"airgap_mode", dag.value("airgap_mode", false)},
-        }, parent.at("task_id").get_ref<const std::string&>());
+        }, parent_id);
         if (!dependencies.empty()) {
             message["memory_context"].push_back({{"tier", "dependencies"}, {"data", dependencies}});
         }
-        return agent.run(std::move(message));
-    }, [](std::string_view name) { return name == "research_agent"; });
+        if (!redis_port.empty()) {
+            ark::Redis worker_bus(std::stoi(redis_port));
+            ark::MessageBus(worker_bus).log({{"event", "worker_start"}, {"task_id", message.at("task_id")},
+                                            {"parent_task_id", parent_id}, {"agent", task.agent}});
+        }
+        auto result = agent.run(std::move(message));
+        if (episodes) {
+            const auto& output = result.at("output");
+            episodes->log({
+                {"task_id", result.at("task_id")}, {"agent_name", task.agent},
+                {"agent_version", result.at("agent_version")}, {"intent", task.intent},
+                {"summary", output.value("summary", output.value("error_message", std::string{}))},
+                {"quality_score", result.at("quality_score") == -1.0 ? ark::Json(nullptr) : result.at("quality_score")},
+                {"metadata", {{"parent_task_id", parent_id}, {"status", result.at("status")}}},
+            });
+        }
+        return result;
+    }, [&](std::string_view name) {
+        if (name != "research_agent") {
+            return false;
+        }
+        if (!redis) {
+            return true;
+        }
+        auto registry = ark::AgentRegistry(*redis);
+        const auto record = registry.get(name);
+        return !record.is_null() && record.at("status") != "OFFLINE" && registry.heartbeat(name);
+    });
     const bool done = std::all_of(results.begin(), results.end(), [](const auto& result) {
         return result.at("status") == "DONE";
     });
-    std::cout << ark::Json{{"task_id", parent.at("task_id")}, {"intent", intent},
+    if (redis) {
+        ark::WorkingMemory(*redis).set(parent_id, "results", results);
+        ark::MessageBus(*redis).log({{"event", "dispatch_done"}, {"task_id", parent_id},
+                                     {"status", done ? "DONE" : "FAILED"}});
+    }
+    std::cout << ark::Json{{"task_id", parent_id}, {"intent", intent},
                            {"status", done ? "DONE" : "FAILED"}, {"dag", dag}, {"results", results}}.dump(2) << '\n';
     return done ? 0 : 1;
 }
@@ -60,6 +109,7 @@ int main(int argc, char** argv) {
         std::cout << "Usage: ark-cpp research [instruction]\n"
                      "       ark-cpp classify|plan|run <goal>\n"
                      "       ark-cpp dispatch < dag.json\n"
+                     "       ark-cpp audit|episodes\n"
                      "Research without an instruction reads an ARKMessage from stdin.\n";
         return argc < 2 ? 2 : 0;
     }
@@ -77,6 +127,17 @@ int main(int argc, char** argv) {
         }
         if (command == "dispatch" && argc == 2) {
             return dispatch(ark::Json::parse(std::cin), config());
+        }
+        if (command == "audit" && argc == 2) {
+            ark::Redis redis(std::stoi(env("ARK_REDIS_PORT", "6379")));
+            std::cout << ark::MessageBus(redis).audit().dump(2) << '\n';
+            return 0;
+        }
+        if (command == "episodes" && argc == 2) {
+            const std::filesystem::path path = env("ARK_EPISODIC_DB", "data/episodic_memory.db");
+            const auto entries = std::filesystem::exists(path) ? ark::EpisodicMemory(path).recent() : ark::Json::array();
+            std::cout << entries.dump(2) << '\n';
+            return 0;
         }
         if ((command == "classify" || command == "plan" || command == "run") && argc == 3) {
             const auto settings = config();

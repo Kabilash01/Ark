@@ -5,9 +5,10 @@ can be checked against the same tasks during the transition.
 
 ## Build and run
 
-Install a C++20 compiler, CMake 3.24 or newer, and the development packages for
-libcurl, libxml2, and OpenSSL. CMake uses system nlohmann/json when available and
-otherwise downloads the pinned release archive.
+Install a C++20 compiler, CMake 3.24 or newer, pkg-config, and the development
+packages for libcurl (7.85+), libxml2, OpenSSL, SQLite, and hiredis. CMake uses
+system nlohmann/json when available and otherwise downloads the pinned release
+archive.
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -33,6 +34,13 @@ Use `ark-cpp classify <goal>` to inspect the local Supervisor's intent and
 classifies, plans, and dispatches research goals. `ark-cpp dispatch < dag.json`
 also accepts a saved plan. The router derives parallel batches from the
 dependency edges and skips tasks whose prerequisites failed.
+
+Set `ARK_REDIS_PORT` and `ARK_EPISODIC_DB` to persist native run metadata to
+Redis and SQLite. Run `ark-cpp audit` and `ark-cpp episodes` with the same
+settings to inspect it. Native working memory, pub/sub, registry hashes, and
+episode rows use the existing Python key and column formats. The storage tests
+always exercise SQLite restart persistence. Set `ARK_TEST_REDIS_PORT` to the
+port of a Redis instance dedicated to tests to include live Redis checks.
 
 `ARK_MODEL` overrides the general model from the active model file.
 `ARK_CONFIG_DIR`, `ARK_OLLAMA_URL`, `ARK_QDRANT_URL`, and
@@ -68,7 +76,8 @@ run with arXiv, Qwen3-4B, BGE, and Qdrant returned a structured summary citing
 The same topic also passed through `ark-cpp run` from classification and
 planning to the cited research result.
 
-The native router currently runs the Research Agent. The other memory tiers,
-message bus, registry, API, and guide milestones beyond Day 23 still need
-native implementations before the Python reference can be retired. The
-current worker uses abstracts and metadata.
+The native router currently runs the Research Agent. The Redis bus, registry,
+working memory, and SQLite episodic memory have native implementations. The
+procedural tier, general semantic retrieval, API, and milestones beyond Day 23
+still need native implementations before the Python reference can be retired.
+The current worker uses abstracts and metadata.
