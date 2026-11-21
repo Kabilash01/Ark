@@ -1,5 +1,6 @@
 #include "ark/kernel.hpp"
 #include "ark/research.hpp"
+#include "ark/runtime_files.hpp"
 #include "ark/storage.hpp"
 #include "ark/vector_memory.hpp"
 
@@ -8,6 +9,7 @@
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#include <mutex>
 
 namespace {
 
@@ -36,6 +38,25 @@ ark::ResearchConfig config(bool chat_required = true) {
 
 std::filesystem::path skills_path() { return env("ARK_PROCEDURAL_DB", "data/procedural_cpp.db"); }
 
+int choose_models(const char* override_vram) {
+    const std::filesystem::path dir = env("ARK_CONFIG_DIR", "config");
+    double vram = 0;
+    if (override_vram) {
+        std::size_t end = 0;
+        const std::string value = override_vram;
+        vram = std::stod(value, &end);
+        if (end != value.size()) {
+            throw std::invalid_argument("VRAM override must be a number in GiB");
+        }
+    } else {
+        vram = ark::detect_vram_gib();
+    }
+    const auto selected = ark::pick_models(ark::read_json(dir / "model-library.json"), vram, ark::detect_ram_gib());
+    ark::write_json(dir / "active-models.json", selected);
+    std::cout << selected.dump(2) << '\n';
+    return 0;
+}
+
 ark::Json recall(const ark::ResearchConfig& settings, std::string_view goal) {
     ark::CurlTransport http;
     const ark::Embeddings encoder(std::ref(http), settings.ollama_url, settings.embedding_model);
@@ -53,6 +74,13 @@ int dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, std::str
     const auto& parent_id = parent.at("task_id").get_ref<const std::string&>();
     const auto redis_port = env("ARK_REDIS_PORT");
     const auto episode_path = env("ARK_EPISODIC_DB");
+    const std::filesystem::path state_path = env("ARK_STATE_PATH", "STATE.md");
+    const auto goal = dag.value("goal", "Saved task plan");
+    const bool private_mode = dag.value("privacy", false) || dag.value("airgap_mode", false)
+        || settings.privacy.value("privacy_mode", false) || settings.privacy.value("airgap_mode", false);
+    std::mutex state_mutex;
+    int completed = 0;
+    auto last = ark::Json::object();
     std::unique_ptr<ark::Redis> redis;
     std::unique_ptr<ark::EpisodicMemory> episodes;
     if (!redis_port.empty()) {
@@ -83,6 +111,14 @@ int dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, std::str
                                             {"parent_task_id", parent_id}, {"agent", task.agent}});
         }
         auto result = agent.run(std::move(message));
+        {
+            const std::lock_guard lock(state_mutex);
+            last = {{"agent", task.agent}, {"task", task.id}, {"version", result.at("agent_version")}};
+            if (result.at("quality_score") != -1.0) {
+                last["score"] = result.at("quality_score");
+            }
+            ark::write_state(state_path, goal, parent_id, "RUNNING", private_mode, ++completed, last);
+        }
         if (episodes) {
             const auto& output = result.at("output");
             episodes->log({
@@ -108,6 +144,8 @@ int dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, std::str
     const bool done = std::all_of(results.begin(), results.end(), [](const auto& result) {
         return result.at("status") == "DONE";
     });
+    ark::write_state(state_path, goal, parent_id, done ? "DONE" : "FAILED", private_mode,
+                     static_cast<int>(results.size()), last);
     if (redis) {
         ark::WorkingMemory(*redis).set(parent_id, "results", results);
         ark::MessageBus(*redis).log({{"event", "dispatch_done"}, {"task_id", parent_id},
@@ -123,6 +161,7 @@ int dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, std::str
 int main(int argc, char** argv) {
     if (argc < 2 || std::string_view(argv[1]) == "--help") {
         std::cout << "Usage: ark-cpp research [instruction]\n"
+                     "       ark-cpp models [vram-gib]\n"
                      "       ark-cpp classify|plan|run <goal>\n"
                      "       ark-cpp dispatch < dag.json\n"
                      "       ark-cpp audit|episodes\n"
@@ -133,6 +172,9 @@ int main(int argc, char** argv) {
     }
     try {
         const std::string_view command = argv[1];
+        if (command == "models" && argc <= 3) {
+            return choose_models(argc == 3 ? argv[2] : nullptr);
+        }
         if (command == "research" && argc <= 3) {
             auto message = argc == 3
                 ? ark::make_message("user", "research_agent", "RESEARCH", {{"instruction", argv[2]}})
@@ -190,6 +232,7 @@ int main(int argc, char** argv) {
             }
             const auto context = recall(settings, argv[2]);
             auto dag = planner.plan(argv[2], {"research_agent"}, context);
+            dag["goal"] = argv[2];
             dag["memory_context"] = context;
             return dispatch(dag, settings, intent);
         }

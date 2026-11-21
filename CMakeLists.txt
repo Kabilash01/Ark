@@ -29,6 +29,7 @@ add_library(ark_native
     cpp/src/kernel.cpp
     cpp/src/message.cpp
     cpp/src/research.cpp
+    cpp/src/runtime_files.cpp
     cpp/src/storage.cpp
     cpp/src/vector_memory.cpp)
 target_compile_features(ark_native PUBLIC cxx_std_20)
@@ -55,4 +56,7 @@ if(BUILD_TESTING)
     add_executable(ark_vector_memory_tests cpp/tests/vector_memory_test.cpp)
     target_link_libraries(ark_vector_memory_tests PRIVATE ark_native)
     add_test(NAME ark_vector_memory_tests COMMAND ark_vector_memory_tests)
+    add_executable(ark_runtime_files_tests cpp/tests/runtime_files_test.cpp)
+    target_link_libraries(ark_runtime_files_tests PRIVATE ark_native)
+    add_test(NAME ark_runtime_files_tests COMMAND ark_runtime_files_tests)
 endif()

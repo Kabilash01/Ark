@@ -11,3 +11,4 @@ config/active-models.json
 data/
 
 /build/
+/STATE.md

@@ -16,8 +16,10 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
+Run `build/ark-cpp models` to select a hardware tier and write
+`config/active-models.json`. An optional GiB argument overrides VRAM detection.
 For research, run Ollama locally with cloud features disabled, pull the model
-from `config/active-models.json` and `bge-large:latest`, and start Qdrant on the
+from the active model file and `bge-large:latest`, and start Qdrant on the
 loopback interface. The C++ process does not load a Python interpreter.
 
 ```bash
@@ -34,6 +36,8 @@ Use `ark-cpp classify <goal>` to inspect the local Supervisor's intent and
 classifies, plans, and dispatches research goals. `ark-cpp dispatch < dag.json`
 also accepts a saved plan. The router derives parallel batches from the
 dependency edges and skips tasks whose prerequisites failed.
+The dispatcher refreshes `STATE.md` after each worker finishes. Use
+`ARK_STATE_PATH` to select a different snapshot file.
 
 Set `ARK_REDIS_PORT` and `ARK_EPISODIC_DB` to persist native run metadata to
 Redis and SQLite. Run `ark-cpp audit` and `ark-cpp episodes` with the same
