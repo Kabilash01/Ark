@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 import pytest
 from qdrant_client import QdrantClient
 
@@ -20,6 +22,16 @@ def test_store_and_count(sm):
     sm.store("Transformers use self-attention to process sequences.")
     sm.store("Convolutional networks use spatial filters.")
     assert sm.count() == 2
+
+
+def test_store_with_same_point_id_replaces_the_existing_record(sm):
+    point_id = str(uuid4())
+    sm.store("First abstract", metadata={"source": "arxiv"}, point_id=point_id)
+    updated_id = sm.store("Updated abstract", metadata={"source": "arxiv"}, point_id=point_id)
+
+    assert updated_id == point_id
+    assert sm.count() == 1
+    assert sm.retrieve_by_metadata({"source": "arxiv"})[0]["text"] == "Updated abstract"
 
 
 def test_semantic_similarity_retrieval(sm):

@@ -33,8 +33,10 @@ class SemanticMemory:
                 vectors_config=VectorParams(size=EMBEDDING_DIM, distance=Distance.COSINE),
             )
 
-    def store(self, text: str, metadata: dict[str, Any] | None = None) -> str:
-        point_id = str(uuid.uuid4())
+    def store(self, text: str, metadata: dict[str, Any] | None = None, *, point_id: str | None = None) -> str:
+        """Store a vector, optionally replacing a record with a stable UUID."""
+        if point_id is None:
+            point_id = str(uuid.uuid4())
         vector = self._encoder.encode(text).tolist()
         payload = {"text": text, **(metadata or {})}
         self._client.upsert(

@@ -36,7 +36,7 @@ class MemoryAgent:
         if memory_type == "episodic":
             return self.episodic.log(**kwargs)  # task_id, agent_name, agent_version, intent, summary, ...
         if memory_type == "semantic":
-            return self.semantic.store(**kwargs)  # text, metadata=
+            return self.semantic.store(**kwargs)  # text, metadata=, point_id=
         if memory_type == "procedural":
             return self.procedural.add_skill(**kwargs)  # intent, description, steps, source=
         raise ValueError(f"unknown memory_type: {memory_type}")

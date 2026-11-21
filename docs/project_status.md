@@ -10,7 +10,7 @@ sequence is defined by `Implementation Guide/ARK_OS_Daily_Build_Plan.md`.
 | Week 1 foundation | Hardware/model selection, Docker configuration, frozen ARKMessage schema, BaseAgent, Redis registry and messaging | Fresh service-level verification on this machine |
 | Week 2 memory | Working (Redis), episodic (SQLite), semantic (Qdrant), procedural (FAISS/JSON), unified MemoryAgent | Fresh persistence/integration verification |
 | Week 3 kernel | Supervisor classification, Planner DAG validation, context injection, STATE.md writer, topological dispatch, heartbeat monitor | LangGraph still contains only a stub node; real worker execution is not integrated |
-| Week 4 workers | Day 22 research tools added in this change | Research Agent, Docker code tools, Coding Agent/self-repair, Evaluation Agent, full MVP loop |
+| Week 4 workers | Day 22 research tools and Day 23 Research Agent | Docker code tools, Coding Agent/self-repair, Evaluation Agent, full MVP loop |
 | Early Day 36 API | REST task lifecycle, registry endpoints, privacy config, WebSocket events | Task store is in-memory; submitted tasks remain pending; memory endpoints return placeholders; API is not wired to kernel |
 | Later phases | Package/directory placeholders | Dashboard, ARKBench, additional workers, SAGE, citation graph, conflict resolution, deployment |
 
@@ -62,9 +62,31 @@ Full-suite collection was attempted but blocked by missing `qdrant_client`,
 and the complete integration suite have not been revalidated. Pytest also emits
 an existing unset asyncio fixture-loop-scope warning.
 
-## Next deliverable
+## Day 23 Research Agent
 
-Day 23: implement ResearchAgent using active local-model configuration and the
-search → fetch → embed → MemoryAgent semantic store → synthesis pipeline. Return
-structured summaries with arXiv citations. Preserve the frozen ARKMessage schema.
-Then proceed to Days 24–27 in order before reconnecting the early API scaffold.
+`ResearchAgent` accepts a planner `instruction` or an explicit arXiv `query` in
+an ARKMessage payload. It uses `models.general` from `config/active-models.json`
+for local query generation and synthesis. On an empty arXiv search it can use
+Semantic Scholar to discover papers with arXiv IDs. It fetches up to five
+abstracts and stores them through `MemoryAgent` before synthesis. A stable ID per
+arXiv version keeps repeated searches from duplicating those records.
+
+The result contains a `summary`, `findings` with source IDs, and `citations` built
+from fetched metadata. The worker rejects out-of-set citation IDs. Privacy mode
+honors the configured literature-service allowlist, and airgap mode rejects
+external research before sending requests. The worker handles abstracts and
+metadata. Full-text reading and factual evaluation remain separate work.
+
+Hardware detection selected T2 with `qwen2.5:7b`. The live research smoke test
+used a temporary active-model config, a cached local Qwen3-4B model, and the
+project's BGE encoder. It returned a structured summary citing `1706.03762v7`
+and verified that the paper abstract was written to and retrieved from Qdrant.
+Running the same search twice kept the collection at five unique abstracts.
+
+After installing the vector dependencies and preparing temporary local Redis
+and Qdrant instances, the regression run passed 171 tests. It deselected 18
+hosted-model cases and 3 Supervisor cases that require `qwen2.5:7b`. The run
+included the memory persistence tests and the stable record ID test.
+
+Day 24 covers the Docker code execution sandbox. The guide then sequences the
+Coding and Evaluation Agents before the Day 27 MVP integration test.
