@@ -15,6 +15,7 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <thread>
 
 namespace {
 
@@ -131,6 +132,27 @@ ark::Json recall(const ark::ResearchConfig& settings, std::string_view goal) {
     return ark::memory_context("", goal, nullptr, semantic, skills.get());
 }
 
+void record_escalations(std::string_view task_id, const ark::Json& reports,
+                        ark::EpisodicMemory* episodes = nullptr, ark::Redis* redis = nullptr) {
+    if (reports.empty()) {
+        return;
+    }
+    std::unique_ptr<ark::EpisodicMemory> fallback;
+    if (!episodes) {
+        fallback = std::make_unique<ark::EpisodicMemory>(env("ARK_EPISODIC_DB", "data/episodic_memory.db"));
+        episodes = fallback.get();
+    }
+    for (const auto& report : reports) {
+        episodes->log({{"task_id", task_id}, {"agent_name", "supervisor_agent"},
+                       {"agent_version", "supervisor_agent@1.0.0"}, {"intent", "SUPERVISE"},
+                       {"summary", "Escalation: " + report.at("detail").get<std::string>()},
+                       {"metadata", {{"event", "task_escalated"}, {"report", report}}}});
+        if (redis) {
+            ark::MessageBus(*redis).log({{"event", "task_escalated"}, {"task_id", task_id}, {"report", report}});
+        }
+    }
+}
+
 ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, std::string_view intent = "PLAN",
                    std::string parent_id = {}) {
     const bool via_api = !parent_id.empty();
@@ -168,7 +190,8 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     if (!episode_path.empty()) {
         episodes = std::make_unique<ark::EpisodicMemory>(episode_path);
     }
-    const auto results = ark::dispatch_plan(dag, [&](const ark::Task& task, const ark::Json& dependencies) {
+    const auto [results, escalations] = ark::supervise_plan(dag, [&](const ark::Task& task, const ark::Json& dependencies,
+                                                                   int attempt, const ark::Json& feedback) {
         ark::CurlTransport http;
         auto message = ark::make_message("router", task.agent, task.intent, {
             {"instruction", task.instruction}, {"goal", goal}, {"privacy", dag.value("privacy", false)},
@@ -178,15 +201,22 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         if (!dependencies.empty()) {
             message["memory_context"].push_back({{"tier", "dependencies"}, {"data", dependencies}});
         }
+        message["retry_count"] = attempt - 1;
+        if (feedback.contains("review")) {
+            message["payload"]["review_feedback"] = feedback.at("review");
+        }
         if (!redis_port.empty()) {
             ark::Redis worker_bus(std::stoi(redis_port), redis_db);
             ark::MessageBus(worker_bus).log({{"event", "worker_start"}, {"task_id", message.at("task_id")},
-                                            {"parent_task_id", parent_id}, {"agent", task.agent}});
+                                            {"parent_task_id", parent_id}, {"agent", task.agent},
+                                            {"plan_task_id", task.id}, {"attempt", attempt}});
         }
         ark::Json result;
         if (task.agent == "coding_agent") {
             if (dag.contains("coding_test_files")) {
                 message["payload"]["test_files"] = dag.at("coding_test_files");
+            } else if (feedback.contains("tests")) {
+                message["payload"]["test_files"] = feedback.at("tests");
             }
             result = run_coding(http, settings, std::move(message));
         } else if (task.agent == "evaluation_agent") {
@@ -195,6 +225,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         } else {
             result = ark::ResearchAgent(std::ref(http), settings).run(std::move(message));
         }
+        result["retry_count"] = attempt - 1;
         {
             const std::lock_guard lock(state_mutex);
             last = {{"agent", task.agent}, {"task", task.id}, {"version", result.at("agent_version")}};
@@ -210,7 +241,8 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
                 {"agent_version", result.at("agent_version")}, {"intent", task.intent},
                 {"summary", output.value("summary", output.value("error_message", std::string{}))},
                 {"quality_score", result.at("quality_score") == -1.0 ? ark::Json(nullptr) : result.at("quality_score")},
-                {"metadata", {{"parent_task_id", parent_id}, {"status", result.at("status")}}},
+                {"metadata", {{"parent_task_id", parent_id}, {"status", result.at("status")},
+                              {"plan_task_id", task.id}, {"attempt", attempt}}},
             });
         }
         return result;
@@ -225,6 +257,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         const auto record = registry.get(name);
         return !record.is_null() && record.at("status") != "OFFLINE" && registry.heartbeat(name);
     });
+    record_escalations(parent_id, escalations, episodes.get(), redis.get());
     const bool done = std::all_of(results.begin(), results.end(), [](const auto& result) {
         return result.at("status") == "DONE";
     });
@@ -243,7 +276,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
                                      {"status", done ? "DONE" : "FAILED"}});
     }
     return {{"task_id", parent_id}, {"intent", intent}, {"status", done ? "DONE" : "FAILED"},
-            {"dag", dag}, {"results", results}, {"quality_score", quality}};
+            {"dag", dag}, {"results", results}, {"quality_score", quality}, {"escalations", escalations}};
 }
 
 ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, const ark::Json& trusted_tests,
@@ -253,19 +286,42 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
     }
     ark::CurlTransport http;
     const ark::Planner planner(std::ref(http), settings.ollama_url, settings.model);
-    const auto intent = planner.classify(goal);
-    if (intent != "RESEARCH" && intent != "SEARCH" && intent != "CODE") {
-        throw std::invalid_argument("No native worker available for intent " + intent);
-    }
-    const auto context = recall(settings, goal);
     auto lower_goal = std::string(goal);
     std::transform(lower_goal.begin(), lower_goal.end(), lower_goal.begin(),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     const bool explicit_research = lower_goal.starts_with("research ") || lower_goal.find("arxiv:") != std::string::npos;
-    const auto agents = intent == "CODE" && !explicit_research ? std::vector<std::string>{"coding_agent"}
-        : intent == "SEARCH" ? std::vector<std::string>{"research_agent"}
-        : std::vector<std::string>{"research_agent", "coding_agent"};
-    auto dag = planner.plan(goal, agents, context);
+    std::string intent = "SUPERVISE";
+    ark::Json dag;
+    for (int attempt = 1; ; ++attempt) {
+        try {
+            intent = planner.classify(goal);
+            if (intent != "RESEARCH" && intent != "SEARCH" && intent != "CODE") {
+                throw std::invalid_argument("No native worker available for intent " + intent);
+            }
+            const auto agents = intent == "CODE" && !explicit_research ? std::vector<std::string>{"coding_agent"}
+                : intent == "SEARCH" ? std::vector<std::string>{"research_agent"}
+                : std::vector<std::string>{"research_agent", "coding_agent"};
+            auto context = recall(settings, goal);
+            dag = planner.plan(goal, agents, context);
+            dag["memory_context"] = std::move(context);
+            break;
+        } catch (const std::exception& error) {
+            const bool retryable = dynamic_cast<const ark::TransientHttpError*>(&error) != nullptr;
+            if (retryable && attempt < ark::supervisor_attempt_limit) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(200 * attempt));
+                continue;
+            }
+            if (task_id.empty()) {
+                task_id = ark::make_message("user", "supervisor_agent", "SUPERVISE", ark::Json::object())
+                    .at("task_id").get<std::string>();
+            }
+            const auto reports = ark::Json::array({{{"plan_task_id", "planning"}, {"agent", "supervisor_agent"},
+                {"attempts", attempt}, {"last_status", retryable ? "RETRY" : "FAILED"}, {"detail", error.what()}}});
+            record_escalations(task_id, reports);
+            return {{"task_id", task_id}, {"intent", intent}, {"status", "FAILED"},
+                    {"results", ark::Json::object()}, {"quality_score", nullptr}, {"escalations", reports}};
+        }
+    }
     ensure_evaluation(dag);
     dag["goal"] = goal;
     dag["privacy"] = privacy;
@@ -273,7 +329,6 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
     if (!trusted_tests.empty()) {
         dag["coding_test_files"] = trusted_tests;
     }
-    dag["memory_context"] = context;
     return dispatch(dag, settings, intent, std::move(task_id));
 }
 

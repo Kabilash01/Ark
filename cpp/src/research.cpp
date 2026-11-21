@@ -212,7 +212,7 @@ Json ResearchAgent::run(Json message) {
         message["output"] = run_research(message["payload"]);
         message["status"] = "DONE";
     } catch (const std::exception& error) {
-        message["status"] = "FAILED";
+        message["status"] = dynamic_cast<const TransientHttpError*>(&error) ? "RETRY" : "FAILED";
         message["output"] = {{"error_type", "ResearchError"}, {"error_message", error.what()},
                              {"agent", agent_name}, {"agent_version", version}};
         message["quality_score"] = 0.0;
@@ -345,9 +345,11 @@ Json ResearchAgent::run_research(const Json& payload) {
         throw std::runtime_error("No arXiv papers with abstracts found for the query");
     }
     persist(sources);
-    return validate_summary(query, chat(synthesis_prompt, Json{
-        {"instruction", instruction}, {"papers", sources}
-    }.dump()), citations);
+    Json synthesis{{"instruction", instruction}, {"papers", sources}};
+    if (payload.contains("review_feedback")) {
+        synthesis["review_feedback"] = payload.at("review_feedback");
+    }
+    return validate_summary(query, chat(synthesis_prompt, synthesis.dump()), citations);
 }
 
 void ResearchAgent::persist(const Json& sources) {

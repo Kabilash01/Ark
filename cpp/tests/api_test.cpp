@@ -47,6 +47,9 @@ void test_api() {
                 privacy,
                 [&](const Json& task) -> Json {
                     gate.wait_for(3s);
+                    if (task.at("payload").at("goal") == "Exercise escalation") {
+                        return {{"status", "FAILED"}, {"escalations", {{{"plan_task_id", "t1"}, {"attempts", 3}}}}};
+                    }
                     return {{"status", "DONE"}, {"quality_score", 0.9}, {"goal", task.at("payload").at("goal")}};
                 },
                 [] { return Json::array({{{"name", "research_agent"}}}); },
@@ -95,6 +98,25 @@ void test_api() {
     }
     check(result.at("status") == "DONE" && result.at("quality_score") == 0.9, "job result was not published");
     check(body(api.Get("/tasks?limit=1")).size() == 1, "listing limit was ignored");
+
+    const auto failed = body(api.Post("/task", R"({"goal":"Exercise escalation"})", "application/json"));
+    const auto failed_id = failed.at("task_id").get<std::string>();
+    bool saw_report = false;
+    for (int i = 0; i < 8; ++i) {
+        check(static_cast<bool>(events.read(event)), "missing escalation events");
+        const auto notification = Json::parse(event);
+        if (notification.at("task_id") != failed_id) {
+            continue;
+        }
+        if (notification.at("event") == "task_escalated") {
+            saw_report = notification.at("report").at("attempts") == 3;
+        }
+        if (notification.at("event") == "task_finished") {
+            break;
+        }
+    }
+    check(saw_report && body(api.Get("/task/" + failed_id)).at("output").at("escalations").size() == 1,
+          "escalation must be visible over WebSocket and REST");
 
     auto config = body(api.Post("/config/privacy", R"({"privacy_mode":true,"airgap_mode":true})", "application/json"));
     check(config.at("airgap_mode") == true && config.at("allowed_external").size() == 1

@@ -38,7 +38,11 @@ struct CurlGlobal {
 
 void Response::require_success(std::string_view action) const {
     if (status < 200 || status >= 300) {
-        throw std::runtime_error(std::string(action) + " returned HTTP " + std::to_string(status));
+        const auto message = std::string(action) + " returned HTTP " + std::to_string(status);
+        if (status == 408 || status == 429 || status == 500 || status == 502 || status == 503 || status == 504) {
+            throw TransientHttpError(message);
+        }
+        throw std::runtime_error(message);
     }
 }
 
@@ -90,7 +94,12 @@ Response CurlTransport::operator()(const Request& request) {
         throw HttpTimeout("HTTP request timed out");
     }
     if (result != CURLE_OK) {
-        throw std::runtime_error(std::string("HTTP transport failed: ") + curl_easy_strerror(result));
+        const auto message = std::string("HTTP transport failed: ") + curl_easy_strerror(result);
+        if (result == CURLE_COULDNT_CONNECT || result == CURLE_COULDNT_RESOLVE_HOST
+            || result == CURLE_RECV_ERROR || result == CURLE_SEND_ERROR) {
+            throw TransientHttpError(message);
+        }
+        throw std::runtime_error(message);
     }
     curl_easy_getinfo(handle_, CURLINFO_RESPONSE_CODE, &response.status);
     return response;

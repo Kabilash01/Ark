@@ -1,6 +1,7 @@
 #include "ark/kernel.hpp"
 
 #include <chrono>
+#include <atomic>
 #include <condition_variable>
 #include <iostream>
 #include <mutex>
@@ -88,6 +89,61 @@ void skip_blocked_tasks() {
     check(result.at("independent").at("status") == "DONE", result.dump());
 }
 
+void retries_without_replaying_successful_tasks() {
+    const Json plan{{"tasks", {task("retry"), task("after", {"retry"}), task("independent")}}};
+    std::atomic<int> independent{0};
+    const auto run = ark::supervise_plan(plan, [&](const ark::Task& t, const Json& prior, int attempt, const Json&) {
+        if (t.id == "retry" && attempt < 3) {
+            throw ark::HttpTimeout("Temporary timeout");
+        }
+        if (t.id == "after") {
+            check(attempt == 1 && prior.at("retry").at("attempt") == 3, "dependent ran before recovery");
+        }
+        if (t.id == "independent") {
+            ++independent;
+        }
+        return Json{{"status", "DONE"}, {"attempt", attempt}};
+    }, [](std::string_view) { return true; });
+    check(run.escalations.empty() && run.results.at("after").at("status") == "DONE"
+          && independent == 1, run.results.dump());
+}
+
+void retries_the_graded_artifact_with_feedback() {
+    auto evaluation = task("grade", {"code", "source"}, "evaluation_agent");
+    evaluation["intent"] = "EVALUATE";
+    const Json plan{{"tasks", {task("source"), task("code", {"source"}, "coding_agent"), evaluation}}};
+    const auto run = ark::supervise_plan(plan, [&](const ark::Task& t, const Json& prior, int attempt, const Json& feedback) {
+        if (t.id == "source") {
+            check(attempt == 1, "source lookup should be retained");
+        } else if (t.id == "code" && attempt == 2) {
+            check(feedback.at("review") == "Make the output clearer" && feedback.at("tests") == Json{{"test.py", "fixed"}},
+                  "revision did not receive evaluator feedback and fixed tests");
+        } else if (t.id == "grade" && attempt == 1) {
+            return Json{{"status", "RETRY"}, {"output", {{"evaluated_task", "code"}, {"summary", "Make the output clearer"}}}};
+        } else if (t.id == "grade") {
+            check(prior.at("code").at("attempt") == 2, "evaluation repeated on the old artifact");
+        }
+        return Json{{"status", "DONE"}, {"attempt", attempt}, {"output", {{"tests", {{"test.py", "fixed"}}}}}};
+    }, [](std::string_view) { return true; });
+    check(run.results.at("grade").at("status") == "DONE" && run.escalations.empty(), run.results.dump());
+}
+
+void escalates_exhaustion_and_permanent_errors() {
+    const Json plan{{"tasks", {task("exhausted"), task("blocked", {"exhausted"}), task("permanent")}}};
+    const auto run = ark::supervise_plan(plan, [&](const ark::Task& t, const Json&, int attempt, const Json&) {
+        if (t.id == "permanent") {
+            check(attempt == 1, "permanent failure should not be retried");
+            return Json{{"status", "FAILED"}, {"reason", "Airgap blocks request"}};
+        }
+        check(t.id == "exhausted" && attempt <= 3, "unexpected attempt");
+        return Json{{"status", "RETRY"}, {"reason", "Unavailable"}};
+    }, [](std::string_view) { return true; });
+    check(run.escalations.size() == 2 && run.escalations.at(0).at("attempts") == 3
+          && run.escalations.at(1).at("attempts") == 1, run.escalations.dump());
+    check(run.results.at("exhausted").at("status") == "FAILED"
+          && run.results.at("blocked").at("status") == "SKIPPED", run.results.dump());
+}
+
 void model_plans_are_validated() {
     bool available = true;
     ark::Planner planner([&](const ark::Request& request) {
@@ -124,6 +180,9 @@ int main() {
         validate_graph();
         route_in_parallel();
         skip_blocked_tasks();
+        retries_without_replaying_successful_tasks();
+        retries_the_graded_artifact_with_feedback();
+        escalates_exhaustion_and_permanent_errors();
         model_plans_are_validated();
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

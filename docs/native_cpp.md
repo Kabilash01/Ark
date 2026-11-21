@@ -171,3 +171,21 @@ The guided Fibonacci scenario names arXiv paper 1803.07199 and supplies the
 fast-doubling recurrence and a fixed contract suite. The runtime still
 classifies, builds the DAG, reads the paper, writes code, evaluates it, and
 persists the outcome. A second test suite runs independently in Docker.
+
+## Day 29 retries and escalation
+
+The supervisor gives a dispatched plan three rounds, including the initial
+attempt. Goal preparation also gets three attempts for temporary service
+failures. During dispatch, temporary HTTP failures retry the affected worker and unblock its
+dependents when it succeeds. A low evaluation score sends the evaluator's
+feedback to the artifact's producer and reruns downstream tasks with the
+revised result. Completed independent work is reused. The coding worker
+keeps its fixed tests across a revision. Invalid inputs and privacy denials
+are terminal failures.
+
+The final result contains `escalations` for unresolved worker failures,
+including the plan task ID, attempt count, and last failure. The supervisor
+records the report in episodic SQLite. Dispatch also adds a Redis audit event
+when Redis is configured. The API emits `task_escalated` on `/ws` before
+`task_finished`. Routed ARKMessages count supervisor retries in
+`retry_count`. Coding's in-attempt repairs remain in `output.repairs`.

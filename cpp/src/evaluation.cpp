@@ -25,28 +25,34 @@ const std::map<std::string, Rubric> rubrics{
     {"general", {{"correctness", 0.50}, {"completeness", 0.30}, {"clarity", 0.20}}},
 };
 
-std::pair<std::string, Json> artifact_for(const Json& payload, const Json& memory) {
+struct Artifact {
+    std::string type;
+    Json output;
+    std::string task_id;
+};
+
+Artifact artifact_for(const Json& payload, const Json& memory) {
     if (payload.contains("artifact")) {
-        return {payload.value("output_type", "general"), payload.at("artifact")};
+        return {payload.value("output_type", "general"), payload.at("artifact"), {}};
     }
-    Json research;
+    Artifact research;
     for (const auto& tier : memory) {
         if (!tier.is_object() || tier.value("tier", "") != "dependencies") {
             continue;
         }
-        for (const auto& task : tier.at("data")) {
+        for (const auto& [id, task] : tier.at("data").items()) {
             if (task.is_object() && task.value("status", "") == "DONE" && task.contains("output")) {
                 if (task.value("intent", "") == "CODE") {
-                    return {"code", task.at("output")};
+                    return {"code", task.at("output"), id};
                 }
                 if ((task.value("intent", "") == "RESEARCH" || task.value("intent", "") == "SEARCH")) {
-                    research = task.at("output");
+                    research = {"research", task.at("output"), id};
                 }
             }
         }
     }
-    if (!research.is_null()) {
-        return {"research", research};
+    if (!research.task_id.empty()) {
+        return research;
     }
     throw std::invalid_argument("Evaluation requires an artifact or a completed worker dependency");
 }
@@ -71,7 +77,7 @@ Json EvaluationAgent::run(Json message) const {
         }
         message["status"] = "RUNNING";
         const auto& payload = message.at("payload");
-        auto [type, artifact] = artifact_for(payload, message.value("memory_context", Json::array()));
+        auto [type, artifact, evaluated_task] = artifact_for(payload, message.value("memory_context", Json::array()));
         const auto found = rubrics.find(type);
         if (found == rubrics.end()) {
             throw std::invalid_argument("Unsupported evaluation output type: " + type);
@@ -119,8 +125,11 @@ Json EvaluationAgent::run(Json message) const {
         message["status"] = score < 0.65 ? "RETRY" : "DONE";
         message["output"] = {{"output_type", type}, {"decision", decision}, {"scores", std::move(scores)},
                              {"summary", judged.at("feedback").get<std::string>()}};
+        if (!evaluated_task.empty()) {
+            message["output"]["evaluated_task"] = evaluated_task;
+        }
     } catch (const std::exception& error) {
-        message["status"] = "FAILED";
+        message["status"] = dynamic_cast<const TransientHttpError*>(&error) ? "RETRY" : "FAILED";
         message["quality_score"] = 0.0;
         message["output"] = {{"error_type", "EvaluationError"}, {"error_message", error.what()},
                              {"agent", name}, {"agent_version", version}};

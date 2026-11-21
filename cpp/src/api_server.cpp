@@ -94,8 +94,12 @@ public:
         while (socket.read(message)) {}
     }
 
-    void send(std::string_view event, std::string_view task_id) {
-        const auto message = Json{{"event", event}, {"task_id", task_id}, {"timestamp", utc_timestamp()}}.dump();
+    void send(std::string_view event, std::string_view task_id, const Json& report = nullptr) {
+        Json payload{{"event", event}, {"task_id", task_id}, {"timestamp", utc_timestamp()}};
+        if (!report.is_null()) {
+            payload["report"] = report;
+        }
+        const auto message = payload.dump();
         const std::lock_guard lock(mutex_);
         for (auto* socket : sockets_) {
             if (socket->is_open()) {
@@ -232,6 +236,7 @@ private:
             } catch (const std::exception& error) {
                 output = {{"status", "FAILED"}, {"error_message", error.what()}};
             }
+            const auto escalations = output.value("escalations", Json::array());
             {
                 const std::lock_guard lock(mutex_);
                 auto& stored = find(id);
@@ -240,6 +245,9 @@ private:
                     stored["quality_score"] = output.at("quality_score");
                 }
                 stored["output"] = std::move(output);
+            }
+            for (const auto& report : escalations) {
+                events_.send("task_escalated", id, report);
             }
             events_.send("task_finished", id);
         }

@@ -6,6 +6,8 @@
 #include <map>
 #include <set>
 #include <stdexcept>
+#include <thread>
+#include <utility>
 
 namespace ark {
 namespace {
@@ -63,6 +65,8 @@ Json execute_task(const TaskHandler& execute, const Task& task, const Json& inpu
             throw std::runtime_error("Worker must return an object with a status");
         }
         return result;
+    } catch (const TransientHttpError& error) {
+        return {{"status", "RETRY"}, {"reason", error.what()}};
     } catch (const std::exception& error) {
         return {{"status", "FAILED"}, {"reason", error.what()}};
     }
@@ -184,13 +188,12 @@ std::vector<TaskLayer> order_tasks(const Json& dag) {
     return layers;
 }
 
-Json dispatch_plan(const Json& dag, const TaskHandler& execute,
-                   const AgentAvailable& available, std::size_t max_workers) {
+static Json dispatch_layers(const std::vector<TaskLayer>& layers, const TaskHandler& execute,
+                            const AgentAvailable& available, std::size_t max_workers, Json results) {
     if (max_workers == 0 || !execute || !available) {
         throw std::invalid_argument("Router requires at least one worker and both callbacks");
     }
-    auto results = Json::object();
-    for (const auto& layer : order_tasks(dag)) {
+    for (const auto& layer : layers) {
         std::vector<std::pair<std::string, std::future<Json>>> pending;
         const auto collect = [&pending, &results] {
             for (auto& [id, future] : pending) {
@@ -199,6 +202,9 @@ Json dispatch_plan(const Json& dag, const TaskHandler& execute,
             pending.clear();
         };
         for (const auto& task : layer) {
+            if (results.contains(task.id)) {
+                continue;
+            }
             if (!available(task.agent)) {
                 results[task.id] = {{"status", "SKIPPED"}, {"reason", "agent " + task.agent + " is unavailable"}};
                 continue;
@@ -220,6 +226,103 @@ Json dispatch_plan(const Json& dag, const TaskHandler& execute,
         collect();
     }
     return results;
+}
+
+Json dispatch_plan(const Json& dag, const TaskHandler& execute,
+                   const AgentAvailable& available, std::size_t max_workers) {
+    return dispatch_layers(order_tasks(dag), execute, available, max_workers, Json::object());
+}
+
+SupervisedRun supervise_plan(const Json& dag, const AttemptHandler& execute,
+                             const AgentAvailable& available, std::size_t max_workers) {
+    if (!execute) {
+        throw std::invalid_argument("Supervisor requires an attempt handler");
+    }
+    const auto layers = order_tasks(dag);
+    std::map<std::string, int> counts;
+    for (const auto& layer : layers) {
+        for (const auto& task : layer) {
+            counts.emplace(task.id, 0);
+        }
+    }
+    auto retained = Json::object();
+    auto feedback = Json::object();
+    auto results = Json::object();
+    for (int round = 1; round <= supervisor_attempt_limit; ++round) {
+        results = dispatch_layers(layers, [&](const Task& task, const Json& dependencies) {
+            return execute(task, dependencies, std::as_const(counts).at(task.id) + 1,
+                           feedback.value(task.id, Json::object()));
+        }, available, max_workers, retained);
+
+        std::set<std::string> retry;
+        for (const auto& layer : layers) {
+            for (const auto& task : layer) {
+                const auto& result = results.at(task.id);
+                if (!retained.contains(task.id) && result.at("status") != "SKIPPED") {
+                    ++counts.at(task.id);
+                }
+                if (result.at("status") != "RETRY") {
+                    continue;
+                }
+                retry.insert(task.id);
+                const auto output = result.value("output", Json::object());
+                if (task.intent != "EVALUATE" || !output.is_object()) {
+                    continue;
+                }
+                const auto target = output.value("evaluated_task", "");
+                if (!contains(task.dependencies, target)) {
+                    continue;
+                }
+                retry.insert(target);
+                feedback[target]["review"] = output.value("summary", "Evaluation requested a revision");
+                const auto previous = results.at(target).value("output", Json::object());
+                if (previous.is_object() && previous.contains("tests")) {
+                    feedback[target]["tests"] = previous.at("tests");
+                }
+            }
+        }
+        if (retry.empty() || round == supervisor_attempt_limit) {
+            break;
+        }
+        // In dependency order, invalidate every consumer of work being rerun.
+        retained = Json::object();
+        for (const auto& layer : layers) {
+            for (const auto& task : layer) {
+                if (retry.contains(task.id) || std::any_of(task.dependencies.begin(), task.dependencies.end(),
+                        [&](const auto& dep) { return retry.contains(dep); })) {
+                    retry.insert(task.id);
+                } else {
+                    retained[task.id] = results.at(task.id);
+                }
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(200 * round));
+    }
+
+    auto escalations = Json::array();
+    for (const auto& layer : layers) {
+        for (const auto& task : layer) {
+            auto& result = results.at(task.id);
+            const auto status = result.at("status").get<std::string>();
+            const bool blocked = std::any_of(task.dependencies.begin(), task.dependencies.end(),
+                [&](const auto& dep) { return !succeeded(results.at(dep)); });
+            if (status == "DONE" || (status == "SKIPPED" && blocked)) {
+                continue;
+            }
+            const auto output = result.value("output", Json::object());
+            auto detail = result.value("reason", "Worker did not complete");
+            if (output.is_object()) {
+                detail = output.value("error_message", output.value("summary", detail));
+            }
+            escalations.push_back({{"plan_task_id", task.id}, {"agent", task.agent}, {"attempts", counts.at(task.id)},
+                                   {"last_status", status}, {"detail", detail},
+                                   {"worker_task_id", result.value("task_id", "")}});
+            if (status == "RETRY") {
+                result["status"] = "FAILED";
+            }
+        }
+    }
+    return {std::move(results), std::move(escalations)};
 }
 
 std::string chat_local(const Transport& transport, std::string_view url, std::string_view model,

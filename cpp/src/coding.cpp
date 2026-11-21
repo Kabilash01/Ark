@@ -105,7 +105,7 @@ Json CodingAgent::run(Json message) const {
         }
         message["output"] = std::move(output);
     } catch (const std::exception& error) {
-        message["status"] = "FAILED";
+        message["status"] = dynamic_cast<const TransientHttpError*>(&error) ? "RETRY" : "FAILED";
         message["quality_score"] = 0.0;
         message["output"] = {{"error_type", "CodingError"}, {"error_message", error.what()},
                              {"agent", name}, {"agent_version", version}};
@@ -121,6 +121,9 @@ Json CodingAgent::solve(const Json& payload, const Json& memory, int repairs) co
     auto tests = payload.value("test_files", Json::object());
     Json input{{"instruction", instruction}, {"goal", payload.value("goal", instruction)},
                {"evidence", prior_artifacts(memory)}};
+    if (payload.contains("review_feedback")) {
+        input["review_feedback"] = payload.at("review_feedback");
+    }
     Json final;
     for (int attempt = 0; attempt <= repairs; ++attempt) {
         if (!tests.empty()) {

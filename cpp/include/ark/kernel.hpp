@@ -21,12 +21,22 @@ struct Task {
 using TaskLayer = std::vector<Task>;
 using TaskHandler = std::function<Json(const Task&, const Json& dependency_results)>;
 using AgentAvailable = std::function<bool(std::string_view)>;
+using AttemptHandler = std::function<Json(const Task&, const Json& dependencies, int attempt, const Json& feedback)>;
+
+struct SupervisedRun {
+    Json results;
+    Json escalations;
+};
+
+inline constexpr int supervisor_attempt_limit = 3;
 
 // Copies only the task fields needed by the router. Parallelism is derived
 // from dependencies instead of trusting the model's parallel_with hints.
 std::vector<TaskLayer> order_tasks(const Json& dag);
 Json dispatch_plan(const Json& dag, const TaskHandler& execute,
                    const AgentAvailable& available, std::size_t max_workers = 4);
+SupervisedRun supervise_plan(const Json& dag, const AttemptHandler& execute,
+                             const AgentAvailable& available, std::size_t max_workers = 4);
 
 std::string chat_local(const Transport& transport, std::string_view url, std::string_view model,
                        std::string_view prompt, std::string_view content, const Json& format = "json");

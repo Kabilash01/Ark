@@ -18,9 +18,14 @@ struct Request {
     std::string unix_socket;
 };
 
-class HttpTimeout : public std::runtime_error {
+class TransientHttpError : public std::runtime_error {
 public:
     using std::runtime_error::runtime_error;
+};
+
+class HttpTimeout : public TransientHttpError {
+public:
+    using TransientHttpError::TransientHttpError;
 };
 
 struct Response {
