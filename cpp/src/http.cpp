@@ -62,6 +62,9 @@ Response CurlTransport::operator()(const Request& request) {
     curl_easy_setopt(handle_, CURLOPT_PROXY, "");
     curl_easy_setopt(handle_, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(handle_, CURLOPT_USERAGENT, "ARK-OS/0.1");
+    if (!request.unix_socket.empty()) {
+        curl_easy_setopt(handle_, CURLOPT_UNIX_SOCKET_PATH, request.unix_socket.c_str());
+    }
     curl_easy_setopt(handle_, CURLOPT_WRITEFUNCTION, receive);
     Response response{};
     curl_easy_setopt(handle_, CURLOPT_WRITEDATA, &response.body);
@@ -83,6 +86,9 @@ Response CurlTransport::operator()(const Request& request) {
     }
 
     const auto result = curl_easy_perform(handle_);
+    if (result == CURLE_OPERATION_TIMEDOUT) {
+        throw HttpTimeout("HTTP request timed out");
+    }
     if (result != CURLE_OK) {
         throw std::runtime_error(std::string("HTTP transport failed: ") + curl_easy_strerror(result));
     }

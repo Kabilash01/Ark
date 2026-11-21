@@ -90,5 +90,24 @@ planning to the cited research result.
 
 The native router currently runs the Research Agent. The Redis bus, registry,
 and all four memory tiers have native implementations. The API and milestones
-beyond Day 23 still need native implementations before the Python reference can
-be retired. The current worker uses abstracts and metadata.
+beyond Day 24 still need native implementations before the Python reference can
+be retired. The research worker uses abstracts and metadata.
+
+## Day 24 sandbox
+
+`ark-cpp sandbox` uses the local Docker Engine Unix socket. Pull
+`python:3.11-slim` once before running it. Each job gets a fresh container,
+non-root UID, read-only root, bounded writable temporary space, no host mounts,
+and no network. The runner kills timed-out jobs and removes their containers.
+
+```bash
+docker pull python:3.11-slim
+printf '%s\\n' '{"code":"print(2 + 2)","timeout_seconds":10}' | build/ark-cpp sandbox
+```
+
+The request can include a `files` object of relative paths and a `tests` flag
+for unittest discovery. File staging stays in memory until the container starts.
+Use `ARK_SANDBOX_IMAGE` to select a prepared image and `ARK_DOCKER_SOCKET`
+for a different local socket. Package requirements use only wheels bundled
+under `/wheels` in the image. Set `ARK_TEST_DOCKER_SOCKET` when running CTest to
+verify the real timeout, host filesystem isolation, and unittest execution.

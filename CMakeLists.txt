@@ -30,6 +30,7 @@ add_library(ark_native
     cpp/src/message.cpp
     cpp/src/research.cpp
     cpp/src/runtime_files.cpp
+    cpp/src/sandbox.cpp
     cpp/src/storage.cpp
     cpp/src/vector_memory.cpp)
 target_compile_features(ark_native PUBLIC cxx_std_20)
@@ -59,4 +60,7 @@ if(BUILD_TESTING)
     add_executable(ark_runtime_files_tests cpp/tests/runtime_files_test.cpp)
     target_link_libraries(ark_runtime_files_tests PRIVATE ark_native)
     add_test(NAME ark_runtime_files_tests COMMAND ark_runtime_files_tests)
+    add_executable(ark_sandbox_tests cpp/tests/sandbox_test.cpp)
+    target_link_libraries(ark_sandbox_tests PRIVATE ark_native)
+    add_test(NAME ark_sandbox_tests COMMAND ark_sandbox_tests)
 endif()

@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <functional>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -14,6 +15,12 @@ struct Request {
     std::string body;
     std::vector<std::string> headers;
     std::chrono::seconds timeout{30};
+    std::string unix_socket;
+};
+
+class HttpTimeout : public std::runtime_error {
+public:
+    using std::runtime_error::runtime_error;
 };
 
 struct Response {

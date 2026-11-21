@@ -1,6 +1,7 @@
 #include "ark/kernel.hpp"
 #include "ark/research.hpp"
 #include "ark/runtime_files.hpp"
+#include "ark/sandbox.hpp"
 #include "ark/storage.hpp"
 #include "ark/vector_memory.hpp"
 
@@ -55,6 +56,30 @@ int choose_models(const char* override_vram) {
     ark::write_json(dir / "active-models.json", selected);
     std::cout << selected.dump(2) << '\n';
     return 0;
+}
+
+int run_sandbox() {
+    const auto input = ark::Json::parse(std::cin);
+    ark::SandboxWorkspace workspace;
+    const auto files = input.value("files", ark::Json::object());
+    if (!files.is_object()) {
+        throw std::invalid_argument("Sandbox files must be an object of relative paths and contents");
+    }
+    for (const auto& [path, contents] : files.items()) {
+        workspace.write_file(path, contents.get<std::string>());
+    }
+    for (const auto& package : input.value("packages", std::vector<std::string>{})) {
+        workspace.install_package(package);
+    }
+    ark::CurlTransport http;
+    const ark::DockerSandbox sandbox(std::ref(http), env("ARK_DOCKER_SOCKET", "/var/run/docker.sock"),
+                                     env("ARK_SANDBOX_IMAGE", "python:3.11-slim"));
+    const auto timeout = std::chrono::seconds(input.value("timeout_seconds", 30));
+    const auto output = input.value("tests", false)
+        ? sandbox.run_tests(workspace, timeout)
+        : sandbox.run_python(input.at("code").get<std::string>(), workspace, timeout);
+    std::cout << output.json().dump(2, ' ', false, ark::Json::error_handler_t::replace) << '\n';
+    return output.exit_code == 0 ? 0 : output.timed_out ? 124 : 1;
 }
 
 ark::Json recall(const ark::ResearchConfig& settings, std::string_view goal) {
@@ -167,6 +192,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp audit|episodes\n"
                      "       ark-cpp memory <query>\n"
                      "       ark-cpp skill-add < skill.json\n"
+                     "       ark-cpp sandbox < workspace.json\n"
                      "Research without an instruction reads an ARKMessage from stdin.\n";
         return argc < 2 ? 2 : 0;
     }
@@ -174,6 +200,9 @@ int main(int argc, char** argv) {
         const std::string_view command = argv[1];
         if (command == "models" && argc <= 3) {
             return choose_models(argc == 3 ? argv[2] : nullptr);
+        }
+        if (command == "sandbox" && argc == 2) {
+            return run_sandbox();
         }
         if (command == "research" && argc <= 3) {
             auto message = argc == 3
