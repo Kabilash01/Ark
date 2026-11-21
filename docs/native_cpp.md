@@ -1,0 +1,64 @@
+# ARK C++ runtime
+
+The conversion keeps the frozen ARKMessage JSON contract so that Python and C++
+can be checked against the same tasks during the transition.
+
+## Build and run
+
+Install a C++20 compiler, CMake 3.24 or newer, and the development packages for
+libcurl, libxml2, and OpenSSL. CMake uses system nlohmann/json when available and
+otherwise downloads the pinned release archive.
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+```
+
+For research, run Ollama locally with cloud features disabled, pull the model
+from `config/active-models.json` and `bge-large:latest`, and start Qdrant on the
+loopback interface. The C++ process does not load a Python interpreter.
+
+```bash
+OLLAMA_NO_CLOUD=1 ollama serve
+# In a separate terminal with Qdrant running:
+ollama pull bge-large:latest
+ARK_MODEL=qwen2.5:7b build/ark-cpp research "Explain the Transformer architecture"
+# Or submit an existing pending message:
+build/ark-cpp research < message.json
+```
+
+`ARK_MODEL` overrides the general model from the active model file.
+`ARK_CONFIG_DIR`, `ARK_OLLAMA_URL`, `ARK_QDRANT_URL`, and
+`ARK_EMBEDDING_MODEL` override the config directory, loopback service addresses,
+and embedding model. `SEMANTIC_SCHOLAR_API_KEY` optionally authenticates the
+fallback search. The worker uses a separate Qdrant collection per embedding
+model to avoid mixing vectors from different engines. Paper UUIDs keep the
+same mapping as the Python worker.
+
+## SDK trial
+
+Built AMD GAIA at `2a0e47ea6a420eeaa18f6870c32572eed0a9c928` with its TUI and
+examples disabled. Its C++ client successfully requested a JSON completion
+from the local Qwen3-4B model and returned two 1,024-dimensional embeddings
+from the local BGE model. The source revision also exposes a bearer auth
+setter.
+
+ARK uses a small HTTP client and a fixed workflow for this worker. The workflow
+batches the arXiv ID lookup, embeddings, and Qdrant upsert. It controls exactly
+which external endpoints receive the query and verifies every citation against
+retrieved evidence. GAIA would be useful to evaluate again for MCP and
+open-ended tool calling. No inference speed advantage was measured for either
+client.
+
+## Port status
+
+The standalone Research Agent, its provider requests, and the paper storage
+path are native. CTest exercises the frozen message shape, Scholar fallback,
+citation checks, batched calls, stable IDs, and network restrictions. A live
+run with arXiv, Qwen3-4B, BGE, and Qdrant returned a structured summary citing
+`1706.03762v7`. Qdrant returned the stored abstract by its stable point ID.
+
+The other memory tiers, message bus, registry, API, and guide milestones beyond
+Day 23 still need native implementations before the Python reference can be
+retired. The current worker uses abstracts and metadata.

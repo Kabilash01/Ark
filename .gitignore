@@ -9,3 +9,5 @@ dist/
 .uv/
 config/active-models.json
 data/
+
+/build/
