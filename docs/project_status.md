@@ -1,5 +1,9 @@
 # Project status — 2026-11-21
 
+This report records the Python baseline through Day 23. The later C++
+conversion and live MVP verification are in [the native runtime guide](native_cpp.md)
+and [the Month 1 results](month1_results.md).
+
 ## Repository assessment
 
 The latest pre-existing commit is `9a668d0` (Day 21 review). The implementation
