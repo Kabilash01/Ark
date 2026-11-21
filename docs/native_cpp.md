@@ -28,6 +28,12 @@ ARK_MODEL=qwen2.5:7b build/ark-cpp research "Explain the Transformer architectur
 build/ark-cpp research < message.json
 ```
 
+Use `ark-cpp classify <goal>` to inspect the local Supervisor's intent and
+`ark-cpp plan <goal>` to print a validated task DAG. `ark-cpp run <goal>`
+classifies, plans, and dispatches research goals. `ark-cpp dispatch < dag.json`
+also accepts a saved plan. The router derives parallel batches from the
+dependency edges and skips tasks whose prerequisites failed.
+
 `ARK_MODEL` overrides the general model from the active model file.
 `ARK_CONFIG_DIR`, `ARK_OLLAMA_URL`, `ARK_QDRANT_URL`, and
 `ARK_EMBEDDING_MODEL` override the config directory, loopback service addresses,
@@ -53,12 +59,16 @@ client.
 
 ## Port status
 
-The standalone Research Agent, its provider requests, and the paper storage
-path are native. CTest exercises the frozen message shape, Scholar fallback,
-citation checks, batched calls, stable IDs, and network restrictions. A live
+The Research Agent, its provider requests, the paper storage path, the local
+Supervisor and Planner, and the DAG router are native. CTest exercises the
+frozen message shape, Scholar fallback, citation checks, batched calls,
+stable IDs, network restrictions, plan validation, and parallel dispatch. A live
 run with arXiv, Qwen3-4B, BGE, and Qdrant returned a structured summary citing
 `1706.03762v7`. Qdrant returned the stored abstract by its stable point ID.
+The same topic also passed through `ark-cpp run` from classification and
+planning to the cited research result.
 
-The other memory tiers, message bus, registry, API, and guide milestones beyond
-Day 23 still need native implementations before the Python reference can be
-retired. The current worker uses abstracts and metadata.
+The native router currently runs the Research Agent. The other memory tiers,
+message bus, registry, API, and guide milestones beyond Day 23 still need
+native implementations before the Python reference can be retired. The
+current worker uses abstracts and metadata.
