@@ -26,6 +26,8 @@ if request["packages"]:
 os.chdir(root)
 sys.path.insert(0, str(root))
 if request["tests"]:
+    for path in root.rglob("*.py"):
+        compile(path.read_bytes(), str(path), "exec")
     suite = unittest.defaultTestLoader.discover(str(root))
     if not suite.countTestCases():
         raise SystemExit("No unittest tests discovered")

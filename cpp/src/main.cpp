@@ -1,4 +1,5 @@
 #include "ark/coding.hpp"
+#include "ark/evaluation.hpp"
 #include "ark/kernel.hpp"
 #include "ark/research.hpp"
 #include "ark/runtime_files.hpp"
@@ -98,6 +99,24 @@ ark::Json run_coding(ark::CurlTransport& http, const ark::ResearchConfig& settin
     return worker.run(std::move(message));
 }
 
+ark::Json run_evaluation(ark::CurlTransport& http, const ark::ResearchConfig& settings, ark::Json message) {
+    const ark::EvaluationAgent worker(std::ref(http), settings.ollama_url, env("ARK_EVAL_MODEL", settings.model));
+    return worker.run(std::move(message));
+}
+
+void ensure_evaluation(ark::Json& dag) {
+    auto dependencies = ark::Json::array();
+    for (const auto& task : dag.at("tasks")) {
+        if (task.at("agent") == "evaluation_agent") {
+            return;
+        }
+        dependencies.push_back(task.at("task_id"));
+    }
+    dag["tasks"].push_back({{"task_id", "evaluate_" + ark::random_uuid()}, {"agent", "evaluation_agent"},
+                            {"intent", "EVALUATE"}, {"instruction", "Score the completed artifact against the goal"},
+                            {"depends_on", dependencies}, {"parallel_with", ark::Json::array()}});
+}
+
 ark::Json recall(const ark::ResearchConfig& settings, std::string_view goal) {
     ark::CurlTransport http;
     const ark::Embeddings encoder(std::ref(http), settings.ollama_url, settings.embedding_model);
@@ -135,6 +154,9 @@ int dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, std::str
             const auto model = env("ARK_CODE_MODEL", "active-models.json:code");
             registry.add("coding_agent", {"CODE"}, model, "1.0.0");
         }
+        if (registry.get("evaluation_agent").is_null()) {
+            registry.add("evaluation_agent", {"EVALUATE"}, env("ARK_EVAL_MODEL", settings.model), "1.0.0");
+        }
     }
     if (!episode_path.empty()) {
         episodes = std::make_unique<ark::EpisodicMemory>(episode_path);
@@ -154,9 +176,15 @@ int dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, std::str
             ark::MessageBus(worker_bus).log({{"event", "worker_start"}, {"task_id", message.at("task_id")},
                                             {"parent_task_id", parent_id}, {"agent", task.agent}});
         }
-        auto result = task.agent == "coding_agent"
-            ? run_coding(http, settings, std::move(message))
-            : ark::ResearchAgent(std::ref(http), settings).run(std::move(message));
+        ark::Json result;
+        if (task.agent == "coding_agent") {
+            result = run_coding(http, settings, std::move(message));
+        } else if (task.agent == "evaluation_agent") {
+            message["payload"]["instruction"] = goal + "\n" + task.instruction;
+            result = run_evaluation(http, settings, std::move(message));
+        } else {
+            result = ark::ResearchAgent(std::ref(http), settings).run(std::move(message));
+        }
         {
             const std::lock_guard lock(state_mutex);
             last = {{"agent", task.agent}, {"task", task.id}, {"version", result.at("agent_version")}};
@@ -177,7 +205,7 @@ int dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, std::str
         }
         return result;
     }, [&](std::string_view name) {
-        if (name != "research_agent" && name != "coding_agent") {
+        if (name != "research_agent" && name != "coding_agent" && name != "evaluation_agent") {
             return false;
         }
         if (!redis) {
@@ -190,6 +218,13 @@ int dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, std::str
     const bool done = std::all_of(results.begin(), results.end(), [](const auto& result) {
         return result.at("status") == "DONE";
     });
+    ark::Json quality;
+    for (const auto& result : results) {
+        if (result.value("intent", "") == "EVALUATE" && result.contains("quality_score")) {
+            const auto score = result.at("quality_score").get<double>();
+            quality = quality.is_null() ? score : std::min(quality.get<double>(), score);
+        }
+    }
     ark::write_state(state_path, goal, parent_id, done ? "DONE" : "FAILED", private_mode,
                      static_cast<int>(results.size()), last);
     if (redis) {
@@ -198,7 +233,8 @@ int dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, std::str
                                      {"status", done ? "DONE" : "FAILED"}});
     }
     std::cout << ark::Json{{"task_id", parent_id}, {"intent", intent},
-                           {"status", done ? "DONE" : "FAILED"}, {"dag", dag}, {"results", results}}.dump(2) << '\n';
+                           {"status", done ? "DONE" : "FAILED"}, {"dag", dag}, {"results", results},
+                           {"quality_score", quality}}.dump(2) << '\n';
     return done ? 0 : 1;
 }
 
@@ -208,6 +244,7 @@ int main(int argc, char** argv) {
     if (argc < 2 || std::string_view(argv[1]) == "--help") {
         std::cout << "Usage: ark-cpp research [instruction]\n"
                      "       ark-cpp code [instruction]\n"
+                     "       ark-cpp evaluate < message.json\n"
                      "       ark-cpp models [vram-gib]\n"
                      "       ark-cpp classify|plan|run <goal>\n"
                      "       ark-cpp dispatch < dag.json\n"
@@ -242,6 +279,12 @@ int main(int argc, char** argv) {
                 : ark::Json::parse(std::cin);
             ark::CurlTransport http;
             const auto result = run_coding(http, config(false), std::move(message));
+            std::cout << result.dump(2) << '\n';
+            return result.at("status") == "DONE" ? 0 : 1;
+        }
+        if (command == "evaluate" && argc == 2) {
+            ark::CurlTransport http;
+            const auto result = run_evaluation(http, config(), ark::Json::parse(std::cin));
             std::cout << result.dump(2) << '\n';
             return result.at("status") == "DONE" ? 0 : 1;
         }
@@ -292,6 +335,7 @@ int main(int argc, char** argv) {
             }
             const auto context = recall(settings, argv[2]);
             auto dag = planner.plan(argv[2], {"research_agent", "coding_agent"}, context);
+            ensure_evaluation(dag);
             dag["goal"] = argv[2];
             dag["memory_context"] = context;
             return dispatch(dag, settings, intent);

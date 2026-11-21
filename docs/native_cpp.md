@@ -88,9 +88,9 @@ run with arXiv, Qwen3-4B, BGE, and Qdrant returned a structured summary citing
 The same topic also passed through `ark-cpp run` from classification and
 planning to the cited research result.
 
-The native router currently runs the Research and Coding Agents. The Redis bus, registry,
+The native router runs the Research, Coding, and Evaluation Agents. The Redis bus, registry,
 and all four memory tiers have native implementations. The API and milestones
-beyond Day 25 still need native implementations before the Python reference can
+beyond Day 26 still need native implementations before the Python reference can
 be retired. The research worker uses abstracts and metadata.
 
 ## Day 24 sandbox
@@ -121,3 +121,16 @@ trusted `payload.test_files`. Those files stay fixed throughout the repair
 loop. The C++ worker sends actual Docker test output back to the model and
 attempts at most three repairs. The Docker integration test injects a subtraction
 bug, observes the failed test, and verifies that the repair passes the same test.
+
+## Day 26 evaluation
+
+The evaluator applies the guide's research, code, security report, hypothesis,
+and data rubrics, plus a general fallback. It uses a local model through
+`ARK_EVAL_MODEL`, which defaults to the general model. Tests and syntax scores
+in a routed code task come from Docker execution. The model judges style and
+security. A score below 0.65 requests a retry; scores from 0.65 to below 0.80
+pass with a warning. `ark-cpp run` adds an evaluation task to the plan.
+
+For a standalone evaluation, submit an ARKMessage with receiver
+`evaluation_agent`, intent `EVALUATE`, and an `artifact` and `output_type` in
+the payload via `ark-cpp evaluate < message.json`.

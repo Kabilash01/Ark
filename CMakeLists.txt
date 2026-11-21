@@ -26,6 +26,7 @@ endif()
 
 add_library(ark_native
     cpp/src/coding.cpp
+    cpp/src/evaluation.cpp
     cpp/src/http.cpp
     cpp/src/kernel.cpp
     cpp/src/message.cpp
@@ -67,4 +68,7 @@ if(BUILD_TESTING)
     add_executable(ark_coding_tests cpp/tests/coding_test.cpp)
     target_link_libraries(ark_coding_tests PRIVATE ark_native)
     add_test(NAME ark_coding_tests COMMAND ark_coding_tests)
+    add_executable(ark_evaluation_tests cpp/tests/evaluation_test.cpp)
+    target_link_libraries(ark_evaluation_tests PRIVATE ark_native)
+    add_test(NAME ark_evaluation_tests COMMAND ark_evaluation_tests)
 endif()
