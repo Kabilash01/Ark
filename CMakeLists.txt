@@ -37,6 +37,7 @@ endif()
 
 add_library(ark_native
     cpp/src/benchmark.cpp
+    cpp/src/browser.cpp
     cpp/src/coding.cpp
     cpp/src/conflict_resolver.cpp
     cpp/src/done_condition.cpp
@@ -80,6 +81,10 @@ if(BUILD_TESTING)
     target_link_libraries(ark_benchmark_tests PRIVATE ark_native)
     add_test(NAME ark_benchmark_tests COMMAND ark_benchmark_tests
         "${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/arkbench/benchmark_v0.1.json")
+    add_executable(ark_browser_tests cpp/tests/browser_test.cpp)
+    target_link_libraries(ark_browser_tests PRIVATE ark_native httplib::httplib)
+    add_test(NAME ark_browser_tests COMMAND ark_browser_tests)
+    set_tests_properties(ark_browser_tests PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 45)
     add_executable(ark_native_tests cpp/tests/research_test.cpp)
     target_link_libraries(ark_native_tests PRIVATE ark_native)
     add_test(NAME ark_native_tests COMMAND ark_native_tests)

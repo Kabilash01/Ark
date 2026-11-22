@@ -389,3 +389,41 @@ and SQLite stores when recording a baseline.
 
 The [Month 2 review](month2_results.md) records the live baseline and its
 verification evidence.
+
+## Day 43 browser tool
+
+Install Chromium and run `build/ark-cpp browser < actions.json` from the
+repository root. `ARK_BROWSER_BINARY` selects a compatible Chromium
+executable. The C++ tool uses Chromium's DevTools pipe and a temporary browser
+profile. The profile closes when the batch exits. [Chrome DevTools Protocol](https://chromedevtools.github.io/devtools-protocol/)
+
+```json
+{
+  "timeout_ms": 10000,
+  "actions": [
+    {"action": "navigate", "url": "https://arxiv.org/abs/1706.03762"},
+    {"action": "wait_for_element", "selector": "h1"},
+    {"action": "get_page_text"},
+    {"action": "extract_links"},
+    {"action": "screenshot"}
+  ]
+}
+```
+
+Each action returns a result. `get_page_html` returns the current DOM as HTML.
+`click`, `type_text`, `wait_for_element`, and `extract_table` take CSS
+selectors. `type_text` inserts text at the cursor. `fill_form` takes a
+`fields` object that maps selectors to string values or Boolean checkbox and
+radio values. Screenshots return a base64-encoded PNG.
+
+```bash
+build/ark-cpp browser < actions.json | jq -r '.results[] | select(.action == "screenshot") | .result.data' | base64 -d > page.png
+```
+
+Set `privacy` or `airgap_mode` on the batch to apply the corresponding policy.
+Private browsing permits loopback and exact hosts from `allowed_external`.
+Airgap permits loopback only. The Chromium proxy policy applies to redirects
+and page resources as well. [Chromium proxy rules](https://chromium.googlesource.com/chromium/src/+/HEAD/net/docs/proxy.md)
+
+Set `ARK_TEST_CHROMIUM` to the executable path when running CTest to include
+the headless Chromium integration checks.

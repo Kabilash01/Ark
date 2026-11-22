@@ -1,5 +1,6 @@
 #include "ark/api_server.hpp"
 #include "ark/benchmark.hpp"
+#include "ark/browser.hpp"
 #include "ark/coding.hpp"
 #include "ark/done_condition.hpp"
 #include "ark/evaluation.hpp"
@@ -101,6 +102,54 @@ int run_sandbox() {
         : sandbox.run_python(input.at("code").get<std::string>(), workspace, timeout);
     std::cout << output.json().dump(2, ' ', false, ark::Json::error_handler_t::replace) << '\n';
     return output.exit_code == 0 ? 0 : output.timed_out ? 124 : 1;
+}
+
+int run_browser() {
+    const auto input = ark::Json::parse(std::cin);
+    const auto& actions = input.at("actions");
+    if (!actions.is_array() || actions.empty()) {
+        throw std::invalid_argument("Browser requires a nonempty actions array");
+    }
+    const auto timeout = input.value("timeout_ms", ark::Json(10000));
+    if (!timeout.is_number_integer() || timeout.get<double>() < 1 || timeout.get<double>() > 120000) {
+        throw std::invalid_argument("Browser timeout_ms must be between 1 and 120000");
+    }
+    ark::Browser browser({env("ARK_BROWSER_BINARY", "chromium"), std::chrono::milliseconds(timeout.get<int>()),
+                          config(false).privacy, input.value("privacy", false), input.value("airgap_mode", false)});
+    auto results = ark::Json::array();
+    for (const auto& action : actions) {
+        const auto name = action.at("action").get<std::string>();
+        const auto selector = [&] { return action.at("selector").get<std::string>(); };
+        ark::Json value = true;
+        if (name == "navigate") {
+            browser.navigate(action.at("url").get_ref<const std::string&>());
+        } else if (name == "get_page_text") {
+            value = browser.get_page_text();
+        } else if (name == "get_page_html") {
+            value = browser.get_page_html();
+        } else if (name == "click") {
+            browser.click(selector());
+        } else if (name == "type_text") {
+            browser.type_text(selector(), action.at("text").get_ref<const std::string&>());
+        } else if (name == "screenshot") {
+            value = {{"mime_type", "image/png"}, {"data", browser.screenshot()}};
+        } else if (name == "fill_form") {
+            browser.fill_form(action.at("fields"));
+        } else if (name == "extract_links") {
+            value = browser.extract_links();
+        } else if (name == "extract_table") {
+            value = browser.extract_table(selector());
+        } else if (name == "wait_for_element") {
+            value = browser.wait_for_element(selector());
+        } else if (name == "close_browser") {
+            browser.close_browser();
+        } else {
+            throw std::invalid_argument("Unknown browser action: " + name);
+        }
+        results.push_back({{"action", name}, {"result", std::move(value)}});
+    }
+    std::cout << ark::Json{{"results", std::move(results)}}.dump(2) << '\n';
+    return 0;
 }
 
 ark::AgentProfile actor_profile(std::string_view name, const std::string& general_model, ark::Redis* redis) {
@@ -735,12 +784,16 @@ int main(int argc, char** argv) {
                      "       ark-cpp skill-add < skill.json\n"
                      "       ark-cpp sandbox < workspace.json\n"
                      "       ark-cpp benchmark [suite.json] [report.json]\n"
+                     "       ark-cpp browser < actions.json\n"
                      "       ark-cpp serve [port]\n"
                      "Research without an instruction reads an ARKMessage from stdin.\n";
         return argc < 2 ? 2 : 0;
     }
     try {
         const std::string_view command = argv[1];
+        if (command == "browser" && argc == 2) {
+            return run_browser();
+        }
         if (command == "benchmark" && argc <= 4) {
             return benchmark(argc >= 3 ? argv[2] : "benchmarks/arkbench/benchmark_v0.1.json",
                              argc == 4 ? argv[3] : "");
