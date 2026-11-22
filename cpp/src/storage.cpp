@@ -571,11 +571,12 @@ Json ProceduralMemory::get(std::string_view id) {
     return result == SQLITE_ROW ? skill(statement.get()) : Json(nullptr);
 }
 
-Json ProceduralMemory::all() {
+Json ProceduralMemory::all(int limit) {
     const std::lock_guard lock(impl_->mutex);
     auto* db = impl_->db.get();
-    auto statement = prepare(db, std::string("SELECT ") + skill_fields + " FROM skills WHERE model = ? ORDER BY rowid");
+    auto statement = prepare(db, std::string("SELECT ") + skill_fields + " FROM skills WHERE model = ? ORDER BY rowid LIMIT ?");
     bind_text(db, statement.get(), 1, encoder_.model());
+    sqlite_check(sqlite3_bind_int(statement.get(), 2, limit), db);
     auto entries = Json::array();
     for (int result; (result = sqlite3_step(statement.get())) != SQLITE_DONE;) {
         sqlite_check(result, db);

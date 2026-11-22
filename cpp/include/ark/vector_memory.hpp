@@ -59,7 +59,7 @@ public:
     Json retrieve(std::string_view query, std::size_t top_k = 5, std::size_t candidate_pool = 20);
     Json record_use(std::string_view id, bool success);
     Json get(std::string_view id);
-    Json all();
+    Json all(int limit = -1);
 
 private:
     struct Impl;

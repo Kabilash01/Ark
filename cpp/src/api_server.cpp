@@ -78,6 +78,13 @@ int count_param(const HttpRequest& request) {
     throw HttpFailure(422, "limit must be an integer between 1 and 200");
 }
 
+Json privacy_config(const std::filesystem::path& path) {
+    if (std::filesystem::exists(path)) {
+        return read_json(path);
+    }
+    return {{"privacy_mode", false}, {"airgap_mode", false}, {"allowed_external", Json::array()}};
+}
+
 class Events {
 public:
     void listen(Socket& socket) {
@@ -352,21 +359,23 @@ bool serve_api(int port, ApiServices services, std::stop_token stop, const std::
     server.Post("/memory/search", route([&](const HttpRequest& request, HttpResponse& response) {
         const auto input = body(request);
         const auto query = input.at("query").get<std::string>();
-        const auto limit = input.value("top_k", 5);
-        if (query.empty() || query.size() > 8192 || limit < 1 || limit > 50) {
+        const auto top_k = input.value("top_k", Json(5));
+        if (query.size() > 8192 || query.find_first_not_of(" \r\t\n") == std::string::npos
+            || !top_k.is_number_integer() || top_k.get<double>() < 1 || top_k.get<double>() > 50) {
             throw HttpFailure(422, "query and top_k are out of range");
         }
+        const auto limit = top_k.get<int>();
         reply(response, {{"query", query}, {"top_k", limit}, {"results", services.memory("semantic", query, "", limit)}});
     }));
     std::mutex config_lock;
     server.Get("/config/privacy", route([&](const HttpRequest&, HttpResponse& response) {
         const std::lock_guard lock(config_lock);
-        reply(response, read_json(services.privacy_file));
+        reply(response, privacy_config(services.privacy_file));
     }));
     server.Post("/config/privacy", route([&](const HttpRequest& request, HttpResponse& response) {
         const auto input = body(request);
         const std::lock_guard lock(config_lock);
-        auto config = read_json(services.privacy_file);
+        auto config = privacy_config(services.privacy_file);
         config["privacy_mode"] = input.at("privacy_mode").get<bool>();
         if (input.contains("airgap_mode") && !input.at("airgap_mode").is_null()) {
             config["airgap_mode"] = input.at("airgap_mode").get<bool>();

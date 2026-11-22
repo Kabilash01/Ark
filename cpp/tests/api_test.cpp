@@ -56,10 +56,10 @@ void test_api() {
                 },
                 [] { return Json::array({{{"name", "research_agent"}}}); },
                 [](std::string_view name) {
-                    return name == "research_agent" ? Json::array() : Json(nullptr);
+                    return name == "research_agent" ? Json::array({{{"version", "1.0.0"}}}) : Json(nullptr);
                 },
-                [](std::string_view tier, std::string_view query, std::string_view, int limit) {
-                    return Json::array({{{"tier", tier}, {"query", query}, {"limit", limit}}});
+                [](std::string_view tier, std::string_view query, std::string_view task_id, int limit) {
+                    return Json::array({{{"tier", tier}, {"query", query}, {"task_id", task_id}, {"limit", limit}}});
                 },
                 [&](const Json& conflict) { audit.set_value(conflict); },
             }, stop, [&](int assigned) { bound.set_value(assigned); });
@@ -78,9 +78,18 @@ void test_api() {
 
     const auto agents = body(api.Get("/agents"));
     check(agents.at(0).at("name") == "research_agent", "registry was not exposed");
+    check(body(api.Get("/agents/research_agent/versions")).at(0).at("version") == "1.0.0", "version list was not exposed");
     (void)body(api.Get("/agents/nonexistent/versions"), 404);
     const auto results = body(api.Post("/memory/search", R"({"query":"attention","top_k":9})", "application/json"));
     check(results.at("results").at(0).at("limit") == 9, "memory limit not forwarded");
+    (void)body(api.Post("/memory/search", R"({"query":"attention","top_k":1.5})", "application/json"), 422);
+    (void)body(api.Post("/memory/search", R"({"query":"  "})", "application/json"), 422);
+    for (const auto* tier : {"working", "episodic", "semantic", "procedural"}) {
+        const auto items = body(api.Get(std::string("/memory/") + tier + "?task_id=fixture&limit=2"));
+        const auto& args = items.at("items").at(0);
+        check(items.at("tier") == tier && args.at("query") == "" && args.at("task_id") == "fixture"
+              && args.at("limit") == 2, "memory listing contract changed");
+    }
 
     const auto task = body(api.Post("/task", R"({"goal":"Research attention","privacy":true,"test_files":{"test_fixture.py":"fixture"}})", "application/json"));
     const auto first_id = task.at("task_id").get<std::string>();
@@ -152,6 +161,11 @@ void test_api() {
     auto config = body(api.Post("/config/privacy", R"({"privacy_mode":true,"airgap_mode":true})", "application/json"));
     check(config.at("airgap_mode") == true && config.at("allowed_external").size() == 1
           && ark::read_json(privacy).at("privacy_mode") == true, "privacy config did not persist");
+    check(body(api.Get("/config/privacy")) == config, "privacy configuration readback differs");
+    std::filesystem::remove(privacy);
+    check(body(api.Get("/config/privacy")).at("privacy_mode") == false, "missing configuration did not return defaults");
+    check(body(api.Post("/config/privacy", R"({"privacy_mode":true})", "application/json")).at("privacy_mode") == true
+          && std::filesystem::exists(privacy), "privacy toggle did not initialize its configuration file");
     const httplib::Headers foreign{{"Origin", "https://other.example"}};
     (void)body(api.Get("/tasks", foreign), 403);
     events.close();

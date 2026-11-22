@@ -292,3 +292,18 @@ File paths are relative to the named workspace. Reads and writes are limited
 to 1 MiB of UTF-8 text. Set `overwrite` explicitly to replace an existing
 regular file. The worker writes file-operation events to episodic SQLite
 with the workspace, path, and byte count.
+
+## Day 36 API verification
+
+The C++ server implements the guide's task submission, lookup, listing,
+and cancellation routes, along with agent revisions, memory, privacy
+configuration, and WebSocket events. `GET /memory/{tier}` takes `limit`.
+The working tier takes `task_id`. The semantic and procedural tiers list
+stored records by default and rank matches when `query` is supplied.
+`POST /memory/search` accepts a nonblank `query` and an integer `top_k`
+from 1 to 50.
+
+`POST /config/privacy` persists `privacy_mode` and accepts an optional
+`airgap_mode`. In a fresh configuration directory, the first update creates
+the settings file. A native API run verified the toggle with Redis, Qdrant,
+SQLite, Docker, and loopback model fixtures.

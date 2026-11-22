@@ -51,7 +51,11 @@ void semantic_round_trip() {
             match["score"] = 0.9;
             return response({{"result", {{"points", {match}}}}});
         } else if (request.url.ends_with("/points/scroll")) {
-            check(body.at("filter").at("must").at(0).at("match").at("value") == "arxiv", "filter not passed");
+            if (body.contains("filter")) {
+                check(body.at("filter").at("must").at(0).at("match").at("value") == "arxiv", "filter not passed");
+            } else {
+                check(body.at("limit") == 1, "unfiltered listing ignored its limit");
+            }
             return response({{"result", {{"points", points}}}});
         } else if (request.url.ends_with("/points/delete?wait=true")) {
             check(body.at("points").at(0) == "paper", "unexpected delete request");
@@ -74,6 +78,9 @@ void semantic_round_trip() {
           result.dump());
     check(memory.by_metadata({{"source", "arxiv"}}).at(0).at("metadata") == Json{{"source", "arxiv"}},
           "metadata shape changed");
+    const auto previous_calls = calls;
+    check(memory.by_metadata(Json::object(), 1).at(0).at("text") == "similar" && calls == previous_calls,
+          "unfiltered listing should work without embeddings");
     memory.remove("paper");
     check(memory.count() == 0, "forget should remove the point");
 }
@@ -99,6 +106,7 @@ void skills_persist_and_rank() {
     }
     ark::ProceduralMemory reopened(path, encoder);
     check(reopened.all().size() == 3, "skills didn't survive restart");
+    check(reopened.all(1).size() == 1, "procedural listing ignored its limit");
     check(reopened.get(similar).at("success_rate") == 1.0, "skill outcome didn't persist");
     check(reopened.retrieve("query", 1, 2).at(0).at("skill_id") == similar,
           "reranking did not weight observed success");

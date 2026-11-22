@@ -135,9 +135,11 @@ Json SemanticMemory::by_metadata(const Json& filter, int limit) {
     for (const auto& [key, value] : filter.items()) {
         fields.push_back({{"key", key}, {"match", {{"value", value}}}});
     }
-    const auto response = send(transport_, collection_ + "/points/scroll", "POST", {
-        {"filter", {{"must", fields}}}, {"with_payload", true}, {"limit", limit},
-    });
+    Json request{{"with_payload", true}, {"limit", limit}};
+    if (!fields.empty()) {
+        request["filter"] = {{"must", fields}};
+    }
+    const auto response = send(transport_, collection_ + "/points/scroll", "POST", request);
     return flatten(payload_result(response, "Qdrant metadata search").at("points"));
 }
 

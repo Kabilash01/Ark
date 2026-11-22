@@ -484,17 +484,19 @@ ark::Json memory_tier(std::string_view tier, std::string_view query, std::string
         const std::filesystem::path path = env("ARK_EPISODIC_DB", "data/episodic_memory.db");
         return std::filesystem::exists(path) ? ark::EpisodicMemory(path).recent(limit) : ark::Json::array();
     }
-    if (query.empty()) {
+    if (tier == "working") {
         return ark::Json::array();
     }
     const auto settings = config(false);
     ark::CurlTransport http;
     ark::Embeddings encoder(std::ref(http), settings.ollama_url, settings.embedding_model);
     if (tier == "semantic") {
-        return ark::SemanticMemory(std::ref(http), settings.qdrant_url, encoder).retrieve(query, limit);
+        ark::SemanticMemory semantic(std::ref(http), settings.qdrant_url, std::move(encoder));
+        return query.empty() ? semantic.by_metadata(ark::Json::object(), limit) : semantic.retrieve(query, limit);
     }
     if (tier == "procedural" && std::filesystem::exists(skills_path())) {
-        return ark::ProceduralMemory(skills_path(), encoder).retrieve(query, limit, std::max(limit, 20));
+        ark::ProceduralMemory skills(skills_path(), std::move(encoder));
+        return query.empty() ? skills.all(limit) : skills.retrieve(query, limit, std::max(limit, 20));
     }
     return ark::Json::array();
 }
@@ -518,7 +520,8 @@ int serve(int port) {
         [=](std::string_view name) {
             ark::Redis redis(redis_port, redis_db);
             ark::AgentRegistry registry(redis);
-            return registry.get(name).is_null() ? ark::Json(nullptr) : registry.history(name);
+            auto history = registry.history(name);
+            return history.empty() && registry.get(name).is_null() ? ark::Json(nullptr) : std::move(history);
         },
         memory_tier,
         [=](const ark::Json& report) {
