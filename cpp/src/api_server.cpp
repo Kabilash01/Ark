@@ -1,4 +1,5 @@
 #include "ark/api_server.hpp"
+#include "ark/conflict_resolver.hpp"
 #include "ark/research.hpp"
 #include "ark/runtime_files.hpp"
 
@@ -7,6 +8,8 @@
 #include <algorithm>
 #include <condition_variable>
 #include <deque>
+#include <iostream>
+#include <limits>
 #include <map>
 #include <mutex>
 #include <stdexcept>
@@ -115,8 +118,9 @@ private:
 
 class Tasks {
 public:
-    Tasks(Events& events, std::function<Json(const Json&)> run)
-        : events_(events), run_(std::move(run)), worker_([this](std::stop_token token) { work(token); }) {}
+    Tasks(Events& events, std::function<Json(const Json&)> run, std::function<void(const Json&)> log_conflict)
+        : events_(events), run_(std::move(run)), log_conflict_(std::move(log_conflict)),
+          worker_([this](std::stop_token token) { work(token); }) {}
 
     Json submit(const Json& request) {
         const auto& goal = request.at("goal").get_ref<const std::string&>();
@@ -124,7 +128,19 @@ public:
             throw HttpFailure(422, "goal must contain 1 to 8192 bytes");
         }
         const bool privacy = request.value("privacy", false);
+        const auto priority = request.value("priority", Json(5));
+        if (!priority.is_number_integer() || priority.get<double>() < std::numeric_limits<int>::min()
+            || priority.get<double>() > std::numeric_limits<int>::max()) {
+            throw HttpFailure(422, "priority must be an integer in range");
+        }
+        const auto domain = request.value("domain", std::string("general"));
+        if (domain.size() > 64 || domain.find_first_not_of(" \r\t\n") == std::string::npos) {
+            throw HttpFailure(422, "domain must contain 1 to 64 bytes");
+        }
         Json payload{{"goal", goal}, {"privacy", privacy}, {"airgap_mode", request.value("airgap_mode", false)}};
+        if (request.contains("domain")) {
+            payload["domain"] = domain;
+        }
         if (request.contains("test_files")) {
             if (!request.at("test_files").is_object()) {
                 throw HttpFailure(422, "test_files must map filenames to contents");
@@ -152,9 +168,10 @@ public:
                 task = make_message("user", "supervisor_agent", "SUPERVISE", task.at("payload"));
                 id = task.at("task_id").get<std::string>();
             }
+            task["priority"] = priority;
             tasks_.emplace(id, task);
             order_.push_back(id);
-            queue_.push_back(id);
+            queue_.push_back({id, priority.get<int>(), task.at("timestamp").get<std::string>(), domain});
             // Publish creation before the worker can announce a start.
             events_.send("task_created", id);
         }
@@ -186,7 +203,7 @@ public:
             }
             task["status"] = "FAILED";
             task["output"] = {{"cancelled", true}, {"reason", "cancelled by user"}};
-            std::erase(queue_, id);
+            std::erase_if(queue_, [&](const auto& queued) { return queued.id == id; });
             canceled = task;
         }
         events_.send("task_cancelled", id);
@@ -196,11 +213,13 @@ public:
 private:
     Events& events_;
     std::function<Json(const Json&)> run_;
+    std::function<void(const Json&)> log_conflict_;
     std::mutex mutex_;
     std::condition_variable_any ready_;
     std::map<std::string, Json> tasks_;
-    std::deque<std::string> queue_;
+    std::vector<PendingTask> queue_;
     std::deque<std::string> order_;
+    ConflictResolver conflicts_;
     std::jthread worker_;
 
     Json& find(const std::string& id) {
@@ -215,16 +234,31 @@ private:
         while (!token.stop_requested()) {
             Json task;
             std::string id;
+            Json conflict;
             {
                 std::unique_lock lock(mutex_);
                 if (!ready_.wait(lock, token, [this] { return !queue_.empty(); }) || token.stop_requested()) {
                     return;
                 }
-                id = std::move(queue_.front());
-                queue_.pop_front();
+                const auto selected = conflicts_.resolve_priority(queue_);
+                if (conflicts_.detect_priority_conflict(queue_)) {
+                    conflict = conflicts_.log_conflict(queue_, selected);
+                }
+                id = std::move(queue_[selected].id);
+                queue_.erase(queue_.begin() + selected);
                 auto& stored = find(id);
                 stored["status"] = "RUNNING";
                 task = stored;
+            }
+            if (!conflict.is_null()) {
+                if (log_conflict_) {
+                    try {
+                        log_conflict_(conflict);
+                    } catch (const std::exception& error) {
+                        std::cerr << "Could not record priority conflict: " << error.what() << '\n';
+                    }
+                }
+                events_.send("conflict_detected", id, conflict);
             }
             events_.send("task_started", id);
             Json output;
@@ -261,7 +295,7 @@ bool serve_api(int port, ApiServices services, std::stop_token stop, const std::
         throw std::invalid_argument("API requires a local port and runtime services");
     }
     Events events;
-    Tasks tasks(events, services.run);
+    Tasks tasks(events, services.run, services.log_conflict);
     httplib::Server server;
     server.set_payload_max_length(64 * 1024);
     server.set_write_timeout(5, 0);

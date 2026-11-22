@@ -237,3 +237,13 @@ episodic database. When a successful task scores at least 0.80 and the review
 identifies a reusable procedure, the runtime saves it to `ARK_PROCEDURAL_DB`.
 `ark-cpp reflection-queue` lists pending version recommendations from
 `ARK_EPISODIC_DB`. A reflection failure is reported alongside the task outcome.
+
+## Day 32 task priority
+
+`POST /task` accepts an integer `priority` (default `5`) and a `domain`
+(default `general`). When jobs compete for the next API worker slot, the
+highest priority runs first. Equal priorities follow the earlier timestamp.
+Requests that share a timestamp rotate through domains in alphabetical order
+and retain arrival order within each domain. Work already running continues
+to completion. Each scheduling conflict emits `conflict_detected` on `/ws`
+and is recorded in the Redis audit log.

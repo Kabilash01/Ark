@@ -490,6 +490,11 @@ int serve(int port) {
             return registry.get(name).is_null() ? ark::Json(nullptr) : registry.history(name);
         },
         memory_tier,
+        [=](const ark::Json& report) {
+            ark::Redis redis(redis_port, redis_db);
+            ark::MessageBus(redis).log({{"event", "conflict_detected"}, {"task_id", report.at("task_id")},
+                                      {"report", report}});
+        },
     });
     if (!listened) {
         std::cerr << "Could not listen on 127.0.0.1:" << port << '\n';

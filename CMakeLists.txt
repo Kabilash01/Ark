@@ -37,6 +37,7 @@ endif()
 
 add_library(ark_native
     cpp/src/coding.cpp
+    cpp/src/conflict_resolver.cpp
     cpp/src/evaluation.cpp
     cpp/src/http.cpp
     cpp/src/kernel.cpp
@@ -69,6 +70,9 @@ if(BUILD_TESTING)
     add_executable(ark_kernel_tests cpp/tests/kernel_test.cpp)
     target_link_libraries(ark_kernel_tests PRIVATE ark_native)
     add_test(NAME ark_kernel_tests COMMAND ark_kernel_tests)
+    add_executable(ark_conflict_tests cpp/tests/conflict_resolver_test.cpp)
+    target_link_libraries(ark_conflict_tests PRIVATE ark_native)
+    add_test(NAME ark_conflict_tests COMMAND ark_conflict_tests)
     add_executable(ark_storage_tests cpp/tests/storage_test.cpp)
     target_link_libraries(ark_storage_tests PRIVATE ark_native)
     add_test(NAME ark_storage_tests COMMAND ark_storage_tests)

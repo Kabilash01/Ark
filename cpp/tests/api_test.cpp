@@ -40,6 +40,8 @@ void test_api() {
     std::promise<int> bound;
     std::promise<void> allow_completion;
     const auto gate = allow_completion.get_future().share();
+    std::promise<Json> audit;
+    auto logged = audit.get_future();
     auto port = bound.get_future();
     std::jthread server([&](std::stop_token stop) {
         try {
@@ -59,6 +61,7 @@ void test_api() {
                 [](std::string_view tier, std::string_view query, std::string_view, int limit) {
                     return Json::array({{{"tier", tier}, {"query", query}, {"limit", limit}}});
                 },
+                [&](const Json& conflict) { audit.set_value(conflict); },
             }, stop, [&](int assigned) { bound.set_value(assigned); });
         } catch (...) {
             try { bound.set_exception(std::current_exception()); } catch (...) {}
@@ -86,10 +89,18 @@ void test_api() {
     std::string event;
     check(static_cast<bool>(events.read(event)), "missing task creation event");
     check(Json::parse(event).at("event") == "task_created", "creation event was not emitted first");
+    check(static_cast<bool>(events.read(event)) && Json::parse(event).at("event") == "task_started",
+          "the first task must be running before queueing competitors");
 
     const auto queued = body(api.Post("/task", R"({"goal":"Research Fibonacci"})", "application/json"));
     const auto cancelled = body(api.Delete("/task/" + queued.at("task_id").get<std::string>()));
     check(cancelled.at("output").at("cancelled") == true, "queued task was not cancelled");
+    const auto low = body(api.Post("/task", R"({"goal":"Low","priority":1})", "application/json"));
+    const auto high = body(api.Post("/task", R"({"goal":"High","priority":10,"domain":"research"})", "application/json"));
+    const auto high_id = high.at("task_id");
+    const auto low_id = low.at("task_id");
+    check(high.at("priority") == 10 && high.at("payload").at("domain") == "research", "priority request was dropped");
+    (void)body(api.Post("/task", R"({"goal":"Invalid","priority":1.5})", "application/json"), 422);
     allow_completion.set_value();
     auto result = task;
     for (int i = 0; i < 50 && result.at("status") != "DONE"; ++i) {
@@ -98,6 +109,24 @@ void test_api() {
     }
     check(result.at("status") == "DONE" && result.at("quality_score") == 0.9, "job result was not published");
     check(body(api.Get("/tasks?limit=1")).size() == 1, "listing limit was ignored");
+    check(logged.wait_for(3s) == std::future_status::ready && logged.get().at("task_id") == high_id,
+          "conflict audit should select the higher-priority job");
+    bool saw_conflict = false;
+    auto order = Json::array();
+    for (int i = 0; i < 12; ++i) {
+        check(static_cast<bool>(events.read(event)), "missing queued task events");
+        const auto notification = Json::parse(event);
+        if (notification.at("event") == "conflict_detected") {
+            saw_conflict = notification.at("report").at("waiting").at(0).at("task_id") == low_id;
+        }
+        if (notification.at("event") == "task_started") {
+            order.push_back(notification.at("task_id"));
+        }
+        if (notification.at("event") == "task_finished" && notification.at("task_id") == low_id) {
+            break;
+        }
+    }
+    check(saw_conflict && order == Json::array({high_id, low_id}), "priority order or conflict event was incorrect");
 
     const auto failed = body(api.Post("/task", R"({"goal":"Exercise escalation"})", "application/json"));
     const auto failed_id = failed.at("task_id").get<std::string>();
