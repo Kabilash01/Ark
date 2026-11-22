@@ -6,6 +6,7 @@ string(RANDOM LENGTH 12 ALPHABET "0123456789abcdef" suffix)
 set(test_dir "${CMAKE_CURRENT_BINARY_DIR}/mvp-${suffix}")
 file(MAKE_DIRECTORY "${test_dir}")
 set(ENV{ARK_EPISODIC_DB} "${test_dir}/episodes.db")
+set(ENV{ARK_PROCEDURAL_DB} "${test_dir}/procedural.db")
 set(ENV{ARK_STATE_PATH} "${test_dir}/STATE.md")
 set(ENV{ARK_REDIS_DB} "15")
 

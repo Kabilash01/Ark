@@ -478,6 +478,11 @@ Json EpisodicMemory::search(std::string_view keyword, int limit) {
     return query("summary LIKE ?", {"%" + std::string(keyword) + "%"}, limit);
 }
 
+Json EpisodicMemory::pending_improvements(int limit) {
+    return query("agent_name = 'reflection_agent' AND json_extract(metadata, '$.self_improvement_status') = 'pending'",
+                 {}, limit);
+}
+
 namespace {
 
 constexpr auto skill_fields = "id,intent,description,steps,success_rate,use_count,last_used,source";

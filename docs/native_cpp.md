@@ -223,3 +223,17 @@ event. Older metadata remains visible in version history. Rollback requires a
 saved snapshot, and the first snapshot advances past any existing revision
 number in that history. Routed worker messages and episodic SQLite records
 carry the version used for that task.
+
+## Day 31 task reflection
+
+`run`, `dispatch`, and API jobs review the task outcome after execution. The
+Reflection Agent receives bounded attempt summaries, scores, escalations,
+and agent versions. It uses the local Ollama general model by default. Set
+`ARK_REFLECTION_MODEL` for its first Redis revision or for runs without Redis.
+An existing revision can be updated with `version-bump reflection_agent`.
+
+The task result includes `reflection`. Each review is also saved to the
+episodic database. When a successful task scores at least 0.80 and the review
+identifies a reusable procedure, the runtime saves it to `ARK_PROCEDURAL_DB`.
+`ark-cpp reflection-queue` lists pending version recommendations from
+`ARK_EPISODIC_DB`. A reflection failure is reported alongside the task outcome.

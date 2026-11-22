@@ -41,6 +41,7 @@ add_library(ark_native
     cpp/src/http.cpp
     cpp/src/kernel.cpp
     cpp/src/message.cpp
+    cpp/src/reflection.cpp
     cpp/src/research.cpp
     cpp/src/runtime_files.cpp
     cpp/src/sandbox.cpp
@@ -74,6 +75,9 @@ if(BUILD_TESTING)
     add_executable(ark_version_tests cpp/tests/versions_test.cpp)
     target_link_libraries(ark_version_tests PRIVATE ark_native)
     add_test(NAME ark_version_tests COMMAND ark_version_tests)
+    add_executable(ark_reflection_tests cpp/tests/reflection_test.cpp)
+    target_link_libraries(ark_reflection_tests PRIVATE ark_native)
+    add_test(NAME ark_reflection_tests COMMAND ark_reflection_tests)
     add_executable(ark_vector_memory_tests cpp/tests/vector_memory_test.cpp)
     target_link_libraries(ark_vector_memory_tests PRIVATE ark_native)
     add_test(NAME ark_vector_memory_tests COMMAND ark_vector_memory_tests)

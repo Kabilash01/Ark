@@ -88,6 +88,7 @@ public:
     Json by_version(std::string_view agent, std::string_view version, int limit = 50);
     Json by_time(std::string_view start, std::string_view end, int limit = 50);
     Json search(std::string_view keyword, int limit = 50);
+    Json pending_improvements(int limit = 50);
 
 private:
     struct Impl;

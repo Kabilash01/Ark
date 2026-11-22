@@ -2,6 +2,7 @@
 #include "ark/coding.hpp"
 #include "ark/evaluation.hpp"
 #include "ark/kernel.hpp"
+#include "ark/reflection.hpp"
 #include "ark/research.hpp"
 #include "ark/runtime_files.hpp"
 #include "ark/sandbox.hpp"
@@ -114,6 +115,9 @@ ark::AgentProfile actor_profile(std::string_view name, const std::string& genera
     } else if (name == "supervisor_agent") {
         defaults = ark::supervisor_profile(general_model);
         capabilities = {"SUPERVISE"};
+    } else if (name == "reflection_agent") {
+        defaults = ark::reflection_profile(env("ARK_REFLECTION_MODEL", general_model));
+        capabilities = {"REFLECT"};
     } else {
         throw std::invalid_argument("Unknown versioned agent " + std::string(name));
     }
@@ -187,6 +191,30 @@ void record_escalations(std::string_view task_id, const ark::Json& reports,
     }
 }
 
+void attach_reflection(ark::Json& result, const ark::ResearchConfig& settings, std::string_view goal,
+                       const ark::Json& attempts, ark::Redis* redis, ark::EpisodicMemory* episodes = nullptr) {
+    try {
+        const auto profile = actor_profile("reflection_agent", settings.model, redis);
+        const auto versions = result.at("agent_versions");
+        result["agent_versions"]["reflection_agent"] = profile.version;
+        std::unique_ptr<ark::EpisodicMemory> fallback;
+        if (!episodes) {
+            fallback = std::make_unique<ark::EpisodicMemory>(env("ARK_EPISODIC_DB", "data/episodic_memory.db"));
+            episodes = fallback.get();
+        }
+        ark::CurlTransport http;
+        ark::Embeddings encoder(std::ref(http), settings.ollama_url, settings.embedding_model);
+        ark::ProceduralMemory skills(skills_path(), std::move(encoder));
+        ark::ReflectionAgent review(std::ref(http), settings.ollama_url, profile);
+        result["reflection"] = review.run({{"task_id", result.at("task_id")}, {"intent", result.at("intent")},
+            {"goal", goal.substr(0, 2000)}, {"status", result.at("status")}, {"quality_score", result.at("quality_score")},
+            {"attempts", attempts}, {"escalations", result.at("escalations")},
+            {"agent_versions", versions}}, *episodes, skills);
+    } catch (const std::exception& error) {
+        result["reflection"] = {{"status", "FAILED"}, {"error", error.what()}};
+    }
+}
+
 ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, std::string_view intent = "PLAN",
                    std::string parent_id = {}, ark::Json versions = ark::Json::object()) {
     const bool via_api = !parent_id.empty();
@@ -204,6 +232,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     std::mutex state_mutex;
     int completed = 0;
     auto last = ark::Json::object();
+    auto attempts = ark::Json::array();
     std::unique_ptr<ark::Redis> redis;
     std::unique_ptr<ark::EpisodicMemory> episodes;
     if (!redis_port.empty()) {
@@ -263,20 +292,29 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
             result = ark::ResearchAgent(std::ref(http), settings, profiles.at(task.agent)).run(std::move(message));
         }
         result["retry_count"] = attempt - 1;
+        const auto& output = result.at("output");
+        const auto summary = output.value("summary", output.value("error_message", std::string{}));
         {
             const std::lock_guard lock(state_mutex);
             last = {{"agent", task.agent}, {"task", task.id}, {"version", result.at("agent_version")}};
             if (result.at("quality_score") != -1.0) {
                 last["score"] = result.at("quality_score");
             }
+            if (attempts.size() < 60) {
+                attempts.push_back({{"plan_task_id", task.id}, {"agent", task.agent}, {"intent", task.intent},
+                                    {"attempt", attempt}, {"status", result.at("status")},
+                                    {"quality_score", result.at("quality_score")}, {"summary", summary.substr(0, 500)}});
+                if (output.contains("repairs")) {
+                    attempts.back()["repairs"] = output.at("repairs");
+                }
+            }
             ark::write_state(state_path, goal, parent_id, "RUNNING", private_mode, ++completed, last);
         }
         if (episodes) {
-            const auto& output = result.at("output");
             episodes->log({
                 {"task_id", result.at("task_id")}, {"agent_name", task.agent},
                 {"agent_version", result.at("agent_version")}, {"intent", task.intent},
-                {"summary", output.value("summary", output.value("error_message", std::string{}))},
+                {"summary", summary},
                 {"quality_score", result.at("quality_score") == -1.0 ? ark::Json(nullptr) : result.at("quality_score")},
                 {"metadata", {{"parent_task_id", parent_id}, {"status", result.at("status")},
                               {"plan_task_id", task.id}, {"attempt", attempt}}},
@@ -313,9 +351,11 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         ark::MessageBus(*redis).log({{"event", "dispatch_done"}, {"task_id", parent_id},
                                      {"status", done ? "DONE" : "FAILED"}});
     }
-    return {{"task_id", parent_id}, {"intent", intent}, {"status", done ? "DONE" : "FAILED"},
-            {"dag", dag}, {"results", results}, {"quality_score", quality}, {"escalations", escalations},
-            {"agent_versions", versions}};
+    ark::Json result{{"task_id", parent_id}, {"intent", intent}, {"status", done ? "DONE" : "FAILED"},
+                     {"dag", dag}, {"results", results}, {"quality_score", quality}, {"escalations", escalations},
+                     {"agent_versions", versions}};
+    attach_reflection(result, settings, goal, attempts, redis.get(), episodes.get());
+    return result;
 }
 
 ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, const ark::Json& trusted_tests,
@@ -361,9 +401,11 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
             const auto reports = ark::Json::array({{{"plan_task_id", "planning"}, {"agent", "supervisor_agent"},
                 {"attempts", attempt}, {"last_status", retryable ? "RETRY" : "FAILED"}, {"detail", error.what()}}});
             record_escalations(task_id, reports, nullptr, redis.get(), supervisor.version);
-            return {{"task_id", task_id}, {"intent", intent}, {"status", "FAILED"},
-                    {"results", ark::Json::object()}, {"quality_score", nullptr}, {"escalations", reports},
-                    {"agent_versions", versions}};
+            ark::Json result{{"task_id", task_id}, {"intent", intent}, {"status", "FAILED"},
+                             {"results", ark::Json::object()}, {"quality_score", nullptr}, {"escalations", reports},
+                             {"agent_versions", versions}};
+            attach_reflection(result, settings, goal, ark::Json::array(), redis.get());
+            return result;
         }
     }
     ensure_evaluation(dag);
@@ -467,6 +509,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp run <goal> [tests.json]\n"
                      "       ark-cpp dispatch < dag.json\n"
                      "       ark-cpp audit|episodes\n"
+                     "       ark-cpp reflection-queue\n"
                      "       ark-cpp versions <agent>\n"
                      "       ark-cpp version-bump <agent> <patch|minor|major> <change.json>\n"
                      "       ark-cpp version-rollback <agent> <version>\n"
@@ -533,9 +576,13 @@ int main(int argc, char** argv) {
             std::cout << ark::MessageBus(redis).audit().dump(2) << '\n';
             return 0;
         }
-        if (command == "episodes" && argc == 2) {
+        if ((command == "episodes" || command == "reflection-queue") && argc == 2) {
             const std::filesystem::path path = env("ARK_EPISODIC_DB", "data/episodic_memory.db");
-            const auto entries = std::filesystem::exists(path) ? ark::EpisodicMemory(path).recent() : ark::Json::array();
+            auto entries = ark::Json::array();
+            if (std::filesystem::exists(path)) {
+                ark::EpisodicMemory episodes(path);
+                entries = command == "episodes" ? episodes.recent() : episodes.pending_improvements();
+            }
             std::cout << entries.dump(2) << '\n';
             return 0;
         }
