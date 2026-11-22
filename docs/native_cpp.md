@@ -335,3 +335,15 @@ workers or evaluation evidence.
 `/ws` emits worker activity, tool calls and results, memory writes, task
 completion, and priority conflicts. Agent activity shows the current step.
 Version bumps and rollbacks also appear as `version_updated` events via Redis.
+
+## Day 38 web dashboard
+
+Start `build/ark-cpp serve 8000` and open `http://127.0.0.1:8000/`.
+The C++ server embeds the dashboard's HTML, CSS, and browser JavaScript at
+build time. It serves both the page and the APIs on the same loopback origin.
+
+The dashboard shows the 20 agent roles, registered version numbers, running
+assignments, active and recent tasks, and the WebSocket event log. It supports
+task submission, roster filters, and pausing the visible log. The registry
+provides versions and idle or offline status. The API overlays active worker
+assignments so new dashboard connections can see work already in progress.

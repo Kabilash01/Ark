@@ -1,5 +1,6 @@
 #include "ark/api_server.hpp"
 #include "ark/conflict_resolver.hpp"
+#include "ark/dashboard_assets.hpp"
 #include "ark/done_condition.hpp"
 #include "ark/research.hpp"
 #include "ark/runtime_files.hpp"
@@ -14,6 +15,7 @@
 #include <limits>
 #include <map>
 #include <mutex>
+#include <set>
 #include <stdexcept>
 #include <thread>
 
@@ -33,6 +35,12 @@ public:
 void reply(HttpResponse& out, const Json& body, int status = 200) {
     out.status = status;
     out.set_content(body.dump(-1, ' ', false, Json::error_handler_t::replace), "application/json");
+}
+
+void dashboard_asset(HttpResponse& out, std::string_view body, const char* type) {
+    out.set_header("Cache-Control", "no-cache");
+    out.set_header("X-Content-Type-Options", "nosniff");
+    out.set_content(body.data(), body.size(), type);
 }
 
 template <typename Handler>
@@ -113,6 +121,25 @@ public:
         }
         const auto message = payload.dump();
         const std::lock_guard lock(mutex_);
+        if (event == "agent_started" || event == "agent_done") {
+            const auto agent = report.value("agent", "");
+            if (!agent.empty()) {
+                const Assignment assignment{std::string(task_id), report.value("plan_task_id", "")};
+                if (event == "agent_started") {
+                    active_[agent].insert(assignment);
+                } else if (const auto current = active_.find(agent); current != active_.end()) {
+                    current->second.erase(assignment);
+                    if (current->second.empty()) {
+                        active_.erase(current);
+                    }
+                }
+            }
+        } else if (event == "task_finished") {
+            for (auto entry = active_.begin(); entry != active_.end();) {
+                std::erase_if(entry->second, [&](const auto& assignment) { return assignment.first == task_id; });
+                entry = entry->second.empty() ? active_.erase(entry) : std::next(entry);
+            }
+        }
         for (auto* socket : sockets_) {
             if (socket->is_open()) {
                 socket->send(message);
@@ -125,9 +152,22 @@ public:
         return !sockets_.empty();
     }
 
+    Json agent_snapshot(Json agents) {
+        const std::lock_guard lock(mutex_);
+        for (auto& agent : agents) {
+            if (const auto active = active_.find(agent.at("name").get_ref<const std::string&>()); active != active_.end()) {
+                agent["status"] = "BUSY";
+                agent["current_task"] = active->second.begin()->first;
+            }
+        }
+        return agents;
+    }
+
 private:
+    using Assignment = std::pair<std::string, std::string>;
     std::mutex mutex_;
     std::vector<Socket*> sockets_;
+    std::map<std::string, std::set<Assignment>> active_;
 };
 
 class Tasks {
@@ -365,6 +405,17 @@ bool serve_api(int port, ApiServices services, std::stop_token stop, const std::
         }
         return httplib::Server::HandlerResponse::Unhandled;
     });
+    server.Get("/", [&](const HttpRequest&, HttpResponse& response) {
+        response.set_header("Content-Security-Policy", "default-src 'self'; object-src 'none'; base-uri 'none'; "
+            "frame-ancestors 'none'; connect-src 'self' ws://" + address + " ws://" + localhost);
+        dashboard_asset(response, dashboard::html, "text/html; charset=utf-8");
+    });
+    server.Get("/dashboard/styles.css", [](const HttpRequest&, HttpResponse& response) {
+        dashboard_asset(response, dashboard::css, "text/css; charset=utf-8");
+    });
+    server.Get("/dashboard/app.js", [](const HttpRequest&, HttpResponse& response) {
+        dashboard_asset(response, dashboard::js, "text/javascript; charset=utf-8");
+    });
     server.Post("/task", route([&](const HttpRequest& request, HttpResponse& response) {
         reply(response, tasks.submit(body(request)));
     }));
@@ -377,7 +428,9 @@ bool serve_api(int port, ApiServices services, std::stop_token stop, const std::
     server.Delete(R"(/task/([a-zA-Z0-9_-]+))", route([&](const HttpRequest& request, HttpResponse& response) {
         reply(response, tasks.cancel(request.matches[1]));
     }));
-    server.Get("/agents", route([&](const HttpRequest&, HttpResponse& response) { reply(response, services.agents()); }));
+    server.Get("/agents", route([&](const HttpRequest&, HttpResponse& response) {
+        reply(response, events.agent_snapshot(services.agents()));
+    }));
     server.Get(R"(/agents/([a-zA-Z0-9_-]+)/versions)", route([&](const HttpRequest& request, HttpResponse& response) {
         const auto history = services.versions(request.matches[1].str());
         if (history.is_null()) {

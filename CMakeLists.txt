@@ -62,6 +62,13 @@ set_target_properties(ark_native PROPERTIES CXX_EXTENSIONS OFF)
 
 add_library(ark_api STATIC cpp/src/api_server.cpp)
 target_link_libraries(ark_api PUBLIC ark_native PRIVATE httplib::httplib)
+foreach(asset IN ITEMS index.html styles.css app.js)
+    set(path "${CMAKE_CURRENT_SOURCE_DIR}/dashboard/${asset}")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${path}")
+    file(READ "${path}" "dashboard_${asset}")
+endforeach()
+configure_file(dashboard/assets.hpp.in generated/ark/dashboard_assets.hpp @ONLY)
+target_include_directories(ark_api PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
 add_executable(ark-cpp cpp/src/main.cpp)
 target_link_libraries(ark-cpp PRIVATE ark_api)

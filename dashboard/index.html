@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f7f3">
+  <title>Operations · ARK OS</title>
+  <link rel="stylesheet" href="/dashboard/styles.css">
+  <script src="/dashboard/app.js" type="module"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#overview" aria-label="ARK OS overview">
+        <span class="brand-mark" aria-hidden="true">A</span><span>ARK<span class="brand-os"> OS</span></span>
+      </a>
+      <nav aria-label="Dashboard sections">
+        <a href="#overview" aria-current="location">Overview</a>
+        <a href="#tasks">Tasks</a>
+        <a href="#activity">Activity</a>
+      </nav>
+      <span class="connection" id="connection" role="status"><i></i>Connecting</span>
+    </div>
+  </header>
+
+  <main id="overview" class="workspace">
+    <div class="page-heading">
+      <h1>Operations</h1>
+      <button class="primary" id="open-task" type="button"><span aria-hidden="true">+</span> New task</button>
+    </div>
+    <p id="service-error" class="service-error" role="status" hidden></p>
+
+    <section class="overview-metrics" aria-label="Runtime summary">
+      <div class="metric"><span>Agents online</span><strong id="online-count">—</strong></div>
+      <div class="metric"><span>Agents running</span><strong id="running-count">—</strong></div>
+      <div class="metric"><span>Tasks queued</span><strong id="queued-count">—</strong></div>
+      <div class="metric"><span>Recent completions</span><strong id="completed-count">—</strong></div>
+    </section>
+
+    <div class="layout">
+      <section class="agent-section" aria-labelledby="agents-heading">
+        <div class="section-heading">
+          <div><h2 id="agents-heading">Agent roster</h2><p id="agent-count">20 agents</p></div>
+          <div class="segments" id="agent-filters" aria-label="Filter agents">
+            <button type="button" data-filter="all" aria-pressed="true">All</button>
+            <button type="button" data-filter="registered" aria-pressed="false">Registered</button>
+            <button type="button" data-filter="running" aria-pressed="false">Running</button>
+          </div>
+        </div>
+        <div class="agent-grid" id="agent-grid"></div>
+      </section>
+
+      <aside class="sidebar" aria-label="Tasks and activity">
+        <section class="queue" id="tasks" aria-labelledby="tasks-heading">
+          <div class="aside-heading"><h2 id="tasks-heading">Task queue</h2><span id="active-count" class="count-pill">—</span></div>
+          <div class="queue-group"><h3>Active</h3><ul id="active-tasks" class="task-list"></ul></div>
+          <div class="queue-group"><h3>Recent</h3><ul id="recent-tasks" class="task-list"></ul></div>
+        </section>
+
+        <section class="activity" id="activity" aria-labelledby="activity-heading">
+          <div class="aside-heading">
+            <div class="activity-title"><span class="terminal-icon" aria-hidden="true">›_</span><h2 id="activity-heading">Live activity</h2></div>
+            <button class="activity-toggle" id="pause-events" type="button" aria-pressed="false">Pause</button>
+          </div>
+          <ol id="events" class="events" aria-label="Runtime events" tabindex="0"></ol>
+          <footer class="activity-footer"><span id="event-count">0 events</span><button id="clear-events" type="button">Clear</button></footer>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <dialog id="task-dialog" aria-labelledby="task-dialog-title">
+    <form id="task-form">
+      <div class="dialog-heading"><h2 id="task-dialog-title">New task</h2><button id="close-task" type="button" aria-label="Close">×</button></div>
+      <label for="goal">Goal</label>
+      <textarea id="goal" name="goal" rows="4" maxlength="8192" required placeholder="Describe what ARK should do" autofocus></textarea>
+      <label class="check"><input id="private-task" type="checkbox"> Privacy mode</label>
+      <p id="task-error" class="task-error" role="alert" hidden></p>
+      <div class="dialog-actions"><button id="cancel-task" class="secondary" type="button">Cancel</button><button id="submit-task" class="primary" type="submit">Queue task</button></div>
+    </form>
+  </dialog>
+</body>
+</html>

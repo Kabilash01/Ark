@@ -1,0 +1,11 @@
+#pragma once
+
+#include <string_view>
+
+namespace ark::dashboard {
+
+inline constexpr std::string_view html = R"arkasset(@dashboard_index.html@)arkasset";
+inline constexpr std::string_view css = R"arkasset(@dashboard_styles.css@)arkasset";
+inline constexpr std::string_view js = R"arkasset(@dashboard_app.js@)arkasset";
+
+} // namespace ark::dashboard

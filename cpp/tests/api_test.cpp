@@ -55,7 +55,8 @@ void test_api() {
                     }
                     return {{"status", "DONE"}, {"quality_score", 0.9}, {"goal", task.at("payload").at("goal")}};
                 },
-                [] { return Json::array({{{"name", "research_agent"}}}); },
+                [] { return Json::array({{{"name", "research_agent"}},
+                                         {{"name", "coding_agent"}, {"status", "IDLE"}, {"version", "1.2.0"}}}); },
                 [](std::string_view name) {
                     return name == "research_agent" ? Json::array({{{"version", "1.0.0"}}}) : Json(nullptr);
                 },
@@ -72,6 +73,14 @@ void test_api() {
     const auto assigned = port.get();
     httplib::Client api("127.0.0.1", assigned);
     api.set_read_timeout(3, 0);
+    const auto home = api.Get("/");
+    check(home && home->status == 200 && home->body.find("Agent roster") != std::string::npos
+          && home->get_header_value("Content-Security-Policy").find("connect-src 'self'") != std::string::npos,
+          "dashboard page or browser policy was missing");
+    for (const auto* path : {"/dashboard/styles.css", "/dashboard/app.js"}) {
+        const auto asset = api.Get(path);
+        check(asset && asset->status == 200 && !asset->body.empty(), "dashboard asset was not served");
+    }
 
     httplib::ws::WebSocketClient events("ws://127.0.0.1:" + std::to_string(assigned) + "/ws");
     check(static_cast<bool>(events.connect()), "WebSocket handshake failed");
@@ -101,6 +110,11 @@ void test_api() {
     check(Json::parse(event).at("event") == "task_created", "creation event was not emitted first");
     check(static_cast<bool>(events.read(event)) && Json::parse(event).at("event") == "task_started",
           "the first task must be running before queueing competitors");
+    check(static_cast<bool>(events.read(event)) && Json::parse(event).at("event") == "agent_started",
+          "the running agent did not emit its start event");
+    const auto active = body(api.Get("/agents")).at(1);
+    check(active.at("status") == "BUSY" && active.at("current_task") == first_id && active.at("version") == "1.2.0",
+          "an agent snapshot did not include its live assignment and version");
 
     const auto queued = body(api.Post("/task", R"({"goal":"Research Fibonacci","airgap_mode":true})", "application/json"));
     check(queued.at("payload").at("airgap_mode") == true && queued.at("payload").at("privacy") == true,
@@ -140,6 +154,7 @@ void test_api() {
         }
     }
     check(saw_conflict && order == Json::array({high_id, low_id}), "priority order or conflict event was incorrect");
+    check(body(api.Get("/agents")).at(1).at("status") == "IDLE", "finished jobs left an agent busy");
 
     const auto failed = body(api.Post("/task", R"({"goal":"Exercise escalation"})", "application/json"));
     const auto failed_id = failed.at("task_id").get<std::string>();
