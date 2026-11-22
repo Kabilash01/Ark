@@ -386,3 +386,6 @@ cannot obtain the evidence or evaluation needed to score a case, its score is
 is unscored. Running the full suite requires local models, Docker, Qdrant, and
 access to arXiv. Use an isolated Redis database and separate paths for state
 and SQLite stores when recording a baseline.
+
+The [Month 2 review](month2_results.md) records the live baseline and its
+verification evidence.
