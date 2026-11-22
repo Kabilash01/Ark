@@ -1,0 +1,316 @@
+{
+  "benchmark": "ARKBench",
+  "dataset_version": "0.1",
+  "duration_unit": "seconds",
+  "finished_at": "2026-11-22T06:08:38+00:00",
+  "results": [
+    {
+      "agent_version": "research_agent@1.0.0",
+      "agent_versions": {
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0",
+        "research_agent": "1.0.0"
+      },
+      "duration": 27.774432348,
+      "evidence": {
+        "citations": [
+          "1706.03762v7"
+        ],
+        "missing_arxiv_ids": []
+      },
+      "kind": "research",
+      "notes": "The artifact provides accurate information about the Transformer architecture, correctly identifying that it replaces traditional recurrent and convolutional neural networks with attention mechanisms. It also correctly explains why the architecture change enables better utilization of parallel processing, leading to faster training times. The artifact also correctly reports a specific translation result (BLEU score of 28.4 on the WMT 2014 English-to-German translation task) and distinguishes it from a general performance claim. The citation is accurate and properly formatted. The summary is clear and directly addresses the task requirements. The artifact meets all the criteria specified in the rubric.",
+      "run_task_id": "ark_20261122_060415_e5c007",
+      "score": 0.34,
+      "status": "FAILED",
+      "task_id": "research-01-transformer",
+      "evaluator_criteria": {
+        "citation_accuracy": 0.4,
+        "clarity": 0.3,
+        "coverage": 0.3
+      }
+    },
+    {
+      "agent_version": "research_agent@1.0.0",
+      "agent_versions": {
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0",
+        "research_agent": "1.0.0"
+      },
+      "duration": 28.585948275,
+      "evidence": {
+        "citations": [
+          "1512.03385v1"
+        ],
+        "missing_arxiv_ids": []
+      },
+      "kind": "research",
+      "notes": "The artifact provides a clear explanation of the training difficulty addressed by residual learning (deeper networks are more difficult to train) and what a residual block learns (the difference between input and output). It also describes a result from image recognition experiments on the ImageNet dataset, noting that an ensemble of residual networks achieved a 3.57% error rate. The artifact correctly cites the arXiv paper and includes relevant information about the dataset and ensemble usage. The explanation is accurate and meets the criteria.",
+      "run_task_id": "ark_20261122_060443_106033",
+      "score": 0.34,
+      "status": "FAILED",
+      "task_id": "research-02-residual-learning",
+      "evaluator_criteria": {
+        "citation_accuracy": 0.4,
+        "clarity": 0.3,
+        "coverage": 0.3
+      }
+    },
+    {
+      "agent_version": "research_agent@1.0.0",
+      "agent_versions": {
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0",
+        "research_agent": "1.0.0"
+      },
+      "duration": 36.490157908,
+      "evidence": {
+        "citations": [
+          "1810.04805v2",
+          "1907.11692v1"
+        ],
+        "missing_arxiv_ids": []
+      },
+      "kind": "research",
+      "notes": "The artifact provides a detailed comparison of BERT and RoBERTa, correctly identifying their contributions and the changes in interpretation of benchmark gains. However, the artifact does not explicitly cite each paper for its own contribution as required in the criteria. The citation accuracy is slightly lacking in this aspect. The coverage and clarity are adequate, but the missing citation for each paper's specific contribution results in a low score for citation accuracy.",
+      "run_task_id": "ark_20261122_060512_7a9bea",
+      "score": 0.57,
+      "status": "FAILED",
+      "task_id": "research-03-language-pretraining",
+      "evaluator_criteria": {
+        "citation_accuracy": 0.3,
+        "clarity": 0.8,
+        "coverage": 0.7
+      }
+    },
+    {
+      "agent_version": "research_agent@1.0.0",
+      "agent_versions": {
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0",
+        "research_agent": "1.0.0"
+      },
+      "duration": 27.70797194,
+      "evidence": {
+        "citations": [
+          "1711.05101v3",
+          "1412.6980v9"
+        ],
+        "missing_arxiv_ids": []
+      },
+      "kind": "research",
+      "notes": "The artifact provides a clear explanation of the purpose of Adam and how decoupled weight decay changes the treatment of regularization for adaptive optimization. It distinguishes the algorithmic change from the empirical claims and supports the comparison with both abstracts. The citations are accurate and relevant to the task. The summary is well-structured and addresses all the required elements of the query. The artifact meets all the criteria effectively.",
+      "run_task_id": "ark_20261122_060548_095c7b",
+      "score": 0.34,
+      "status": "FAILED",
+      "task_id": "research-04-adam-weight-decay",
+      "evaluator_criteria": {
+        "citation_accuracy": 0.4,
+        "clarity": 0.3,
+        "coverage": 0.3
+      }
+    },
+    {
+      "agent_version": "research_agent@1.0.0",
+      "agent_versions": {
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0",
+        "research_agent": "1.0.0"
+      },
+      "duration": 17.250846197,
+      "evidence": {
+        "citations": [
+          "1910.01108v4"
+        ],
+        "missing_arxiv_ids": []
+      },
+      "kind": "research",
+      "notes": "The artifact provides a clear explanation of DistilBERT's goal and reports the trade-offs for model size, speed, and retained performance. It correctly identifies BERT as the comparison baseline and includes the reported numbers tied to the abstract. The citation is accurate and properly formatted. The summary is well-structured and accurately cites the arXiv ID. The artifact meets all the criteria.",
+      "run_task_id": "ark_20261122_060616_5f5c80",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "research-05-model-distillation",
+      "evaluator_criteria": {
+        "citation_accuracy": 1.0,
+        "clarity": 1.0,
+        "coverage": 1.0
+      }
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "agent_versions": {
+        "coding_agent": "1.0.0",
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0"
+      },
+      "duration": 20.496073919,
+      "evidence": {
+        "acceptance_tests": {
+          "exit_code": 1,
+          "timed_out": false
+        },
+        "smoke_tests_passed": true
+      },
+      "kind": "coding",
+      "notes": "Solution failed the separate Docker acceptance tests",
+      "run_task_id": "ark_20261122_060633_933867",
+      "score": 0.0,
+      "status": "FAILED",
+      "task_id": "coding-01-merge-intervals",
+      "evaluator_criteria": {
+        "security": 0.0,
+        "style": 0.0,
+        "syntax": 1.0,
+        "tests_pass": 1.0
+      }
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "agent_versions": {
+        "coding_agent": "1.0.0",
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0"
+      },
+      "duration": 19.592485736,
+      "evidence": {
+        "acceptance_tests": {
+          "exit_code": 0,
+          "timed_out": false
+        },
+        "smoke_tests_passed": true
+      },
+      "kind": "coding",
+      "notes": "The artifact meets the criteria for style and security. The code is well-written and follows good coding practices. The function handles edge cases such as invalid window sizes and returns the correct output for valid inputs. The code is secure as it does not have any vulnerabilities that could be exploited. However, the artifact does not provide any additional information beyond the code and test results.",
+      "run_task_id": "ark_20261122_060654_a7f85c",
+      "score": 0.745,
+      "status": "DONE",
+      "task_id": "coding-02-rolling-mean",
+      "evaluator_criteria": {
+        "security": 0.15,
+        "style": 0.15,
+        "syntax": 1.0,
+        "tests_pass": 1.0
+      }
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "agent_versions": {
+        "coding_agent": "1.0.0",
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0"
+      },
+      "duration": 21.797011099,
+      "evidence": {
+        "acceptance_tests": {
+          "exit_code": 0,
+          "timed_out": false
+        },
+        "smoke_tests_passed": true
+      },
+      "kind": "coding",
+      "notes": "The artifact passes the sandbox tests and includes a solution for the topological_order function that meets the specified criteria. The code correctly handles the lexicographical selection of nodes and raises errors for invalid edges or cycles. However, the artifact does not provide any information about the style or security criteria, which are part of the evaluation.",
+      "run_task_id": "ark_20261122_060713_4ec540",
+      "score": 0.7,
+      "status": "DONE",
+      "task_id": "coding-03-topological-order",
+      "evaluator_criteria": {
+        "security": 0.0,
+        "style": 0.0,
+        "syntax": 1.0,
+        "tests_pass": 1.0
+      }
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "agent_versions": {
+        "coding_agent": "1.0.0",
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0"
+      },
+      "duration": 40.282538929,
+      "evidence": {
+        "smoke_tests_passed": false
+      },
+      "kind": "coding",
+      "notes": "Solution failed the Docker smoke tests",
+      "run_task_id": "ark_20261122_060735_1e57c4",
+      "score": 0.0,
+      "status": "FAILED",
+      "task_id": "coding-04-csv-aggregation"
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "agent_versions": {
+        "coding_agent": "1.0.0",
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0"
+      },
+      "duration": 22.641729296,
+      "evidence": {
+        "acceptance_tests": {
+          "exit_code": 1,
+          "timed_out": false
+        },
+        "smoke_tests_passed": true
+      },
+      "kind": "coding",
+      "notes": "Solution failed the separate Docker acceptance tests",
+      "run_task_id": "ark_20261122_060815_0215f1",
+      "score": 0.0,
+      "status": "FAILED",
+      "task_id": "coding-05-run-length-encoding",
+      "evaluator_criteria": {
+        "security": 0.15,
+        "style": 0.15,
+        "syntax": 1.0,
+        "tests_pass": 1.0
+      }
+    }
+  ],
+  "started_at": "2026-11-22T06:04:15+00:00",
+  "summary": {
+    "completed": 3,
+    "mean_score": 0.4035,
+    "scored": 10,
+    "total": 10
+  },
+  "provenance": {
+    "ark_commit": "7e524533e0f46f3b1d5551345b6b9c37b0776a8c",
+    "dataset_sha256": "c101d83ce342158a608356b6437cc9961ca6df91697aa33ffd8de6f451915f1c",
+    "ollama_version": "0.40.7",
+    "ollama_context_length": 4096,
+    "gpu": "NVIDIA GeForce RTX 5060 Laptop GPU",
+    "sandbox_image": "python:3.11-slim",
+    "sandbox_image_id": "sha256:07d4824036af339fa1b6ef769cc99d9c10a141769538b52b3b597c84f7a7b535",
+    "embedding_model": {
+      "name": "bge-large:latest",
+      "model_manifest_sha256": "b3d71c92805938e2c9d78e6f35e82d7cc1bd77e05b47dd2ab3016240f4021c15"
+    },
+    "agent_profiles": {
+      "evaluation_agent": {
+        "version": "1.0.0",
+        "model": "ark-day23-smoke:latest",
+        "model_manifest_sha256": "16587085b9c206dd379bcf49480287474d3fe957bfd01a742d9a5958f22565e9",
+        "prompt_sha256": "a96f2225a9fce084c2bb20695dd4c27d246c8a3cb83e8dda38ed80e49fc2448c"
+      },
+      "reflection_agent": {
+        "version": "1.0.0",
+        "model": "ark-day23-smoke:latest",
+        "model_manifest_sha256": "16587085b9c206dd379bcf49480287474d3fe957bfd01a742d9a5958f22565e9",
+        "prompt_sha256": "fda9a626d7ba706c13300448191cfd4b8c7f327e7d8c5e020b8ecf3f014dcb01"
+      },
+      "research_agent": {
+        "version": "1.0.0",
+        "model": "ark-day23-smoke:latest",
+        "model_manifest_sha256": "16587085b9c206dd379bcf49480287474d3fe957bfd01a742d9a5958f22565e9",
+        "prompt_sha256": "4788dee8bce62cc5fed97a12678d6048381aeb94edc32b8afb5ce82264abaadb"
+      },
+      "coding_agent": {
+        "version": "1.0.0",
+        "model": "qwen2.5-coder:3b",
+        "model_manifest_sha256": "f72c60cabf6237b07f6e632b2c48d533cef25eda2efbd34bed21c5e9c01e6225",
+        "prompt_sha256": "5de18425d3dcab8a6c2fb96f84119602d1e290a8e99b63e5689b0716623d4e95"
+      }
+    }
+  }
+}
