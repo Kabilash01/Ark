@@ -62,7 +62,7 @@ set_target_properties(ark_native PROPERTIES CXX_EXTENSIONS OFF)
 
 add_library(ark_api STATIC cpp/src/api_server.cpp)
 target_link_libraries(ark_api PUBLIC ark_native PRIVATE httplib::httplib)
-foreach(asset IN ITEMS index.html styles.css app.js)
+foreach(asset IN ITEMS index.html styles.css app.js inspectors.js)
     set(path "${CMAKE_CURRENT_SOURCE_DIR}/dashboard/${asset}")
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${path}")
     file(READ "${path}" "dashboard_${asset}")

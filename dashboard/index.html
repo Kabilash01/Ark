@@ -18,6 +18,7 @@
         <a href="#overview" aria-current="location">Overview</a>
         <a href="#tasks">Tasks</a>
         <a href="#activity">Activity</a>
+        <button id="open-memory" type="button">Memory</button>
       </nav>
       <span class="connection" id="connection" role="status"><i></i>Connecting</span>
     </div>
@@ -78,6 +79,14 @@
       <p id="task-error" class="task-error" role="alert" hidden></p>
       <div class="dialog-actions"><button id="cancel-task" class="secondary" type="button">Cancel</button><button id="submit-task" class="primary" type="submit">Queue task</button></div>
     </form>
+  </dialog>
+
+  <dialog id="inspector" class="inspector" aria-labelledby="inspector-title">
+    <header class="inspector-heading">
+      <div><p id="inspector-context"></p><h2 id="inspector-title"></h2></div>
+      <button id="close-inspector" type="button" aria-label="Close details">×</button>
+    </header>
+    <div id="inspector-body" class="inspector-body"></div>
   </dialog>
 </body>
 </html>

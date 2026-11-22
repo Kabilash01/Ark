@@ -1,3 +1,5 @@
+import { inspectors } from "./inspectors.js";
+
 const roster = [
   ["supervisor_agent", "Supervisor", "Management"],
   ["planner_agent", "Planner", "Management"],
@@ -25,6 +27,7 @@ const labelById = new Map(roster.map(([id, label]) => [id, label]));
 const eventNames = {
   task_created: "Task queued", task_started: "Task started", task_cancelled: "Task cancelled",
   task_completed: "Task completed", task_failed: "Task failed", task_escalated: "Task escalated",
+  plan_ready: "Plan ready",
   agent_started: "Agent started", agent_done: "Agent finished", agent_thought: "Agent activity",
   tool_called: "Tool called", tool_result: "Tool result", memory_written: "Memory written",
   conflict_detected: "Priority conflict", version_updated: "Version updated",
@@ -53,6 +56,7 @@ let refreshTimer;
 let refreshing = false;
 let needsRefresh = false;
 let reconnectDelay = 400;
+const panel = inspectors({ create, request, badge, eventRow, title, labelById, getTasks: () => tasks, scheduleRefresh });
 
 function create(tag, className, text) {
   const element = document.createElement(tag);
@@ -69,7 +73,9 @@ async function request(path, options) {
   const response = await fetch(path, { cache: "no-store", ...options });
   if (!response.ok) {
     const failure = await response.json().catch(() => ({}));
-    throw new Error(failure.detail || `Request failed (${response.status})`);
+    const error = new Error(failure.detail || `Request failed (${response.status})`);
+    error.status = response.status;
+    throw error;
   }
   return response.json();
 }
@@ -90,16 +96,26 @@ function badge(status) {
   return element;
 }
 
+function updateList(list, children) {
+  const focused = list.contains(document.activeElement) ? document.activeElement.dataset.target : undefined;
+  list.replaceChildren(...children);
+  if (focused) list.querySelector(`[data-target="${CSS.escape(focused)}"]`)?.focus({ preventScroll: true });
+}
+
 function agentCard([id, label, group]) {
   const agent = agents.get(id);
   const status = statusFor(agent);
   const card = create("article", "agent");
   card.dataset.agent = id;
   card.dataset.status = status;
-  const header = create("div", "agent-header");
+  const header = create("button", "agent-header");
+  header.type = "button";
+  header.dataset.target = id;
+  header.setAttribute("aria-label", `Version history for ${label}`);
+  header.addEventListener("click", () => panel.versions(id, label, header));
   const mark = create("span", "agent-mark", label.split(/[ -]/).slice(0, 2).map((word) => word[0]).join("").toUpperCase());
   mark.setAttribute("aria-hidden", "true");
-  const name = create("h3", "agent-name", label);
+  const name = create("span", "agent-name", label);
   name.append(create("span", "agent-group", group));
   header.append(mark, name);
   const meta = create("div", "agent-meta");
@@ -117,7 +133,7 @@ function renderAgents() {
     || (filter === "running" && statusFor(agents.get(id)) === "running"));
   byId("agent-count").textContent = `${visible.length} ${visible.length === 1 ? "agent" : "agents"}`;
   const empty = filter === "running" ? "No agents running." : "No agents registered yet.";
-  byId("agent-grid").replaceChildren(...(visible.length ? visible.map(agentCard) : [create("p", "empty", empty)]));
+  updateList(byId("agent-grid"), visible.length ? visible.map(agentCard) : [create("p", "empty", empty)]);
   const statuses = [...agents.values()].map(statusFor);
   byId("online-count").textContent = agentsLoaded ? statuses.filter((status) => status === "idle" || status === "running").length : "—";
   byId("running-count").textContent = agentsLoaded ? statuses.filter((status) => status === "running").length : "—";
@@ -137,7 +153,11 @@ function taskRow(task) {
   const item = create("li", "task-item");
   item.dataset.task = task.task_id;
   const description = create("div");
-  description.append(create("span", "task-title", task.payload?.goal || task.task_id));
+  const taskTitle = create("button", "task-title", task.payload?.goal || task.task_id);
+  taskTitle.type = "button";
+  taskTitle.dataset.target = task.task_id;
+  taskTitle.addEventListener("click", () => panel.task(task, taskTitle));
+  description.append(taskTitle);
   const timestamp = time(task.timestamp);
   timestamp.className = "task-time";
   description.append(timestamp);
@@ -150,8 +170,8 @@ function renderTasks() {
   const active = tasks.filter((task) => task.status === "RUNNING" || task.status === "PENDING");
   const recent = tasks.filter((task) => task.status !== "RUNNING" && task.status !== "PENDING");
   const loading = "Waiting for tasks…";
-  byId("active-tasks").replaceChildren(...(active.length ? active.map(taskRow) : [create("li", "empty", tasksLoaded ? "No active tasks." : loading)]));
-  byId("recent-tasks").replaceChildren(...(recent.length ? recent.map(taskRow) : [create("li", "empty", tasksLoaded ? "No completed tasks yet." : loading)]));
+  updateList(byId("active-tasks"), active.length ? active.map(taskRow) : [create("li", "empty", tasksLoaded ? "No active tasks." : loading)]);
+  updateList(byId("recent-tasks"), recent.length ? recent.map(taskRow) : [create("li", "empty", tasksLoaded ? "No completed tasks yet." : loading)]);
   byId("active-count").textContent = tasksLoaded ? `${active.length} active` : "—";
   byId("queued-count").textContent = tasksLoaded ? active.filter((task) => task.status === "PENDING").length : "—";
   byId("completed-count").textContent = tasksLoaded ? recent.filter((task) => task.status === "DONE").length : "—";
@@ -219,6 +239,7 @@ function onEvent(frame) {
   let event;
   try { event = JSON.parse(frame.data); } catch { return; }
   if (!event || typeof event.event !== "string") return;
+  panel.onEvent(event);
   if (event.event.startsWith("task_") || event.event === "agent_started" || event.event === "agent_done" || event.event === "version_updated") {
     scheduleRefresh();
   }
@@ -283,6 +304,7 @@ function updateNavigation() {
 }
 window.addEventListener("hashchange", updateNavigation);
 updateNavigation();
+byId("open-memory").addEventListener("click", (event) => panel.memory(event.currentTarget));
 
 const dialog = byId("task-dialog");
 byId("open-task").addEventListener("click", () => dialog.showModal());

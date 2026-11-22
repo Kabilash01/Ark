@@ -7,5 +7,6 @@ namespace ark::dashboard {
 inline constexpr std::string_view html = R"arkasset(@dashboard_index.html@)arkasset";
 inline constexpr std::string_view css = R"arkasset(@dashboard_styles.css@)arkasset";
 inline constexpr std::string_view js = R"arkasset(@dashboard_app.js@)arkasset";
+inline constexpr std::string_view inspectors = R"arkasset(@dashboard_inspectors.js@)arkasset";
 
 } // namespace ark::dashboard

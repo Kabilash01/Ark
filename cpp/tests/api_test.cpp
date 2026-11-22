@@ -64,6 +64,13 @@ void test_api() {
                     return Json::array({{{"tier", tier}, {"query", query}, {"task_id", task_id}, {"limit", limit}}});
                 },
                 [&](const Json& conflict) { audit.set_value(conflict); },
+                {},
+                [](std::string_view agent, std::string_view version) -> Json {
+                    if (agent != "research_agent" || version != "1.0.0") {
+                        throw std::invalid_argument("No prompt snapshot");
+                    }
+                    return {{"version", version}};
+                },
             }, stop, [&](int assigned) { bound.set_value(assigned); });
         } catch (...) {
             try { bound.set_exception(std::current_exception()); } catch (...) {}
@@ -77,7 +84,7 @@ void test_api() {
     check(home && home->status == 200 && home->body.find("Agent roster") != std::string::npos
           && home->get_header_value("Content-Security-Policy").find("connect-src 'self'") != std::string::npos,
           "dashboard page or browser policy was missing");
-    for (const auto* path : {"/dashboard/styles.css", "/dashboard/app.js"}) {
+    for (const auto* path : {"/dashboard/styles.css", "/dashboard/app.js", "/dashboard/inspectors.js"}) {
         const auto asset = api.Get(path);
         check(asset && asset->status == 200 && !asset->body.empty(), "dashboard asset was not served");
     }
@@ -89,6 +96,10 @@ void test_api() {
     const auto agents = body(api.Get("/agents"));
     check(agents.at(0).at("name") == "research_agent", "registry was not exposed");
     check(body(api.Get("/agents/research_agent/versions")).at(0).at("version") == "1.0.0", "version list was not exposed");
+    const std::string rollback = "/agents/research_agent/versions/1.0.0/rollback";
+    check(body(api.Post(rollback, "{}", "application/json")).at("version") == "1.0.0", "rollback route failed");
+    (void)body(api.Post(rollback, "{}", "text/plain"), 415);
+    (void)body(api.Post("/agents/research_agent/versions/2.0.0/rollback", "{}", "application/json"), 404);
     (void)body(api.Get("/agents/nonexistent/versions"), 404);
     const auto results = body(api.Post("/memory/search", R"({"query":"attention","top_k":9})", "application/json"));
     check(results.at("results").at(0).at("limit") == 9, "memory limit not forwarded");
@@ -135,6 +146,10 @@ void test_api() {
         std::this_thread::sleep_for(10ms);
     }
     check(result.at("status") == "DONE" && result.at("quality_score") == 0.9, "job result was not published");
+    const auto history = body(api.Get("/task/" + first_id + "/events"));
+    check(history.at(0).at("event") == "task_created" && history.at(2).at("event") == "agent_started",
+          "task inspection did not retain lifecycle and worker events");
+    (void)body(api.Get("/task/missing/events"), 404);
     check(body(api.Get("/tasks?limit=1")).size() == 1, "listing limit was ignored");
     check(logged.wait_for(3s) == std::future_status::ready && logged.get().at("task_id") == high_id,
           "conflict audit should select the higher-priority job");

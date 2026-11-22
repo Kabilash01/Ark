@@ -8,6 +8,7 @@
 #include <cmath>
 #include <iomanip>
 #include <limits>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 
@@ -229,6 +230,17 @@ Json AgentVersioner::bump(std::string_view agent, std::string_view change_type, 
 Json AgentVersioner::history(std::string_view agent) {
     agent_key(agent);
     return AgentRegistry(redis_).history(agent);
+}
+
+Json AgentVersioner::history_with_rollback_availability(std::string_view agent) {
+    auto entries = history(agent);
+    if (!entries.empty()) {
+        const auto versions = redis_.command({"HKEYS", revisions_key(agent)}).get<std::set<std::string>>();
+        for (auto& entry : entries) {
+            entry["rollback_available"] = versions.contains(entry.at("version").get<std::string>());
+        }
+    }
+    return entries;
 }
 
 Json AgentVersioner::rollback(std::string_view agent, std::string_view version) {

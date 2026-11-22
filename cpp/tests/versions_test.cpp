@@ -68,6 +68,8 @@ void versions_and_rollback(int port) {
     check(baseline.at(0).at("prompt_hash") == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
           "baseline must hash the actual system prompt");
     check(!baseline.at(0).contains("prompts"), "public history exposed prompt contents");
+    check(versioner.history_with_rollback_availability(name).at(0).at("rollback_available") == true,
+          "stored baseline was missing from rollback options");
 
     const auto patch = versioner.bump(name, "patch", {{"model", "new-model"},
         {"prompts", {{"system", "new instructions"}}}, {"benchmark_score", 0.62}, {"change_summary", "New instructions"}});
@@ -113,6 +115,9 @@ void preserves_legacy_history(int port) {
     check(fixture.registry.version(fixture.name, "1.0.0", 0.4, "Legacy rollback"), "legacy rollback fixture failed");
     check(fixture.active().version == "1.2.1", "migration reused a legacy version");
     check(fixture.versioner.history(fixture.name).size() == 3, "migration discarded legacy history");
+    const auto options = fixture.versioner.history_with_rollback_availability(fixture.name);
+    check(options.at(0).at("rollback_available") == false && options.back().at("rollback_available") == true,
+          "rollback availability must match stored prompt snapshots");
     try {
         fixture.versioner.rollback(fixture.name, "1.2.0");
     } catch (const std::invalid_argument&) {

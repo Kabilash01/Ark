@@ -347,3 +347,17 @@ assignments, active and recent tasks, and the WebSocket event log. It supports
 task submission, roster filters, and pausing the visible log. The registry
 provides versions and idle or offline status. The API overlays active worker
 assignments so new dashboard connections can see work already in progress.
+
+## Day 39 dashboard inspection
+
+Open a task in the queue to see its dependency layers, run log, output, and
+JSON download. The API retains up to 160 events per recent task for the
+lifetime of the server.
+
+The Memory browser can browse and search all four tiers. Working memory
+requires a task ID. Episodic search matches the summary. Semantic and
+procedural search use the existing local embeddings.
+
+Open an agent card to see its revision history, benchmark score changes,
+and the active version. Rollback is available for saved prompt snapshots
+and goes through the same versioner as the CLI, with a Redis audit event.

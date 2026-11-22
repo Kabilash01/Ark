@@ -36,8 +36,8 @@ section[id], main[id] { scroll-margin: 24px; }
 .brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; color: #fff; background: var(--green-dark); font-size: 17px; }
 .brand-os { color: var(--muted); font-weight: 610; }
 .topbar nav { flex: 1; display: flex; align-self: stretch; align-items: stretch; gap: 26px; }
-.topbar nav a { display: flex; align-items: center; margin-bottom: -1px; border-bottom: 2px solid transparent; color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 600; }
-.topbar nav a:hover, .topbar nav a[aria-current] { color: var(--green-dark); }
+.topbar nav a, .topbar nav button { display: flex; align-items: center; margin-bottom: -1px; padding: 0; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 600; }
+.topbar nav a:hover, .topbar nav button:hover, .topbar nav a[aria-current] { color: var(--green-dark); }
 .topbar nav a[aria-current] { border-color: var(--green); }
 .connection { display: flex; align-items: center; gap: 8px; padding: 3px 10px; border: 1px solid var(--line); border-radius: 99px; color: var(--muted); font-size: 12px; white-space: nowrap; }
 .connection i, .status i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
@@ -71,7 +71,9 @@ h2 { font-size: 20px; letter-spacing: -.04em; line-height: 1.2; }
 .segments button:hover { color: var(--green-dark); }
 .agent-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11px; }
 .agent { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); padding: 12px 12px 10px; }
-.agent-header { display: flex; gap: 9px; align-items: center; min-width: 0; }
+.agent-header { display: flex; gap: 9px; align-items: center; min-width: 0; width: 100%; color: inherit; padding: 0; border: 0; background: transparent; text-align: left; }
+.agent-header::after { content: "›"; margin-left: auto; color: #627b6b; font-size: 18px; line-height: 1; }
+.agent-header:hover .agent-name { color: var(--green); }
 .agent-mark { flex: 0 0 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; background: #eaf0e8; color: #426752; font-size: 11px; font-weight: 750; letter-spacing: .04em; }
 .agent-name { min-width: 0; font-size: 13px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
 .agent-group { display: block; color: var(--muted); font-size: 11px; font-weight: 450; margin-top: 2px; }
@@ -97,7 +99,8 @@ h2 { font-size: 20px; letter-spacing: -.04em; line-height: 1.2; }
 .queue-group ul { max-height: 190px; overflow: auto; }
 .task-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 0; }
 .task-item + .task-item { border-top: 1px solid #edf0ec; }
-.task-title { overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 12px; line-height: 1.3; font-weight: 650; }
+.task-title { overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 12px; line-height: 1.3; font-weight: 650; text-align: left; padding: 0; color: inherit; border: 0; background: transparent; }
+.task-title:hover { text-decoration: underline; }
 .task-time { color: var(--muted); font: 10px ui-monospace, monospace; }
 .empty { color: var(--muted); font-size: 12px; padding: 6px 0; }
 .agent-grid .empty { grid-column: 1 / -1; border: 1px dashed #c6d0c6; border-radius: var(--radius); background: var(--paper); padding: 22px; }
@@ -129,6 +132,43 @@ dialog textarea { width: 100%; resize: vertical; padding: 9px; border: 1px solid
 .dialog-actions { display: flex; justify-content: end; gap: 8px; margin-top: 6px; }
 .task-error { color: #8b3941; font-size: 13px; }
 
+.inspector { width: min(860px, calc(100vw - 32px)); max-height: min(86vh, 890px); padding: 0; }
+.inspector-heading { display: flex; align-items: start; justify-content: space-between; gap: 16px; padding: 19px 22px; border-bottom: 1px solid var(--line); background: #f3f6f0; }
+.inspector-heading p { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+.inspector-heading h2 { font-size: clamp(21px, 3vw, 29px); overflow-wrap: anywhere; }
+.inspector-heading button { border: 1px solid transparent; border-radius: 6px; padding: 0; flex: 0 0 30px; height: 30px; background: transparent; color: var(--muted); font-size: 22px; line-height: 1; }
+.inspector-heading button:hover { background: var(--paper); border-color: var(--line); }
+.inspector-body { padding: 16px 22px 22px; display: grid; gap: 16px; min-width: 0; }
+.inspector-bar { display: flex; align-items: center; gap: 8px; justify-content: space-between; flex-wrap: wrap; }
+.inspector-bar .version { overflow-wrap: anywhere; }
+.inspector-section { display: grid; gap: 8px; min-width: 0; }
+.inspector-section h3 { font-size: 13px; font-weight: 700; }
+.inspection-code { max-height: 300px; overflow: auto; padding: 11px 13px; margin: 0; border: 1px solid var(--line); border-radius: 8px; background: #f5f7f3; font: 12px/1.5 ui-monospace, Consolas, monospace; }
+.dag { display: grid; gap: 8px; }
+.dag-layer { display: flex; gap: 8px; flex-wrap: wrap; position: relative; }
+.dag-layer + .dag-layer { padding-top: 10px; border-top: 1px dashed #bdcdbf; }
+.dag-node { min-width: 140px; flex: 1 1 150px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #f6f8f4; overflow-wrap: anywhere; }
+.dag-node strong { margin-right: 5px; color: var(--green-dark); font-family: ui-monospace, monospace; font-size: 12px; }
+.dag-node p { margin-top: 4px; color: var(--muted); font-size: 11px; }
+.inspect-events { max-height: 210px; overflow: auto; border-radius: 8px; padding: 4px 12px; background: #14261e; }
+.inspect-events .empty { color: #adccba; }
+.inspect-events .event:last-child { border-bottom: 0; }
+.inspect-table { width: 100%; border-collapse: collapse; min-width: 575px; font-size: 12px; }
+.table-wrap { overflow: auto; }
+.inspect-table th, .inspect-table td { border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; padding: 7px 6px; }
+.inspect-table th { color: var(--muted); background: #f5f7f3; font-weight: 650; }
+.inspect-table td:nth-child(2) { white-space: nowrap; }
+.inspect-table td:last-child { text-align: right; }
+.inspect-table .secondary { min-height: 30px; padding: 3px 7px; white-space: nowrap; }
+.active-version { display: block; color: var(--green); font-size: 10px; font-weight: 650; }
+.memory-form { display: flex; align-items: end; gap: 8px; flex-wrap: wrap; }
+.memory-field { display: grid; gap: 4px; flex: 1 1 150px; min-width: 0; color: var(--muted); font-size: 12px; font-weight: 650; }
+.memory-field select, .memory-field input { min-width: 0; width: 100%; min-height: 40px; border: 1px solid #cbd6cd; border-radius: 7px; padding: 6px 8px; background: white; color: var(--ink); font: 13px system-ui, sans-serif; }
+.memory-entries { display: grid; gap: 8px; }
+.memory-entry { border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; min-width: 0; }
+.memory-entry summary { cursor: pointer; overflow-wrap: anywhere; color: var(--green-dark); font-size: 13px; font-weight: 650; }
+.memory-entry pre { margin-top: 7px; }
+
 @media (max-width: 1140px) {
   .agent-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -140,7 +180,7 @@ dialog textarea { width: 100%; resize: vertical; padding: 9px; border: 1px solid
 @media (max-width: 590px) {
   .topbar-inner { min-height: 58px; gap: 13px; }
   .topbar nav { gap: 12px; }
-  .topbar nav a { font-size: 11px; }
+  .topbar nav a, .topbar nav button { font-size: 11px; }
   .brand { font-size: 13px; gap: 5px; }
   .brand-mark { width: 23px; height: 23px; font-size: 13px; border-radius: 5px; }
   .connection { padding-inline: 6px; font-size: 10px; gap: 4px; }
@@ -155,6 +195,7 @@ dialog textarea { width: 100%; resize: vertical; padding: 9px; border: 1px solid
   .agent { padding-inline: 8px; }
   .segments button { padding-inline: 5px; }
   .sidebar { grid-template-columns: minmax(0, 1fr); }
+  .inspector-heading, .inspector-body { padding-inline: 13px; }
 }
 @media (max-width: 355px) {
   .topbar nav { gap: 7px; }

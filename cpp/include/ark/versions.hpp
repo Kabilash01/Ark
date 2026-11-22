@@ -20,6 +20,7 @@ public:
     AgentProfile ensure(std::string_view agent, const Json& capabilities, const AgentProfile& defaults);
     Json bump(std::string_view agent, std::string_view change_type, const Json& change);
     Json history(std::string_view agent);
+    Json history_with_rollback_availability(std::string_view agent);
     Json rollback(std::string_view agent, std::string_view version);
     Json compare(std::string_view agent, std::string_view from, std::string_view to);
 

@@ -121,6 +121,16 @@ public:
         }
         const auto message = payload.dump();
         const std::lock_guard lock(mutex_);
+        if (event == "task_created") {
+            history_.try_emplace(std::string(task_id));
+        }
+        if (const auto entry = history_.find(task_id); entry != history_.end()) {
+            auto& log = entry->second;
+            log.push_back(std::move(payload));
+            if (log.size() > 160) {
+                log.pop_front();
+            }
+        }
         if (event == "agent_started" || event == "agent_done") {
             const auto agent = report.value("agent", "");
             if (!agent.empty()) {
@@ -163,11 +173,23 @@ public:
         return agents;
     }
 
+    Json history(const std::string& id) {
+        const std::lock_guard lock(mutex_);
+        const auto log = history_.find(id);
+        return log == history_.end() ? Json::array() : Json(log->second);
+    }
+
+    void forget(const std::string& id) {
+        const std::lock_guard lock(mutex_);
+        history_.erase(id);
+    }
+
 private:
     using Assignment = std::pair<std::string, std::string>;
     std::mutex mutex_;
     std::vector<Socket*> sockets_;
     std::map<std::string, std::set<Assignment>> active_;
+    std::map<std::string, std::deque<Json>, std::less<>> history_;
 };
 
 class Tasks {
@@ -224,6 +246,7 @@ public:
                     return status != "RUNNING" && status != "PENDING";
                 });
                 if (expired != order_.end()) {
+                    events_.forget(*expired);
                     tasks_.erase(*expired);
                     order_.erase(expired);
                 }
@@ -247,6 +270,12 @@ public:
     Json get(const std::string& id) {
         const std::lock_guard lock(mutex_);
         return find(id);
+    }
+
+    Json history(const std::string& id) {
+        const std::lock_guard lock(mutex_);
+        (void)find(id);
+        return events_.history(id);
     }
 
     Json recent(int limit) {
@@ -416,11 +445,17 @@ bool serve_api(int port, ApiServices services, std::stop_token stop, const std::
     server.Get("/dashboard/app.js", [](const HttpRequest&, HttpResponse& response) {
         dashboard_asset(response, dashboard::js, "text/javascript; charset=utf-8");
     });
+    server.Get("/dashboard/inspectors.js", [](const HttpRequest&, HttpResponse& response) {
+        dashboard_asset(response, dashboard::inspectors, "text/javascript; charset=utf-8");
+    });
     server.Post("/task", route([&](const HttpRequest& request, HttpResponse& response) {
         reply(response, tasks.submit(body(request)));
     }));
     server.Get(R"(/task/([a-zA-Z0-9_-]+))", route([&](const HttpRequest& request, HttpResponse& response) {
         reply(response, tasks.get(request.matches[1]));
+    }));
+    server.Get(R"(/task/([a-zA-Z0-9_-]+)/events)", route([&](const HttpRequest& request, HttpResponse& response) {
+        reply(response, tasks.history(request.matches[1].str()));
     }));
     server.Get("/tasks", route([&](const HttpRequest& request, HttpResponse& response) {
         reply(response, tasks.recent(count_param(request)));
@@ -438,6 +473,17 @@ bool serve_api(int port, ApiServices services, std::stop_token stop, const std::
         }
         reply(response, history);
     }));
+    if (services.rollback) {
+        server.Post(R"(/agents/([a-zA-Z0-9_-]+)/versions/([0-9]+\.[0-9]+\.[0-9]+)/rollback)",
+            route([&](const HttpRequest& request, HttpResponse& response) {
+                (void)body(request);
+                try {
+                    reply(response, services.rollback(request.matches[1].str(), request.matches[2].str()));
+                } catch (const std::invalid_argument& error) {
+                    throw HttpFailure(404, error.what());
+                }
+            }));
+    }
     server.Get(R"(/memory/([a-z]+))", route([&](const HttpRequest& request, HttpResponse& response) {
         const auto tier = request.matches[1].str();
         if (tier != "working" && tier != "episodic" && tier != "semantic" && tier != "procedural") {

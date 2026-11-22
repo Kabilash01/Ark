@@ -316,6 +316,14 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     for (const auto& [name, profile] : profiles) {
         versions[name] = profile.version;
     }
+    if (events) {
+        auto plan = ark::Json::array();
+        for (const auto& task : dag.at("tasks")) {
+            plan.push_back({{"task_id", task.at("task_id")}, {"agent", task.at("agent")},
+                            {"depends_on", task.at("depends_on")}});
+        }
+        emit(events, "plan_ready", {{"tasks", std::move(plan)}});
+    }
     if (!episode_path.empty()) {
         episodes = std::make_unique<ark::EpisodicMemory>(episode_path);
     }
@@ -599,7 +607,11 @@ ark::Json memory_tier(std::string_view tier, std::string_view query, std::string
     }
     if (tier == "episodic") {
         const std::filesystem::path path = env("ARK_EPISODIC_DB", "data/episodic_memory.db");
-        return std::filesystem::exists(path) ? ark::EpisodicMemory(path).recent(limit) : ark::Json::array();
+        if (!std::filesystem::exists(path)) {
+            return ark::Json::array();
+        }
+        ark::EpisodicMemory episodes(path);
+        return query.empty() ? episodes.recent(limit) : episodes.search(query, limit);
     }
     if (tier == "working") {
         return ark::Json::array();
@@ -639,7 +651,7 @@ int serve(int port) {
         [=](std::string_view name) {
             ark::Redis redis(redis_port, redis_db);
             ark::AgentRegistry registry(redis);
-            auto history = registry.history(name);
+            auto history = ark::AgentVersioner(redis).history_with_rollback_availability(name);
             return history.empty() && registry.get(name).is_null() ? ark::Json(nullptr) : std::move(history);
         },
         memory_tier,
@@ -659,6 +671,10 @@ int serve(int port) {
                 }
             }
             return reports;
+        },
+        [=](std::string_view name, std::string_view version) {
+            ark::Redis redis(redis_port, redis_db);
+            return ark::AgentVersioner(redis).rollback(name, version);
         },
     });
     if (!listened) {
