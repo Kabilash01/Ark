@@ -7,12 +7,14 @@
 #include "ark/sandbox.hpp"
 #include "ark/storage.hpp"
 #include "ark/vector_memory.hpp"
+#include "ark/versions.hpp"
 
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -94,16 +96,47 @@ int run_sandbox() {
     return output.exit_code == 0 ? 0 : output.timed_out ? 124 : 1;
 }
 
-ark::Json run_coding(ark::CurlTransport& http, const ark::ResearchConfig& settings, ark::Json message) {
+ark::AgentProfile actor_profile(std::string_view name, const std::string& general_model, ark::Redis* redis) {
+    ark::Json capabilities;
+    ark::AgentProfile defaults;
+    if (name == "research_agent") {
+        defaults = ark::research_profile(general_model);
+        capabilities = {"RESEARCH", "SEARCH"};
+    } else if (name == "coding_agent") {
+        defaults = ark::coding_profile(configured_model("ARK_CODE_MODEL", "code"));
+        capabilities = {"CODE"};
+    } else if (name == "evaluation_agent") {
+        defaults = ark::evaluation_profile(env("ARK_EVAL_MODEL", general_model));
+        capabilities = {"EVALUATE"};
+    } else if (name == "planner_agent") {
+        defaults = ark::planner_profile(general_model);
+        capabilities = {"PLAN"};
+    } else if (name == "supervisor_agent") {
+        defaults = ark::supervisor_profile(general_model);
+        capabilities = {"SUPERVISE"};
+    } else {
+        throw std::invalid_argument("Unknown versioned agent " + std::string(name));
+    }
+    return redis ? ark::AgentVersioner(*redis).ensure(name, capabilities, defaults) : defaults;
+}
+
+std::unique_ptr<ark::Redis> version_store(bool required = false) {
+    const auto port = env("ARK_REDIS_PORT", required ? "6379" : "");
+    return port.empty() ? nullptr : std::make_unique<ark::Redis>(std::stoi(port), std::stoi(env("ARK_REDIS_DB", "0")));
+}
+
+ark::Json run_coding(ark::CurlTransport& http, const ark::ResearchConfig& settings, ark::Json message,
+                     const ark::AgentProfile& profile) {
     const ark::DockerSandbox sandbox(std::ref(http), env("ARK_DOCKER_SOCKET", "/var/run/docker.sock"),
                                      env("ARK_SANDBOX_IMAGE", "python:3.11-slim"));
-    const ark::CodingAgent worker(std::ref(http), settings.ollama_url, configured_model("ARK_CODE_MODEL", "code"),
+    const ark::CodingAgent worker(std::ref(http), settings.ollama_url, profile,
                                   [&](const auto& workspace) { return sandbox.run_tests(workspace); });
     return worker.run(std::move(message));
 }
 
-ark::Json run_evaluation(ark::CurlTransport& http, const ark::ResearchConfig& settings, ark::Json message) {
-    const ark::EvaluationAgent worker(std::ref(http), settings.ollama_url, env("ARK_EVAL_MODEL", settings.model));
+ark::Json run_evaluation(ark::CurlTransport& http, const ark::ResearchConfig& settings, ark::Json message,
+                         const ark::AgentProfile& profile) {
+    const ark::EvaluationAgent worker(std::ref(http), settings.ollama_url, profile);
     return worker.run(std::move(message));
 }
 
@@ -133,7 +166,8 @@ ark::Json recall(const ark::ResearchConfig& settings, std::string_view goal) {
 }
 
 void record_escalations(std::string_view task_id, const ark::Json& reports,
-                        ark::EpisodicMemory* episodes = nullptr, ark::Redis* redis = nullptr) {
+                        ark::EpisodicMemory* episodes = nullptr, ark::Redis* redis = nullptr,
+                        std::string_view supervisor_version = "1.0.0") {
     if (reports.empty()) {
         return;
     }
@@ -144,7 +178,7 @@ void record_escalations(std::string_view task_id, const ark::Json& reports,
     }
     for (const auto& report : reports) {
         episodes->log({{"task_id", task_id}, {"agent_name", "supervisor_agent"},
-                       {"agent_version", "supervisor_agent@1.0.0"}, {"intent", "SUPERVISE"},
+                       {"agent_version", "supervisor_agent@" + std::string(supervisor_version)}, {"intent", "SUPERVISE"},
                        {"summary", "Escalation: " + report.at("detail").get<std::string>()},
                        {"metadata", {{"event", "task_escalated"}, {"report", report}}}});
         if (redis) {
@@ -154,7 +188,7 @@ void record_escalations(std::string_view task_id, const ark::Json& reports,
 }
 
 ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, std::string_view intent = "PLAN",
-                   std::string parent_id = {}) {
+                   std::string parent_id = {}, ark::Json versions = ark::Json::object()) {
     const bool via_api = !parent_id.empty();
     if (!via_api) {
         parent_id = ark::make_message("user", "supervisor_agent", intent, ark::Json::object())
@@ -175,17 +209,20 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     if (!redis_port.empty()) {
         redis = std::make_unique<ark::Redis>(std::stoi(redis_port), redis_db);
         ark::MessageBus(*redis).log({{"event", "dispatch_start"}, {"task_id", parent_id}});
-        ark::AgentRegistry registry(*redis);
-        if (registry.get("research_agent").is_null()) {
-            registry.add("research_agent", {"RESEARCH", "SEARCH"}, settings.model, "1.0.0");
+    }
+    const auto profiles = [&] {
+        std::map<std::string, ark::AgentProfile> resolved;
+        for (const auto& layer : ark::order_tasks(dag)) {
+            for (const auto& task : layer) {
+                if (task.agent != "memory_agent" && !resolved.contains(task.agent)) {
+                    resolved.emplace(task.agent, actor_profile(task.agent, settings.model, redis.get()));
+                }
+            }
         }
-        if (registry.get("coding_agent").is_null()) {
-            const auto model = env("ARK_CODE_MODEL", "active-models.json:code");
-            registry.add("coding_agent", {"CODE"}, model, "1.0.0");
-        }
-        if (registry.get("evaluation_agent").is_null()) {
-            registry.add("evaluation_agent", {"EVALUATE"}, env("ARK_EVAL_MODEL", settings.model), "1.0.0");
-        }
+        return resolved;
+    }();
+    for (const auto& [name, profile] : profiles) {
+        versions[name] = profile.version;
     }
     if (!episode_path.empty()) {
         episodes = std::make_unique<ark::EpisodicMemory>(episode_path);
@@ -218,12 +255,12 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
             } else if (feedback.contains("tests")) {
                 message["payload"]["test_files"] = feedback.at("tests");
             }
-            result = run_coding(http, settings, std::move(message));
+            result = run_coding(http, settings, std::move(message), profiles.at(task.agent));
         } else if (task.agent == "evaluation_agent") {
             message["payload"]["instruction"] = goal + "\n" + task.instruction;
-            result = run_evaluation(http, settings, std::move(message));
+            result = run_evaluation(http, settings, std::move(message), profiles.at(task.agent));
         } else {
-            result = ark::ResearchAgent(std::ref(http), settings).run(std::move(message));
+            result = ark::ResearchAgent(std::ref(http), settings, profiles.at(task.agent)).run(std::move(message));
         }
         result["retry_count"] = attempt - 1;
         {
@@ -257,7 +294,8 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         const auto record = registry.get(name);
         return !record.is_null() && record.at("status") != "OFFLINE" && registry.heartbeat(name);
     });
-    record_escalations(parent_id, escalations, episodes.get(), redis.get());
+    record_escalations(parent_id, escalations, episodes.get(), redis.get(),
+                       versions.value("supervisor_agent", "1.0.0"));
     const bool done = std::all_of(results.begin(), results.end(), [](const auto& result) {
         return result.at("status") == "DONE";
     });
@@ -276,7 +314,8 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
                                      {"status", done ? "DONE" : "FAILED"}});
     }
     return {{"task_id", parent_id}, {"intent", intent}, {"status", done ? "DONE" : "FAILED"},
-            {"dag", dag}, {"results", results}, {"quality_score", quality}, {"escalations", escalations}};
+            {"dag", dag}, {"results", results}, {"quality_score", quality}, {"escalations", escalations},
+            {"agent_versions", versions}};
 }
 
 ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, const ark::Json& trusted_tests,
@@ -285,7 +324,11 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
         throw std::invalid_argument("Trusted tests must be a JSON object mapping names to file contents");
     }
     ark::CurlTransport http;
-    const ark::Planner planner(std::ref(http), settings.ollama_url, settings.model);
+    const auto redis = version_store(!task_id.empty());
+    const auto supervisor = actor_profile("supervisor_agent", settings.model, redis.get());
+    const auto plan_profile = actor_profile("planner_agent", settings.model, redis.get());
+    const ark::Planner planner(std::ref(http), settings.ollama_url, supervisor, plan_profile);
+    const ark::Json versions{{"supervisor_agent", supervisor.version}, {"planner_agent", plan_profile.version}};
     auto lower_goal = std::string(goal);
     std::transform(lower_goal.begin(), lower_goal.end(), lower_goal.begin(),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
@@ -317,9 +360,10 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
             }
             const auto reports = ark::Json::array({{{"plan_task_id", "planning"}, {"agent", "supervisor_agent"},
                 {"attempts", attempt}, {"last_status", retryable ? "RETRY" : "FAILED"}, {"detail", error.what()}}});
-            record_escalations(task_id, reports);
+            record_escalations(task_id, reports, nullptr, redis.get(), supervisor.version);
             return {{"task_id", task_id}, {"intent", intent}, {"status", "FAILED"},
-                    {"results", ark::Json::object()}, {"quality_score", nullptr}, {"escalations", reports}};
+                    {"results", ark::Json::object()}, {"quality_score", nullptr}, {"escalations", reports},
+                    {"agent_versions", versions}};
         }
     }
     ensure_evaluation(dag);
@@ -329,12 +373,33 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
     if (!trusted_tests.empty()) {
         dag["coding_test_files"] = trusted_tests;
     }
-    return dispatch(dag, settings, intent, std::move(task_id));
+    return dispatch(dag, settings, intent, std::move(task_id), versions);
 }
 
 int print_run(const ark::Json& result) {
     std::cout << result.dump(2) << '\n';
     return result.at("status") == "DONE" ? 0 : 1;
+}
+
+int manage_versions(std::string_view command, std::string_view agent, char** arguments) {
+    const auto redis = version_store(true);
+    ark::AgentVersioner versioner(*redis);
+    ark::Json result;
+    if (command == "versions") {
+        result = versioner.history(agent);
+    } else if (command == "version-compare") {
+        result = versioner.compare(agent, arguments[0], arguments[1]);
+    } else if (command == "version-rollback") {
+        result = versioner.rollback(agent, arguments[0]);
+    } else {
+        const auto change = ark::read_json(arguments[1]);
+        if (!versioner.initialized(agent)) {
+            actor_profile(agent, agent == "coding_agent" ? "" : configured_model("ARK_MODEL", "general"), redis.get());
+        }
+        result = versioner.bump(agent, arguments[0], change);
+    }
+    std::cout << result.dump(2) << '\n';
+    return 0;
 }
 
 ark::Json memory_tier(std::string_view tier, std::string_view query, std::string_view task_id, int limit) {
@@ -402,6 +467,10 @@ int main(int argc, char** argv) {
                      "       ark-cpp run <goal> [tests.json]\n"
                      "       ark-cpp dispatch < dag.json\n"
                      "       ark-cpp audit|episodes\n"
+                     "       ark-cpp versions <agent>\n"
+                     "       ark-cpp version-bump <agent> <patch|minor|major> <change.json>\n"
+                     "       ark-cpp version-rollback <agent> <version>\n"
+                     "       ark-cpp version-compare <agent> <from> <to>\n"
                      "       ark-cpp memory <query>\n"
                      "       ark-cpp skill-add < skill.json\n"
                      "       ark-cpp sandbox < workspace.json\n"
@@ -411,6 +480,10 @@ int main(int argc, char** argv) {
     }
     try {
         const std::string_view command = argv[1];
+        if ((command == "versions" && argc == 3) || (command == "version-rollback" && argc == 4)
+            || ((command == "version-bump" || command == "version-compare") && argc == 5)) {
+            return manage_versions(command, argv[2], argv + 3);
+        }
         if (command == "serve" && argc <= 3) {
             return serve(argc == 3 ? std::stoi(argv[2]) : 8000);
         }
@@ -425,7 +498,9 @@ int main(int argc, char** argv) {
                 ? ark::make_message("user", "research_agent", "RESEARCH", {{"instruction", argv[2]}})
                 : ark::Json::parse(std::cin);
             ark::CurlTransport http;
-            ark::ResearchAgent agent(std::ref(http), config());
+            const auto settings = config();
+            const auto redis = version_store();
+            ark::ResearchAgent agent(std::ref(http), settings, actor_profile("research_agent", settings.model, redis.get()));
             const auto result = agent.run(std::move(message));
             std::cout << result.dump(2) << '\n';
             return result.at("status") == "DONE" ? 0 : 1;
@@ -435,13 +510,18 @@ int main(int argc, char** argv) {
                 ? ark::make_message("user", "coding_agent", "CODE", {{"instruction", argv[2]}})
                 : ark::Json::parse(std::cin);
             ark::CurlTransport http;
-            const auto result = run_coding(http, config(false), std::move(message));
+            const auto redis = version_store();
+            const auto result = run_coding(http, config(false), std::move(message),
+                                           actor_profile("coding_agent", "", redis.get()));
             std::cout << result.dump(2) << '\n';
             return result.at("status") == "DONE" ? 0 : 1;
         }
         if (command == "evaluate" && argc == 2) {
             ark::CurlTransport http;
-            const auto result = run_evaluation(http, config(), ark::Json::parse(std::cin));
+            const auto settings = config();
+            const auto redis = version_store();
+            const auto result = run_evaluation(http, settings, ark::Json::parse(std::cin),
+                                               actor_profile("evaluation_agent", settings.model, redis.get()));
             std::cout << result.dump(2) << '\n';
             return result.at("status") == "DONE" ? 0 : 1;
         }
@@ -481,7 +561,10 @@ int main(int argc, char** argv) {
         if ((command == "classify" || command == "plan") && argc == 3) {
             const auto settings = config();
             ark::CurlTransport http;
-            const ark::Planner planner(std::ref(http), settings.ollama_url, settings.model);
+            const auto redis = version_store();
+            const ark::Planner planner(std::ref(http), settings.ollama_url,
+                actor_profile("supervisor_agent", settings.model, redis.get()),
+                actor_profile("planner_agent", settings.model, redis.get()));
             if (command == "classify") {
                 std::cout << ark::Json{{"intent", planner.classify(argv[2])}}.dump() << '\n';
                 return 0;

@@ -188,10 +188,17 @@ Json read_json(const std::filesystem::path& path) {
 }
 
 ResearchAgent::ResearchAgent(Transport transport, ResearchConfig config)
-    : transport_(std::move(transport)), config_(std::move(config)) {
+    : ResearchAgent(std::move(transport), config, research_profile(config.model)) {}
+
+AgentProfile research_profile(std::string model) {
+    return {version, std::move(model), {{"query", std::string(query_prompt)}, {"synthesis", std::string(synthesis_prompt)}}};
+}
+
+ResearchAgent::ResearchAgent(Transport transport, ResearchConfig config, AgentProfile profile)
+    : transport_(std::move(transport)), config_(std::move(config)), profile_(std::move(profile)) {
     config_.ollama_url = local_base_url(config_.ollama_url);
     config_.qdrant_url = local_base_url(config_.qdrant_url);
-    if (trim(config_.model).empty() || !config_.privacy.is_object()) {
+    if (trim(profile_.model).empty() || !config_.privacy.is_object()) {
         throw std::invalid_argument("Research requires a local general model and a privacy configuration object");
     }
 }
@@ -200,7 +207,7 @@ Json ResearchAgent::run(Json message) {
     if (!message.is_object()) {
         throw std::invalid_argument("An ARKMessage must be a JSON object");
     }
-    message["agent_version"] = std::string(agent_name) + "@" + version;
+    message["agent_version"] = std::string(agent_name) + "@" + profile_.version;
     try {
         if (!pending_for(message, agent_name)) {
             throw std::invalid_argument("Invalid ARKMessage");
@@ -214,14 +221,14 @@ Json ResearchAgent::run(Json message) {
     } catch (const std::exception& error) {
         message["status"] = dynamic_cast<const TransientHttpError*>(&error) ? "RETRY" : "FAILED";
         message["output"] = {{"error_type", "ResearchError"}, {"error_message", error.what()},
-                             {"agent", agent_name}, {"agent_version", version}};
+                             {"agent", agent_name}, {"agent_version", profile_.version}};
         message["quality_score"] = 0.0;
     }
     return message;
 }
 
 Json ResearchAgent::chat(std::string_view prompt, const std::string& content) {
-    const auto output = Json::parse(chat_local(transport_, config_.ollama_url, config_.model,
+    const auto output = Json::parse(chat_local(transport_, config_.ollama_url, profile_.model,
                                                prompt, content));
     if (!output.is_object()) {
         throw std::runtime_error("Local model must return a JSON object");
@@ -289,7 +296,8 @@ Json ResearchAgent::run_research(const Json& payload) {
              match != end; ++match) {
             add_id((*match)[1]);
         }
-        query = requested.empty() ? string_field(chat(query_prompt, instruction), "query") : "arXiv:" + requested.front();
+        query = requested.empty() ? string_field(chat(profile_.prompts.at("query"), instruction), "query")
+                                  : "arXiv:" + requested.front();
     }
     if (query.empty() || query.size() > 512) {
         throw std::invalid_argument("Research queries must contain 1 to 512 bytes");
@@ -349,7 +357,7 @@ Json ResearchAgent::run_research(const Json& payload) {
     if (payload.contains("review_feedback")) {
         synthesis["review_feedback"] = payload.at("review_feedback");
     }
-    return validate_summary(query, chat(synthesis_prompt, synthesis.dump()), citations);
+    return validate_summary(query, chat(profile_.prompts.at("synthesis"), synthesis.dump()), citations);
 }
 
 void ResearchAgent::persist(const Json& sources) {

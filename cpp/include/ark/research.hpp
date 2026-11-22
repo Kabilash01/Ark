@@ -2,10 +2,13 @@
 
 #include "ark/http.hpp"
 #include "ark/message.hpp"
+#include "ark/versions.hpp"
 
 #include <filesystem>
 
 namespace ark {
+
+AgentProfile research_profile(std::string model);
 
 struct ResearchConfig {
     std::string model;
@@ -20,11 +23,13 @@ struct ResearchConfig {
 class ResearchAgent {
 public:
     explicit ResearchAgent(Transport transport, ResearchConfig config);
+    ResearchAgent(Transport transport, ResearchConfig config, AgentProfile profile);
     Json run(Json message);
 
 private:
     Transport transport_;
     ResearchConfig config_;
+    AgentProfile profile_;
 
     Json run_research(const Json& payload);
     Json chat(std::string_view prompt, const std::string& content);

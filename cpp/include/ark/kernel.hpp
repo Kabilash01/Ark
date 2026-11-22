@@ -2,6 +2,7 @@
 
 #include "ark/http.hpp"
 #include "ark/message.hpp"
+#include "ark/versions.hpp"
 
 #include <cstddef>
 #include <functional>
@@ -41,9 +42,13 @@ SupervisedRun supervise_plan(const Json& dag, const AttemptHandler& execute,
 std::string chat_local(const Transport& transport, std::string_view url, std::string_view model,
                        std::string_view prompt, std::string_view content, const Json& format = "json");
 
+AgentProfile supervisor_profile(std::string model);
+AgentProfile planner_profile(std::string model);
+
 class Planner {
 public:
     Planner(Transport transport, std::string local_url, std::string model);
+    Planner(Transport transport, std::string local_url, AgentProfile supervisor, AgentProfile planner);
 
     std::string classify(std::string_view goal) const;
     Json plan(std::string_view goal, const std::vector<std::string>& agents,
@@ -52,7 +57,8 @@ public:
 private:
     Transport transport_;
     std::string local_url_;
-    std::string model_;
+    AgentProfile supervisor_;
+    AgentProfile planner_;
 };
 
 } // namespace ark

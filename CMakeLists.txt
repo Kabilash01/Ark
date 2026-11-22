@@ -45,7 +45,8 @@ add_library(ark_native
     cpp/src/runtime_files.cpp
     cpp/src/sandbox.cpp
     cpp/src/storage.cpp
-    cpp/src/vector_memory.cpp)
+    cpp/src/vector_memory.cpp
+    cpp/src/versions.cpp)
 target_compile_features(ark_native PUBLIC cxx_std_20)
 target_include_directories(ark_native PUBLIC cpp/include)
 target_link_libraries(ark_native PUBLIC nlohmann_json::nlohmann_json
@@ -70,6 +71,9 @@ if(BUILD_TESTING)
     add_executable(ark_storage_tests cpp/tests/storage_test.cpp)
     target_link_libraries(ark_storage_tests PRIVATE ark_native)
     add_test(NAME ark_storage_tests COMMAND ark_storage_tests)
+    add_executable(ark_version_tests cpp/tests/versions_test.cpp)
+    target_link_libraries(ark_version_tests PRIVATE ark_native)
+    add_test(NAME ark_version_tests COMMAND ark_version_tests)
     add_executable(ark_vector_memory_tests cpp/tests/vector_memory_test.cpp)
     target_link_libraries(ark_vector_memory_tests PRIVATE ark_native)
     add_test(NAME ark_vector_memory_tests COMMAND ark_vector_memory_tests)

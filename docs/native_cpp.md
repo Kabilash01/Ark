@@ -189,3 +189,37 @@ records the report in episodic SQLite. Dispatch also adds a Redis audit event
 when Redis is configured. The API emits `task_escalated` on `/ws` before
 `task_finished`. Routed ARKMessages count supervisor retries in
 `retry_count`. Coding's in-attempt repairs remain in `output.repairs`.
+
+## Day 30 agent versioning
+
+With Redis enabled, the C++ runtime saves the built-in prompts and configured
+model the first time it initializes each agent. The API enables Redis by default.
+For CLI execution, set `ARK_REDIS_PORT` and use the same `ARK_REDIS_DB` for
+workflow and version-management commands. CLI execution without Redis uses the
+built-in prompts and the configured models directly. With Redis, change a saved
+model through a version bump. Each dispatched worker uses the same snapshot
+throughout a run, including retries.
+
+```bash
+export ARK_REDIS_PORT=6379
+build/ark-cpp version-bump evaluation_agent patch change.json
+build/ark-cpp versions evaluation_agent
+build/ark-cpp version-compare evaluation_agent 1.0.0 1.0.1
+build/ark-cpp version-rollback evaluation_agent 1.0.0
+```
+
+`change.json` requires `change_summary`. Supply any of `prompts`, `model`,
+`benchmark_score` (0 to 1), and `changed_by` (defaults to `manual`). The
+`prompts` object replaces the named prompts you supply. Use `system` for
+`coding_agent`, `evaluation_agent`, `planner_agent`, and `supervisor_agent`.
+`research_agent` uses `query` and `synthesis`. Changes become active on a
+successful `patch`, `minor`, or `major` bump.
+
+`GET /agents/{name}/versions` and `ark-cpp versions` show revision metadata
+including the prompt hash. `version-compare` returns the second version's
+benchmark score minus the first when both have scores. `version-rollback`
+restores the saved prompts and model for subsequent runs and writes an audit
+event. Older metadata remains visible in version history. Rollback requires a
+saved snapshot, and the first snapshot advances past any existing revision
+number in that history. Routed worker messages and episodic SQLite records
+carry the version used for that task.

@@ -60,8 +60,15 @@ Artifact artifact_for(const Json& payload, const Json& memory) {
 } // namespace
 
 EvaluationAgent::EvaluationAgent(Transport transport, std::string url, std::string model)
-    : transport_(std::move(transport)), url_(local_base_url(url)), model_(std::move(model)) {
-    if (model_.empty()) {
+    : EvaluationAgent(std::move(transport), std::move(url), evaluation_profile(std::move(model))) {}
+
+AgentProfile evaluation_profile(std::string model) {
+    return {version, std::move(model), {{"system", std::string(prompt)}}};
+}
+
+EvaluationAgent::EvaluationAgent(Transport transport, std::string url, AgentProfile profile)
+    : transport_(std::move(transport)), url_(local_base_url(url)), profile_(std::move(profile)) {
+    if (profile_.model.empty()) {
         throw std::invalid_argument("Evaluation requires a local model");
     }
 }
@@ -70,7 +77,7 @@ Json EvaluationAgent::run(Json message) const {
     if (!message.is_object()) {
         throw std::invalid_argument("An ARKMessage must be a JSON object");
     }
-    message["agent_version"] = std::string(name) + "@" + version;
+    message["agent_version"] = std::string(name) + "@" + profile_.version;
     try {
         if (!pending_for(message, name) || message.at("intent") != "EVALUATE") {
             throw std::invalid_argument("EvaluationAgent requires a pending EVALUATE message");
@@ -103,7 +110,8 @@ Json EvaluationAgent::run(Json message) const {
             }}};
         const auto input = Json{{"instruction", payload.value("instruction", "Evaluate the artifact")},
                                 {"type", type}, {"criteria", criteria}, {"artifact", std::move(artifact)}};
-        const auto judged = Json::parse(chat_local(transport_, url_, model_, prompt, input.dump(), score_format));
+        const auto judged = Json::parse(chat_local(transport_, url_, profile_.model, profile_.prompts.at("system"),
+                                                   input.dump(), score_format));
         const auto& judged_scores = judged.at("scores");
         auto scores = Json::object();
         double total = 0;
@@ -132,7 +140,7 @@ Json EvaluationAgent::run(Json message) const {
         message["status"] = dynamic_cast<const TransientHttpError*>(&error) ? "RETRY" : "FAILED";
         message["quality_score"] = 0.0;
         message["output"] = {{"error_type", "EvaluationError"}, {"error_message", error.what()},
-                             {"agent", name}, {"agent_version", version}};
+                             {"agent", name}, {"agent_version", profile_.version}};
     }
     return message;
 }

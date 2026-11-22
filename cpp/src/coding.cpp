@@ -80,8 +80,15 @@ std::string cap(const std::string& value) {
 } // namespace
 
 CodingAgent::CodingAgent(Transport transport, std::string url, std::string model, TestRunner test_runner)
-    : transport_(std::move(transport)), url_(local_base_url(url)), model_(std::move(model)), test_(std::move(test_runner)) {
-    if (model_.empty() || !test_) {
+    : CodingAgent(std::move(transport), std::move(url), coding_profile(std::move(model)), std::move(test_runner)) {}
+
+AgentProfile coding_profile(std::string model) {
+    return {version, std::move(model), {{"system", std::string(prompt)}}};
+}
+
+CodingAgent::CodingAgent(Transport transport, std::string url, AgentProfile profile, TestRunner test_runner)
+    : transport_(std::move(transport)), url_(local_base_url(url)), profile_(std::move(profile)), test_(std::move(test_runner)) {
+    if (profile_.model.empty() || !test_) {
         throw std::invalid_argument("Coding requires a local model and an isolated test runner");
     }
 }
@@ -90,7 +97,7 @@ Json CodingAgent::run(Json message) const {
     if (!message.is_object()) {
         throw std::invalid_argument("An ARKMessage must be a JSON object");
     }
-    message["agent_version"] = std::string(name) + "@" + version;
+    message["agent_version"] = std::string(name) + "@" + profile_.version;
     try {
         if (!pending_for(message, name) || message.at("intent") != "CODE") {
             throw std::invalid_argument("CodingAgent requires a pending CODE message");
@@ -108,7 +115,7 @@ Json CodingAgent::run(Json message) const {
         message["status"] = dynamic_cast<const TransientHttpError*>(&error) ? "RETRY" : "FAILED";
         message["quality_score"] = 0.0;
         message["output"] = {{"error_type", "CodingError"}, {"error_message", error.what()},
-                             {"agent", name}, {"agent_version", version}};
+                             {"agent", name}, {"agent_version", profile_.version}};
     }
     return message;
 }
@@ -129,7 +136,7 @@ Json CodingAgent::solve(const Json& payload, const Json& memory, int repairs) co
         if (!tests.empty()) {
             input["locked_tests"] = tests;
         }
-        const auto proposed = Json::parse(chat_local(transport_, url_, model_, prompt, input.dump(),
+        const auto proposed = Json::parse(chat_local(transport_, url_, profile_.model, profile_.prompts.at("system"), input.dump(),
                                                      coding_format(!tests.empty())));
         auto filename = proposed.at("filename").get<std::string>();
         if (!filename.empty() && filename.find('.') == std::string::npos) {

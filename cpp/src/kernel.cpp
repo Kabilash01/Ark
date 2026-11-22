@@ -346,13 +346,25 @@ std::string chat_local(const Transport& transport, std::string_view url, std::st
 }
 
 Planner::Planner(Transport transport, std::string local_url, std::string model)
-    : transport_(std::move(transport)), local_url_(local_base_url(local_url)), model_(std::move(model)) {}
+    : Planner(std::move(transport), std::move(local_url), supervisor_profile(model), planner_profile(model)) {}
+
+AgentProfile supervisor_profile(std::string model) {
+    return {"1.0.0", std::move(model), {{"system", std::string(classifier)}}};
+}
+
+AgentProfile planner_profile(std::string model) {
+    return {"1.0.0", std::move(model), {{"system", std::string(planner)}}};
+}
+
+Planner::Planner(Transport transport, std::string local_url, AgentProfile supervisor, AgentProfile plan)
+    : transport_(std::move(transport)), local_url_(local_base_url(local_url)), supervisor_(std::move(supervisor)),
+      planner_(std::move(plan)) {}
 
 std::string Planner::classify(std::string_view goal) const {
     static constexpr std::array allowed{
         "RESEARCH", "SEARCH", "CODE", "EXECUTE", "EVALUATE", "DISCOVER", "BROWSE", "SECURITY", "VISION",
     };
-    const auto output = Json::parse(chat_local(transport_, local_url_, model_, classifier, goal));
+    const auto output = Json::parse(chat_local(transport_, local_url_, supervisor_.model, supervisor_.prompts.at("system"), goal));
     const auto intent = output.at("intent").get<std::string>();
     if (!contains(allowed, intent)) {
         throw std::runtime_error("Local model returned an unknown goal intent");
@@ -368,7 +380,8 @@ Json Planner::plan(std::string_view goal, const std::vector<std::string>& agents
     if (!context.empty()) {
         input["memory_context"] = context;
     }
-    const auto output = Json::parse(chat_local(transport_, local_url_, model_, planner, input.dump(), plan_format(agents)));
+    const auto output = Json::parse(chat_local(transport_, local_url_, planner_.model, planner_.prompts.at("system"),
+                                               input.dump(), plan_format(agents)));
     for (const auto& layer : order_tasks(output)) {
         for (const auto& task : layer) {
             if (!contains(agents, task.agent)) {
