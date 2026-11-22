@@ -1,0 +1,102 @@
+{
+  "version": "0.1",
+  "tasks": [
+    {
+      "task_id": "research-01-transformer",
+      "kind": "research",
+      "goal": "Explain which components the Transformer replaces with attention, why the architecture changes training parallelism, and one translation result reported in the abstract. Distinguish the reported result from a general performance claim.",
+      "required_arxiv_ids": [
+        "1706.03762"
+      ]
+    },
+    {
+      "task_id": "research-02-residual-learning",
+      "kind": "research",
+      "goal": "Explain the training difficulty addressed by residual learning and what a residual block learns relative to its input. Describe one result from the image recognition experiments, identifying the dataset and whether the result concerns a single network or an ensemble when the abstract says so.",
+      "required_arxiv_ids": [
+        "1512.03385"
+      ]
+    },
+    {
+      "task_id": "research-03-language-pretraining",
+      "kind": "research",
+      "goal": "Compare the central contribution of BERT with the pretraining study in RoBERTa. Explain what the later study changes about the interpretation of benchmark gains and identify what the two abstracts leave unresolved. Cite each paper for its own contribution.",
+      "required_arxiv_ids": [
+        "1810.04805",
+        "1907.11692"
+      ]
+    },
+    {
+      "task_id": "research-04-adam-weight-decay",
+      "kind": "research",
+      "goal": "Explain the purpose of Adam and how decoupled weight decay changes the treatment of regularization for adaptive optimization. Distinguish the algorithmic change from the empirical claims and support the comparison with both abstracts.",
+      "required_arxiv_ids": [
+        "1412.6980",
+        "1711.05101"
+      ]
+    },
+    {
+      "task_id": "research-05-model-distillation",
+      "kind": "research",
+      "goal": "Explain the goal of DistilBERT and which trade-offs the authors report for model size, speed, and retained performance. Identify the comparison baseline and keep any reported numbers tied to what the abstract measures.",
+      "required_arxiv_ids": [
+        "1910.01108"
+      ]
+    },
+    {
+      "task_id": "coding-01-merge-intervals",
+      "kind": "coding",
+      "goal": "Write solution.py with merge_intervals(intervals). The input is a list of [start, end] integer pairs with start <= end. Return sorted merged [start, end] lists. Merge closed intervals that overlap or share an endpoint. Do not change the input list or its nested lists. Return [] for empty input.",
+      "test_files": {
+        "test_smoke.py": "import unittest\n\nfrom solution import merge_intervals\n\n\nclass SmokeTests(unittest.TestCase):\n    def test_touching(self):\n        self.assertEqual(merge_intervals([[1, 3], [3, 4]]), [[1, 4]])\n"
+      },
+      "acceptance_tests": {
+        "test_acceptance.py": "import unittest\n\nfrom solution import merge_intervals\n\n\nclass AcceptanceTests(unittest.TestCase):\n    def test_mixed_intervals_without_mutation(self):\n        intervals = [[8, 10], [-4, -2], [1, 4], [2, 3], [-2, 1], [9, 12]]\n        original = [interval[:] for interval in intervals]\n        self.assertEqual(merge_intervals(intervals), [[-4, 4], [8, 12]])\n        self.assertEqual(intervals, original)\n\n    def test_disjoint_and_empty(self):\n        self.assertEqual(merge_intervals([[3, 4], [1, 2]]), [[1, 2], [3, 4]])\n        self.assertEqual(merge_intervals([]), [])\n"
+      }
+    },
+    {
+      "task_id": "coding-02-rolling-mean",
+      "kind": "coding",
+      "goal": "Write solution.py with rolling_mean(values, window). For a list of finite numeric values and a positive integer window, return the mean of every complete contiguous window in input order. Return [] when the window is larger than the input. Raise ValueError for a zero or negative window. Preserve the input.",
+      "test_files": {
+        "test_smoke.py": "import unittest\n\nfrom solution import rolling_mean\n\n\nclass SmokeTests(unittest.TestCase):\n    def test_rolling(self):\n        self.assertEqual(rolling_mean([1, 3, 5], 2), [2.0, 4.0])\n"
+      },
+      "acceptance_tests": {
+        "test_acceptance.py": "import unittest\n\nfrom solution import rolling_mean\n\n\nclass AcceptanceTests(unittest.TestCase):\n    def test_fractional_negative_input(self):\n        values = [2.5, -1.0, 4.5, 0.0]\n        result = rolling_mean(values, 3)\n        self.assertEqual(len(result), 2)\n        self.assertAlmostEqual(result[0], 2.0)\n        self.assertAlmostEqual(result[1], 3.5 / 3.0)\n        self.assertEqual(values, [2.5, -1.0, 4.5, 0.0])\n\n    def test_boundaries(self):\n        self.assertEqual(rolling_mean([2, -4], 1), [2.0, -4.0])\n        self.assertEqual(rolling_mean([], 1), [])\n        self.assertEqual(rolling_mean([20], 2), [])\n        for window in (0, -1):\n            with self.assertRaises(ValueError):\n                rolling_mean([1], window)\n"
+      }
+    },
+    {
+      "task_id": "coding-03-topological-order",
+      "kind": "coding",
+      "goal": "Write solution.py with topological_order(nodes, edges). Nodes is a list of distinct strings. Each (before, after) edge requires before to precede after. At each step, choose the lexicographically smallest available node. Include isolated nodes and count duplicate edges once. Raise ValueError for a cycle or for an edge that mentions an undeclared node.",
+      "test_files": {
+        "test_smoke.py": "import unittest\n\nfrom solution import topological_order\n\n\nclass SmokeTests(unittest.TestCase):\n    def test_precedence(self):\n        self.assertEqual(topological_order(['c', 'b', 'a'], [('b', 'c')]), ['a', 'b', 'c'])\n"
+      },
+      "acceptance_tests": {
+        "test_acceptance.py": "import unittest\n\nfrom solution import topological_order\n\n\nclass AcceptanceTests(unittest.TestCase):\n    def test_available_order_with_parallel_dependencies(self):\n        nodes = ['z', 'd', 'c', 'a', 'b']\n        edges = [('a', 'd'), ('b', 'c'), ('b', 'c'), ('d', 'c')]\n        self.assertEqual(topological_order(nodes, edges), ['a', 'b', 'd', 'c', 'z'])\n        self.assertEqual(topological_order([], []), [])\n\n    def test_invalid_edges(self):\n        with self.assertRaises(ValueError):\n            topological_order(['a', 'b'], [('a', 'b'), ('b', 'a')])\n        with self.assertRaises(ValueError):\n            topological_order(['a'], [('a', 'missing')])\n"
+      }
+    },
+    {
+      "task_id": "coding-04-csv-aggregation",
+      "kind": "coding",
+      "goal": "Write solution.py with aggregate_sales(csv_text). Read CSV with columns city and amount. Trim surrounding whitespace from both fields, preserve case in city names, and sum signed integer amounts by city. Handle quoted CSV fields and skip empty lines. Return an empty dict for a header-only input. Raise ValueError for a blank city or a missing or invalid amount.",
+      "test_files": {
+        "test_smoke.py": "import unittest\n\nfrom solution import aggregate_sales\n\n\nclass SmokeTests(unittest.TestCase):\n    def test_totals(self):\n        self.assertEqual(aggregate_sales('city,amount\\nA,2\\nA,3\\nB,1\\n'), {'A': 5, 'B': 1})\n"
+      },
+      "acceptance_tests": {
+        "test_acceptance.py": "import unittest\n\nfrom solution import aggregate_sales\n\n\nclass AcceptanceTests(unittest.TestCase):\n    def test_quoted_fields_and_negative_sales(self):\n        data = 'city,amount\\r\\n\" Paris, TX \", 4\\r\\n\\r\\n\"Paris, TX\",-2\\r\\nparis,3\\r\\n'\n        self.assertEqual(aggregate_sales(data), {'Paris, TX': 2, 'paris': 3})\n        self.assertEqual(aggregate_sales('city,amount\\n'), {})\n\n    def test_invalid_rows(self):\n        for row in ('A,nope', 'A,1.5', ' ,2', 'B'):\n            with self.subTest(row=row), self.assertRaises(ValueError):\n                aggregate_sales('city,amount\\n' + row + '\\n')\n"
+      }
+    },
+    {
+      "task_id": "coding-05-run-length-encoding",
+      "kind": "coding",
+      "goal": "Write solution.py with encode_runs(text) and decode_runs(runs). Encode adjacent equal Unicode characters as a list of (one_character_string, positive_integer_count) tuples. Decode these pairs back to a string. Empty inputs produce an empty list or string. Raise ValueError for a run with a multi-character or empty string, a non-integer count, or a count less than one.",
+      "test_files": {
+        "test_smoke.py": "import unittest\n\nfrom solution import decode_runs, encode_runs\n\n\nclass SmokeTests(unittest.TestCase):\n    def test_basic_round_trip(self):\n        runs = [('a', 2), ('b', 1)]\n        self.assertEqual(encode_runs('aab'), runs)\n        self.assertEqual(decode_runs(runs), 'aab')\n"
+      },
+      "acceptance_tests": {
+        "test_acceptance.py": "import unittest\n\nfrom solution import decode_runs, encode_runs\n\n\nclass AcceptanceTests(unittest.TestCase):\n    def test_unicode_and_adjacent_groups(self):\n        text = 'éé🐙é  \\n'\n        expected = [('é', 2), ('🐙', 1), ('é', 1), (' ', 2), ('\\n', 1)]\n        self.assertEqual(encode_runs(text), expected)\n        self.assertEqual(decode_runs(expected), text)\n        self.assertEqual(encode_runs(''), [])\n        self.assertEqual(decode_runs([]), '')\n\n    def test_invalid_runs(self):\n        for runs in ([('xy', 1)], [('', 2)], [('x', 0)], [('x', -4)], [('x', 1.5)]):\n            with self.subTest(runs=runs), self.assertRaises(ValueError):\n                decode_runs(runs)\n"
+      }
+    }
+  ]
+}

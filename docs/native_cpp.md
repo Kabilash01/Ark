@@ -361,3 +361,28 @@ procedural search use the existing local embeddings.
 Open an agent card to see its revision history, benchmark score changes,
 and the active version. Rollback is available for saved prompt snapshots
 and goes through the same versioner as the CLI, with a Redis audit event.
+
+## Day 40 ARKBench v0.1
+
+The [v0.1 suite](../benchmarks/arkbench/benchmark_v0.1.json) defines five
+abstract-based research tasks and five coding tasks. Each case runs a fixed
+two-step graph through the native dispatcher. It measures the selected
+research or coding worker and its evaluator without varying the plan.
+
+```bash
+build/ark-cpp benchmark benchmarks/arkbench/benchmark_v0.1.json build/arkbench-report.json
+```
+
+The default suite path is relative to the repository root. The runner prints
+the JSON report and, when a report path is supplied, saves progress after each
+case. Each row includes the dataset task ID, producer version, all participating
+agent versions, score, elapsed seconds, notes, and evidence. Research evidence
+includes the actual arXiv revisions cited. Coding cases give the worker smoke
+tests and run separate acceptance tests on the solution in Docker.
+
+Missing required citations and failed coding tests score zero. When the runner
+cannot obtain the evidence or evaluation needed to score a case, its score is
+`null` and the report retains the reason. The command exits nonzero if any case
+is unscored. Running the full suite requires local models, Docker, Qdrant, and
+access to arXiv. Use an isolated Redis database and separate paths for state
+and SQLite stores when recording a baseline.

@@ -1,4 +1,5 @@
 #include "ark/api_server.hpp"
+#include "ark/benchmark.hpp"
 #include "ark/coding.hpp"
 #include "ark/done_condition.hpp"
 #include "ark/evaluation.hpp"
@@ -567,6 +568,31 @@ int print_run(const ark::Json& result) {
     return result.at("status") == "DONE" ? 0 : 1;
 }
 
+int benchmark(const std::filesystem::path& suite_path, const std::filesystem::path& report_path) {
+    if (!report_path.empty() && std::filesystem::weakly_canonical(suite_path) == std::filesystem::weakly_canonical(report_path)) {
+        throw std::invalid_argument("Benchmark report path must differ from the suite path");
+    }
+    const auto suite = ark::read_json(suite_path);
+    const auto settings = config();
+    ark::CurlTransport http;
+    const ark::DockerSandbox sandbox(std::ref(http), env("ARK_DOCKER_SOCKET", "/var/run/docker.sock"),
+                                     env("ARK_SANDBOX_IMAGE", "python:3.11-slim"));
+    const auto report = ark::run_benchmark(suite,
+        [&](const ark::Json& dag) { return dispatch(dag, settings, "BENCHMARK"); },
+        [&](const ark::SandboxWorkspace& workspace) { return sandbox.run_tests(workspace); },
+        [&](const ark::Json& partial) {
+            if (!report_path.empty()) {
+                ark::write_json(report_path, partial);
+            }
+        });
+    if (!report_path.empty()) {
+        ark::write_json(report_path, report);
+    }
+    std::cout << report.dump(2, ' ', false, ark::Json::error_handler_t::replace) << '\n';
+    const auto& totals = report.at("summary");
+    return totals.at("scored") == totals.at("total") ? 0 : 1;
+}
+
 void api_command(std::string_view path, std::string_view method = "GET") {
     ark::CurlTransport http;
     const auto port = std::stoi(env("ARK_API_PORT", "8000"));
@@ -708,12 +734,17 @@ int main(int argc, char** argv) {
                      "       ark-cpp memory search <query> | show <tier> [task_id]\n"
                      "       ark-cpp skill-add < skill.json\n"
                      "       ark-cpp sandbox < workspace.json\n"
+                     "       ark-cpp benchmark [suite.json] [report.json]\n"
                      "       ark-cpp serve [port]\n"
                      "Research without an instruction reads an ARKMessage from stdin.\n";
         return argc < 2 ? 2 : 0;
     }
     try {
         const std::string_view command = argv[1];
+        if (command == "benchmark" && argc <= 4) {
+            return benchmark(argc >= 3 ? argv[2] : "benchmarks/arkbench/benchmark_v0.1.json",
+                             argc == 4 ? argv[3] : "");
+        }
         if ((command == "versions" && argc == 3) || (command == "version-rollback" && argc == 4)
             || ((command == "version-bump" || command == "version-compare") && argc == 5)) {
             return manage_versions(command, argv[2], argv + 3);

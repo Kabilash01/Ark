@@ -36,6 +36,7 @@ if(NOT nlohmann_json_FOUND)
 endif()
 
 add_library(ark_native
+    cpp/src/benchmark.cpp
     cpp/src/coding.cpp
     cpp/src/conflict_resolver.cpp
     cpp/src/done_condition.cpp
@@ -75,6 +76,10 @@ target_link_libraries(ark-cpp PRIVATE ark_api)
 install(TARGETS ark-cpp RUNTIME DESTINATION bin)
 
 if(BUILD_TESTING)
+    add_executable(ark_benchmark_tests cpp/tests/benchmark_test.cpp)
+    target_link_libraries(ark_benchmark_tests PRIVATE ark_native)
+    add_test(NAME ark_benchmark_tests COMMAND ark_benchmark_tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/arkbench/benchmark_v0.1.json")
     add_executable(ark_native_tests cpp/tests/research_test.cpp)
     target_link_libraries(ark_native_tests PRIVATE ark_native)
     add_test(NAME ark_native_tests COMMAND ark_native_tests)
