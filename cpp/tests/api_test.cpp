@@ -47,7 +47,8 @@ void test_api() {
         try {
             ark::serve_api(0, {
                 privacy,
-                [&](const Json& task) -> Json {
+                [&](const Json& task, const ark::TaskEvents& events) -> Json {
+                    events("agent_started", {{"agent", "coding_agent"}});
                     gate.wait_for(3s);
                     if (task.at("payload").at("goal") == "Exercise escalation") {
                         return {{"status", "FAILED"}, {"escalations", {{{"plan_task_id", "t1"}, {"attempts", 3}}}}};
@@ -112,6 +113,7 @@ void test_api() {
     const auto low_id = low.at("task_id");
     check(high.at("priority") == 10 && high.at("payload").at("domain") == "research", "priority request was dropped");
     (void)body(api.Post("/task", R"({"goal":"Invalid","priority":1.5})", "application/json"), 422);
+    (void)body(api.Post("/task", R"json({"goal":"Invalid","until":"load('file')"})json", "application/json"), 422);
     allow_completion.set_value();
     auto result = task;
     for (int i = 0; i < 50 && result.at("status") != "DONE"; ++i) {
@@ -124,7 +126,7 @@ void test_api() {
           "conflict audit should select the higher-priority job");
     bool saw_conflict = false;
     auto order = Json::array();
-    for (int i = 0; i < 12; ++i) {
+    for (int i = 0; i < 20; ++i) {
         check(static_cast<bool>(events.read(event)), "missing queued task events");
         const auto notification = Json::parse(event);
         if (notification.at("event") == "conflict_detected") {

@@ -212,10 +212,15 @@ Json AgentVersioner::bump(std::string_view agent, std::string_view change_type, 
         redis.call('RPUSH', KEYS[3], ARGV[5])
         redis.call('HSET', KEYS[1], 'active', ARGV[3], 'latest', ARGV[3])
         redis.call('HSET', KEYS[4], 'version', ARGV[3], 'model', ARGV[6])
+        redis.call('RPUSH', KEYS[5], ARGV[7])
+        redis.call('XADD', KEYS[6], 'MAXLEN', '~', '256', '*', 'report', ARGV[7])
         return 1
     )lua";
-    if (redis_.command({"EVAL", script, "4", pointers_key(agent), revisions_key(agent), history_key(agent), registry,
-        active, latest, next.version, created.dump(), output.dump(), next.model}) != 1) {
+    const Json event{{"event", "version_updated"}, {"agent", agent}, {"version", next.version},
+                     {"previous_version", active}, {"timestamp", utc_timestamp()}};
+    if (redis_.command({"EVAL", script, "6", pointers_key(agent), revisions_key(agent), history_key(agent), registry,
+        "ark:audit_log", "ark:version_events", active, latest, next.version, created.dump(), output.dump(), next.model,
+        event.dump()}) != 1) {
         throw std::runtime_error("Agent changed while bumping version; reload its history and retry");
     }
     return output;
@@ -237,12 +242,14 @@ Json AgentVersioner::rollback(std::string_view agent, std::string_view version) 
         event.previous_version = previous
         redis.call('HSET', KEYS[1], 'active', ARGV[1])
         redis.call('HSET', KEYS[2], 'version', ARGV[1], 'model', ARGV[2])
-        redis.call('RPUSH', KEYS[3], cjson.encode(event))
+        local report = cjson.encode(event)
+        redis.call('RPUSH', KEYS[3], report)
+        redis.call('XADD', KEYS[4], 'MAXLEN', '~', '256', '*', 'report', report)
         return 1
     )lua";
     const Json event{{"event", "agent_version_rollback"}, {"agent", agent}, {"version", version},
                      {"timestamp", utc_timestamp()}};
-    if (redis_.command({"EVAL", script, "3", pointers_key(agent), registry, "ark:audit_log",
+    if (redis_.command({"EVAL", script, "4", pointers_key(agent), registry, "ark:audit_log", "ark:version_events",
         std::string(version), target.at("model").get<std::string>(), event.dump()}) != 1) {
         throw std::runtime_error("Could not activate prompt snapshot");
     }

@@ -1,11 +1,13 @@
 #include "ark/api_server.hpp"
 #include "ark/conflict_resolver.hpp"
+#include "ark/done_condition.hpp"
 #include "ark/research.hpp"
 #include "ark/runtime_files.hpp"
 
 #include <httplib.h>
 
 #include <algorithm>
+#include <chrono>
 #include <condition_variable>
 #include <deque>
 #include <iostream>
@@ -118,6 +120,11 @@ public:
         }
     }
 
+    bool connected() {
+        const std::lock_guard lock(mutex_);
+        return !sockets_.empty();
+    }
+
 private:
     std::mutex mutex_;
     std::vector<Socket*> sockets_;
@@ -125,7 +132,8 @@ private:
 
 class Tasks {
 public:
-    Tasks(Events& events, std::function<Json(const Json&)> run, std::function<void(const Json&)> log_conflict)
+    Tasks(Events& events, std::function<Json(const Json&, const TaskEvents&)> run,
+          std::function<void(const Json&)> log_conflict)
         : events_(events), run_(std::move(run)), log_conflict_(std::move(log_conflict)),
           worker_([this](std::stop_token token) { work(token); }) {}
 
@@ -148,6 +156,15 @@ public:
         Json payload{{"goal", goal}, {"privacy", privacy}, {"airgap_mode", airgap}};
         if (request.contains("domain")) {
             payload["domain"] = domain;
+        }
+        if (request.contains("until")) {
+            try {
+                const DoneCondition condition(request.at("until").get<std::string>());
+                payload["until"] = condition.expression();
+                payload["max_iter"] = iteration_limit(request.value("max_iter", Json(10)));
+            } catch (const std::invalid_argument& error) {
+                throw HttpFailure(422, error.what());
+            }
         }
         if (request.contains("test_files")) {
             if (!request.at("test_files").is_object()) {
@@ -220,7 +237,7 @@ public:
 
 private:
     Events& events_;
-    std::function<Json(const Json&)> run_;
+    std::function<Json(const Json&, const TaskEvents&)> run_;
     std::function<void(const Json&)> log_conflict_;
     std::mutex mutex_;
     std::condition_variable_any ready_;
@@ -271,7 +288,7 @@ private:
             events_.send("task_started", id);
             Json output;
             try {
-                output = run_(task);
+                output = run_(task, [&](std::string_view type, const Json& report) { events_.send(type, id, report); });
                 if (!output.is_object() || (output.at("status") != "DONE" && output.at("status") != "FAILED")) {
                     throw std::runtime_error("Native runner returned no terminal status");
                 }
@@ -279,6 +296,7 @@ private:
                 output = {{"status", "FAILED"}, {"error_message", error.what()}};
             }
             const auto escalations = output.value("escalations", Json::array());
+            const bool succeeded = output.at("status") == "DONE";
             {
                 const std::lock_guard lock(mutex_);
                 auto& stored = find(id);
@@ -292,6 +310,7 @@ private:
                 events_.send("task_escalated", id, report);
             }
             events_.send("task_finished", id);
+            events_.send(succeeded ? "task_completed" : "task_failed", id);
         }
     }
 };
@@ -304,6 +323,25 @@ bool serve_api(int port, ApiServices services, std::stop_token stop, const std::
     }
     Events events;
     Tasks tasks(events, services.run, services.log_conflict);
+    std::jthread version_relay;
+    if (services.version_events) {
+        version_relay = std::jthread([&](std::stop_token token) {
+            std::string cursor = "0-0";
+            while (!token.stop_requested()) {
+                if (events.connected()) {
+                    try {
+                        for (const auto& record : services.version_events(cursor)) {
+                            cursor = record.at("id").get<std::string>();
+                            events.send("version_updated", "", record.at("report"));
+                        }
+                    } catch (const std::exception&) {
+                        // A disconnected event source can recover on the next poll.
+                    }
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(250));
+            }
+        });
+    }
     httplib::Server server;
     server.set_payload_max_length(64 * 1024);
     server.set_write_timeout(5, 0);

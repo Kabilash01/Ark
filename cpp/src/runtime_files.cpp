@@ -94,7 +94,8 @@ double detect_vram_gib() {
 void write_json(const std::filesystem::path& path, const Json& data) { replace_text(path, data.dump(2) + "\n"); }
 
 void write_state(const std::filesystem::path& path, std::string_view goal, std::string_view task_id,
-                 std::string_view status, bool privacy, int completed, const Json& last_result) {
+                 std::string_view status, bool privacy, int completed, const Json& last_result,
+                 const Json& done_condition) {
     const auto score = last_result.value("score", Json("n/a"));
     std::ostringstream text;
     text << "# ARK OS STATE\n"
@@ -109,6 +110,11 @@ void write_state(const std::filesystem::path& path, std::string_view goal, std::
          << last_result.value("task", "unknown") << '\n'
          << "Last score:      " << (score.is_string() ? score.get<std::string>() : score.dump()) << " ("
          << last_result.value("version", "n/a") << ")\n";
+    if (!done_condition.is_null()) {
+        text << "Done condition:   " << done_condition.at("expression").get_ref<const std::string&>()
+             << " | Met: " << (done_condition.at("met") == true ? "yes" : "no") << '\n'
+             << "Current metrics:  " << done_condition.at("metrics").dump() << '\n';
+    }
     replace_text(path, text.str());
 }
 

@@ -307,3 +307,31 @@ from 1 to 50.
 `airgap_mode`. In a fresh configuration directory, the first update creates
 the settings file. A native API run verified the toggle with Redis, Qdrant,
 SQLite, Docker, and loopback model fixtures.
+
+## Day 37 completion conditions and live events
+
+```bash
+build/ark-cpp --until 'all_tests_pass AND quality_score > 0.85' --max-iter 4 \
+  'Implement a parser with unit tests'
+```
+
+API clients can send `until` and `max_iter` with `POST /task`. The default
+limit is 10 iterations. A successful workflow stops at the first iteration
+that meets the condition. The runtime records the measured values and condition
+status in `STATE.md` and the task result. An exhausted run returns `FAILED`
+with the final iteration's results.
+
+Conditions use comparisons, Boolean operators, and parentheses. The current
+workers measure quality, test outcomes, citation count, and repair success
+when the relevant evidence exists. A comparison against an unavailable
+metric stays unresolved. Coverage requires a coverage measurement from the
+sandbox. Novelty, feasibility, and security findings require their respective
+workers or evaluation evidence.
+
+`status`, `list`, and `stop` use the loopback API at `ARK_API_PORT` (default
+`8000`). `stop` cancels a queued task. `agents`, `logs`, `versions`, and
+`memory show` read the configured storage directly.
+
+`/ws` emits worker activity, tool calls and results, memory writes, task
+completion, and priority conflicts. Agent activity shows the current step.
+Version bumps and rollbacks also appear as `version_updated` events via Redis.
