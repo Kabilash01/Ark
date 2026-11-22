@@ -16,8 +16,8 @@ constexpr std::array<std::string_view, 13> intents{
     "RESEARCH", "CODE", "SEARCH", "EXECUTE", "STORE", "EVALUATE", "REFLECT",
     "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION",
 };
-constexpr std::array<std::string_view, 4> workers{
-    "research_agent", "coding_agent", "evaluation_agent", "memory_agent",
+constexpr std::array<std::string_view, 5> workers{
+    "research_agent", "coding_agent", "evaluation_agent", "memory_agent", "web_search_agent",
 };
 
 bool contains(const auto& values, std::string_view value) {

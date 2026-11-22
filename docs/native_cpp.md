@@ -264,3 +264,31 @@ Supervisor, Planner, Evaluation, and Reflection use loopback model endpoints.
 Privacy limits outside literature requests to the configured provider allowlist.
 Airgap blocks all external literature requests. Local Docker, model, and memory
 services are available in either mode.
+
+## Day 34 web search and file operations
+
+`build/ark-cpp web-search "query"` searches via Tavily using
+`TAVILY_API_KEY`. The local general model summarizes the returned excerpts.
+Citation IDs resolve to the provider's actual result URLs. The supervisor
+routes `BROWSE` goals to this worker. Airgap blocks the request before it
+reaches Tavily. Private requests require `api.tavily.com` in the configured
+allowlist. [Tavily Search API](https://docs.tavily.com/documentation/api-reference/endpoint/search)
+
+Set `allowed_directories` in `config/file_system.json` or the equivalent
+file under `ARK_CONFIG_DIR`. Map each workspace name to an absolute directory.
+The default configuration grants access to no directories.
+
+```json
+{"allowed_directories":{"notes":"/absolute/path/to/notes"}}
+```
+
+```bash
+printf '%s\n' '{"root":"notes","operation":"list"}' | build/ark-cpp files
+printf '%s\n' '{"root":"notes","operation":"read","path":"index.md"}' | build/ark-cpp files
+printf '%s\n' '{"root":"notes","operation":"write","path":"new.md","content":"# Notes"}' | build/ark-cpp files
+```
+
+File paths are relative to the named workspace. Reads and writes are limited
+to 1 MiB of UTF-8 text. Set `overwrite` explicitly to replace an existing
+regular file. The worker writes file-operation events to episodic SQLite
+with the workspace, path, and byte count.

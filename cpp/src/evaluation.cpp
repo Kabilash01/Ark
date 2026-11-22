@@ -45,7 +45,8 @@ Artifact artifact_for(const Json& payload, const Json& memory) {
                 if (task.value("intent", "") == "CODE") {
                     return {"code", task.at("output"), id};
                 }
-                if ((task.value("intent", "") == "RESEARCH" || task.value("intent", "") == "SEARCH")) {
+                const auto intent = task.value("intent", "");
+                if (intent == "RESEARCH" || intent == "SEARCH" || intent == "BROWSE") {
                     research = {"research", task.at("output"), id};
                 }
             }

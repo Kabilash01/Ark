@@ -39,6 +39,7 @@ add_library(ark_native
     cpp/src/coding.cpp
     cpp/src/conflict_resolver.cpp
     cpp/src/evaluation.cpp
+    cpp/src/file_system.cpp
     cpp/src/http.cpp
     cpp/src/kernel.cpp
     cpp/src/message.cpp
@@ -49,7 +50,8 @@ add_library(ark_native
     cpp/src/sandbox.cpp
     cpp/src/storage.cpp
     cpp/src/vector_memory.cpp
-    cpp/src/versions.cpp)
+    cpp/src/versions.cpp
+    cpp/src/web_search.cpp)
 target_compile_features(ark_native PUBLIC cxx_std_20)
 target_include_directories(ark_native PUBLIC cpp/include)
 target_link_libraries(ark_native PUBLIC nlohmann_json::nlohmann_json
@@ -77,6 +79,12 @@ if(BUILD_TESTING)
     add_executable(ark_privacy_tests cpp/tests/privacy_test.cpp)
     target_link_libraries(ark_privacy_tests PRIVATE ark_native)
     add_test(NAME ark_privacy_tests COMMAND ark_privacy_tests)
+    add_executable(ark_file_system_tests cpp/tests/file_system_test.cpp)
+    target_link_libraries(ark_file_system_tests PRIVATE ark_native)
+    add_test(NAME ark_file_system_tests COMMAND ark_file_system_tests)
+    add_executable(ark_web_search_tests cpp/tests/web_search_test.cpp)
+    target_link_libraries(ark_web_search_tests PRIVATE ark_native)
+    add_test(NAME ark_web_search_tests COMMAND ark_web_search_tests)
     add_executable(ark_storage_tests cpp/tests/storage_test.cpp)
     target_link_libraries(ark_storage_tests PRIVATE ark_native)
     add_test(NAME ark_storage_tests COMMAND ark_storage_tests)

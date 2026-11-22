@@ -1,6 +1,7 @@
 #include "ark/api_server.hpp"
 #include "ark/coding.hpp"
 #include "ark/evaluation.hpp"
+#include "ark/file_system.hpp"
 #include "ark/kernel.hpp"
 #include "ark/privacy.hpp"
 #include "ark/reflection.hpp"
@@ -10,6 +11,7 @@
 #include "ark/storage.hpp"
 #include "ark/vector_memory.hpp"
 #include "ark/versions.hpp"
+#include "ark/web_search.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -119,6 +121,9 @@ ark::AgentProfile actor_profile(std::string_view name, const std::string& genera
     } else if (name == "reflection_agent") {
         defaults = ark::reflection_profile(env("ARK_REFLECTION_MODEL", general_model));
         capabilities = {"REFLECT"};
+    } else if (name == "web_search_agent") {
+        defaults = ark::web_search_profile(general_model);
+        capabilities = {"BROWSE"};
     } else {
         throw std::invalid_argument("Unknown versioned agent " + std::string(name));
     }
@@ -128,6 +133,20 @@ ark::AgentProfile actor_profile(std::string_view name, const std::string& genera
 std::unique_ptr<ark::Redis> version_store(bool required = false) {
     const auto port = env("ARK_REDIS_PORT", required ? "6379" : "");
     return port.empty() ? nullptr : std::make_unique<ark::Redis>(std::stoi(port), std::stoi(env("ARK_REDIS_DB", "0")));
+}
+
+ark::Json run_web_search(ark::CurlTransport& http, const ark::ResearchConfig& settings, ark::Json message,
+                         const ark::AgentProfile& profile) {
+    const ark::WebSearchAgent worker(std::ref(http), settings.ollama_url, profile, env("TAVILY_API_KEY"), settings.privacy);
+    return worker.run(std::move(message));
+}
+
+ark::Json run_file_operation(ark::Json payload) {
+    const auto path = config_dir() / "file_system.json";
+    const auto settings = std::filesystem::exists(path) ? ark::read_json(path) : ark::Json::object();
+    ark::EpisodicMemory episodes(env("ARK_EPISODIC_DB", "data/episodic_memory.db"));
+    const ark::FileSystemAgent worker(settings.value("allowed_directories", ark::Json::object()));
+    return worker.run(ark::make_message("user", "file_system_agent", "FILES", std::move(payload)), episodes);
 }
 
 ark::Json run_coding(ark::CurlTransport& http, const ark::ResearchConfig& settings, ark::Json message,
@@ -240,7 +259,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         ark::MessageBus(*redis).log({{"event", "dispatch_start"}, {"task_id", parent_id}});
     }
     const auto profiles = [&] {
-        std::map<std::string, ark::AgentProfile> resolved;
+        std::map<std::string, ark::AgentProfile, std::less<>> resolved;
         for (const auto& layer : ark::order_tasks(dag)) {
             for (const auto& task : layer) {
                 if (task.agent != "memory_agent" && !resolved.contains(task.agent)) {
@@ -288,6 +307,8 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         } else if (task.agent == "evaluation_agent") {
             message["payload"]["instruction"] = goal + "\n" + task.instruction;
             result = run_evaluation(http, settings, std::move(message), profiles.at(task.agent));
+        } else if (task.agent == "web_search_agent") {
+            result = run_web_search(http, settings, std::move(message), profiles.at(task.agent));
         } else {
             result = ark::ResearchAgent(std::ref(http), settings, profiles.at(task.agent)).run(std::move(message));
         }
@@ -322,7 +343,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         }
         return result;
     }, [&](std::string_view name) {
-        if (name != "research_agent" && name != "coding_agent" && name != "evaluation_agent") {
+        if (!profiles.contains(name)) {
             return false;
         }
         if (!redis) {
@@ -369,7 +390,7 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
     const auto supervisor = actor_profile("supervisor_agent", settings.model, redis.get());
     const auto plan_profile = actor_profile("planner_agent", settings.model, redis.get());
     const ark::Planner planner(std::ref(http), settings.ollama_url, supervisor, plan_profile);
-    const ark::Json versions{{"supervisor_agent", supervisor.version}, {"planner_agent", plan_profile.version}};
+    ark::Json versions{{"supervisor_agent", supervisor.version}};
     auto lower_goal = std::string(goal);
     std::transform(lower_goal.begin(), lower_goal.end(), lower_goal.begin(),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
@@ -379,6 +400,12 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
     for (int attempt = 1; ; ++attempt) {
         try {
             intent = planner.classify(goal);
+            if (intent == "BROWSE") {
+                dag["tasks"] = ark::Json::array({{{"task_id", "t1"}, {"agent", "web_search_agent"},
+                    {"intent", "BROWSE"}, {"instruction", goal}, {"depends_on", ark::Json::array()},
+                    {"parallel_with", ark::Json::array()}}});
+                break;
+            }
             if (intent != "RESEARCH" && intent != "SEARCH" && intent != "CODE") {
                 throw std::invalid_argument("No native worker available for intent " + intent);
             }
@@ -386,6 +413,7 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
                 : intent == "SEARCH" ? std::vector<std::string>{"research_agent"}
                 : std::vector<std::string>{"research_agent", "coding_agent"};
             auto context = recall(settings, goal);
+            versions["planner_agent"] = plan_profile.version;
             dag = planner.plan(goal, agents, context);
             dag["memory_context"] = std::move(context);
             break;
@@ -512,6 +540,8 @@ int main(int argc, char** argv) {
         std::cout << "Usage: ark-cpp research [instruction]\n"
                      "       ark-cpp code [instruction]\n"
                      "       ark-cpp evaluate < message.json\n"
+                     "       ark-cpp web-search [--privacy|--airgap] <query>\n"
+                     "       ark-cpp files < operation.json\n"
                      "       ark-cpp models [vram-gib]\n"
                      "       ark-cpp classify|plan <goal>\n"
                      "       ark-cpp run [--privacy] [--airgap] <goal> [tests.json]\n"
@@ -544,6 +574,22 @@ int main(int argc, char** argv) {
         }
         if (command == "sandbox" && argc == 2) {
             return run_sandbox();
+        }
+        if (command == "files" && argc == 2) {
+            return print_run(run_file_operation(ark::Json::parse(std::cin)));
+        }
+        if (command == "web-search" && (argc == 3 || argc == 4)) {
+            const std::string_view flag = argc == 4 ? argv[2] : "";
+            if (argc == 4 && flag != "--privacy" && flag != "--airgap") {
+                throw std::invalid_argument("Expected --privacy or --airgap before query");
+            }
+            const auto settings = config();
+            const auto redis = version_store();
+            ark::CurlTransport http;
+            auto message = ark::make_message("user", "web_search_agent", "BROWSE", {{"query", argv[argc - 1]},
+                {"privacy", flag == "--privacy"}, {"airgap_mode", flag == "--airgap"}});
+            return print_run(run_web_search(http, settings, std::move(message),
+                                           actor_profile("web_search_agent", settings.model, redis.get())));
         }
         if (command == "research" && argc <= 3) {
             auto message = argc == 3
