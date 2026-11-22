@@ -127,7 +127,8 @@ public:
         if (goal.empty() || goal.size() > 8192 || goal.find_first_not_of(" \r\t\n") == std::string::npos) {
             throw HttpFailure(422, "goal must contain 1 to 8192 bytes");
         }
-        const bool privacy = request.value("privacy", false);
+        const bool airgap = request.value("airgap_mode", false);
+        const bool privacy = request.value("privacy", false) || airgap;
         const auto priority = request.value("priority", Json(5));
         if (!priority.is_number_integer() || priority.get<double>() < std::numeric_limits<int>::min()
             || priority.get<double>() > std::numeric_limits<int>::max()) {
@@ -137,7 +138,7 @@ public:
         if (domain.size() > 64 || domain.find_first_not_of(" \r\t\n") == std::string::npos) {
             throw HttpFailure(422, "domain must contain 1 to 64 bytes");
         }
-        Json payload{{"goal", goal}, {"privacy", privacy}, {"airgap_mode", request.value("airgap_mode", false)}};
+        Json payload{{"goal", goal}, {"privacy", privacy}, {"airgap_mode", airgap}};
         if (request.contains("domain")) {
             payload["domain"] = domain;
         }

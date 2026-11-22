@@ -2,6 +2,7 @@
 #include "ark/coding.hpp"
 #include "ark/evaluation.hpp"
 #include "ark/kernel.hpp"
+#include "ark/privacy.hpp"
 #include "ark/reflection.hpp"
 #include "ark/research.hpp"
 #include "ark/runtime_files.hpp"
@@ -227,8 +228,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     const auto episode_path = env("ARK_EPISODIC_DB", via_api ? "data/episodic_memory.db" : "");
     const std::filesystem::path state_path = env("ARK_STATE_PATH", "STATE.md");
     const auto goal = dag.value("goal", "Saved task plan");
-    const bool private_mode = dag.value("privacy", false) || dag.value("airgap_mode", false)
-        || settings.privacy.value("privacy_mode", false) || settings.privacy.value("airgap_mode", false);
+    const auto privacy = ark::TaskPrivacy::resolve(settings.privacy, dag);
     std::mutex state_mutex;
     int completed = 0;
     auto last = ark::Json::object();
@@ -260,8 +260,8 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
                                                                    int attempt, const ark::Json& feedback) {
         ark::CurlTransport http;
         auto message = ark::make_message("router", task.agent, task.intent, {
-            {"instruction", task.instruction}, {"goal", goal}, {"privacy", dag.value("privacy", false)},
-            {"airgap_mode", dag.value("airgap_mode", false)},
+            {"instruction", task.instruction}, {"goal", goal}, {"privacy", privacy.enabled},
+            {"airgap_mode", privacy.airgap},
         }, parent_id);
         message["memory_context"] = dag.value("memory_context", ark::Json::array());
         if (!dependencies.empty()) {
@@ -308,7 +308,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
                     attempts.back()["repairs"] = output.at("repairs");
                 }
             }
-            ark::write_state(state_path, goal, parent_id, "RUNNING", private_mode, ++completed, last);
+            ark::write_state(state_path, goal, parent_id, "RUNNING", privacy.enabled, ++completed, last);
         }
         if (episodes) {
             episodes->log({
@@ -344,7 +344,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
             quality = quality.is_null() ? score : std::min(quality.get<double>(), score);
         }
     }
-    ark::write_state(state_path, goal, parent_id, done ? "DONE" : "FAILED", private_mode,
+    ark::write_state(state_path, goal, parent_id, done ? "DONE" : "FAILED", privacy.enabled,
                      static_cast<int>(results.size()), last);
     if (redis) {
         ark::WorkingMemory(*redis).set(parent_id, "results", results);
@@ -363,6 +363,7 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
     if (!trusted_tests.is_object()) {
         throw std::invalid_argument("Trusted tests must be a JSON object mapping names to file contents");
     }
+    const auto task_privacy = ark::TaskPrivacy::resolve(settings.privacy, {{"privacy", privacy}, {"airgap_mode", airgap}});
     ark::CurlTransport http;
     const auto redis = version_store(!task_id.empty());
     const auto supervisor = actor_profile("supervisor_agent", settings.model, redis.get());
@@ -401,6 +402,8 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
             const auto reports = ark::Json::array({{{"plan_task_id", "planning"}, {"agent", "supervisor_agent"},
                 {"attempts", attempt}, {"last_status", retryable ? "RETRY" : "FAILED"}, {"detail", error.what()}}});
             record_escalations(task_id, reports, nullptr, redis.get(), supervisor.version);
+            ark::write_state(env("ARK_STATE_PATH", "STATE.md"), goal, task_id, "FAILED", task_privacy.enabled,
+                             0, ark::Json::object());
             ark::Json result{{"task_id", task_id}, {"intent", intent}, {"status", "FAILED"},
                              {"results", ark::Json::object()}, {"quality_score", nullptr}, {"escalations", reports},
                              {"agent_versions", versions}};
@@ -410,8 +413,8 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
     }
     ensure_evaluation(dag);
     dag["goal"] = goal;
-    dag["privacy"] = privacy;
-    dag["airgap_mode"] = airgap;
+    dag["privacy"] = task_privacy.enabled;
+    dag["airgap_mode"] = task_privacy.airgap;
     if (!trusted_tests.empty()) {
         dag["coding_test_files"] = trusted_tests;
     }
@@ -511,7 +514,8 @@ int main(int argc, char** argv) {
                      "       ark-cpp evaluate < message.json\n"
                      "       ark-cpp models [vram-gib]\n"
                      "       ark-cpp classify|plan <goal>\n"
-                     "       ark-cpp run <goal> [tests.json]\n"
+                     "       ark-cpp run [--privacy] [--airgap] <goal> [tests.json]\n"
+                     "       ark-cpp --privacy|--airgap <goal> [tests.json]\n"
                      "       ark-cpp dispatch < dag.json\n"
                      "       ark-cpp audit|episodes\n"
                      "       ark-cpp reflection-queue\n"
@@ -606,9 +610,30 @@ int main(int argc, char** argv) {
             std::cout << skills.get(id).dump(2) << '\n';
             return 0;
         }
-        if (command == "run" && (argc == 3 || argc == 4)) {
-            const auto trusted_tests = argc == 4 ? ark::read_json(argv[3]) : ark::Json::object();
-            return print_run(run_goal(argv[2], config(), trusted_tests));
+        if (command == "run" || command == "--privacy" || command == "--airgap") {
+            bool privacy = false;
+            bool airgap = false;
+            int argument = command == "run" ? 2 : 1;
+            for (; argument < argc; ++argument) {
+                const std::string_view flag = argv[argument];
+                if (flag == "--privacy") {
+                    privacy = true;
+                } else if (flag == "--airgap") {
+                    airgap = true;
+                } else {
+                    break;
+                }
+            }
+            if (command != "run" && argument + 1 < argc && std::string_view(argv[argument]) == "run") {
+                ++argument;
+            }
+            const auto remaining = argc - argument;
+            if (remaining < 1 || remaining > 2 || std::string_view(argv[argument]).starts_with("--")) {
+                std::cerr << "Usage: ark-cpp run [--privacy] [--airgap] <goal> [tests.json]\n";
+                return 2;
+            }
+            const auto trusted_tests = remaining == 2 ? ark::read_json(argv[argument + 1]) : ark::Json::object();
+            return print_run(run_goal(argv[argument], config(), trusted_tests, privacy, airgap));
         }
         if ((command == "classify" || command == "plan") && argc == 3) {
             const auto settings = config();

@@ -92,7 +92,9 @@ void test_api() {
     check(static_cast<bool>(events.read(event)) && Json::parse(event).at("event") == "task_started",
           "the first task must be running before queueing competitors");
 
-    const auto queued = body(api.Post("/task", R"({"goal":"Research Fibonacci"})", "application/json"));
+    const auto queued = body(api.Post("/task", R"({"goal":"Research Fibonacci","airgap_mode":true})", "application/json"));
+    check(queued.at("payload").at("airgap_mode") == true && queued.at("payload").at("privacy") == true,
+          "airgap requests must enable privacy");
     const auto cancelled = body(api.Delete("/task/" + queued.at("task_id").get<std::string>()));
     check(cancelled.at("output").at("cancelled") == true, "queued task was not cancelled");
     const auto low = body(api.Post("/task", R"({"goal":"Low","priority":1})", "application/json"));

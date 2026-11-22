@@ -247,3 +247,20 @@ Requests that share a timestamp rotate through domains in alphabetical order
 and retain arrival order within each domain. Work already running continues
 to completion. Each scheduling conflict emits `conflict_detected` on `/ws`
 and is recorded in the Redis audit log.
+
+## Day 33 privacy and airgap
+
+```bash
+build/ark-cpp --privacy "Write a local data parser"
+build/ark-cpp run --airgap "Write a local data parser"
+```
+
+API clients can set `privacy` or `airgap_mode` on `POST /task`. Requests
+can enable stricter settings than `config/privacy_config.json`. Airgap also
+enables privacy. The effective mode reaches workers and is recorded in
+`STATE.md`.
+
+Supervisor, Planner, Evaluation, and Reflection use loopback model endpoints.
+Privacy limits outside literature requests to the configured provider allowlist.
+Airgap blocks all external literature requests. Local Docker, model, and memory
+services are available in either mode.

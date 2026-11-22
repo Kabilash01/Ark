@@ -42,6 +42,7 @@ add_library(ark_native
     cpp/src/http.cpp
     cpp/src/kernel.cpp
     cpp/src/message.cpp
+    cpp/src/privacy.cpp
     cpp/src/reflection.cpp
     cpp/src/research.cpp
     cpp/src/runtime_files.cpp
@@ -73,6 +74,9 @@ if(BUILD_TESTING)
     add_executable(ark_conflict_tests cpp/tests/conflict_resolver_test.cpp)
     target_link_libraries(ark_conflict_tests PRIVATE ark_native)
     add_test(NAME ark_conflict_tests COMMAND ark_conflict_tests)
+    add_executable(ark_privacy_tests cpp/tests/privacy_test.cpp)
+    target_link_libraries(ark_privacy_tests PRIVATE ark_native)
+    add_test(NAME ark_privacy_tests COMMAND ark_privacy_tests)
     add_executable(ark_storage_tests cpp/tests/storage_test.cpp)
     target_link_libraries(ark_storage_tests PRIVATE ark_native)
     add_test(NAME ark_storage_tests COMMAND ark_storage_tests)

@@ -1,4 +1,5 @@
 #include "ark/research.hpp"
+#include "ark/privacy.hpp"
 #include "ark/kernel.hpp"
 #include "ark/vector_memory.hpp"
 
@@ -50,22 +51,6 @@ std::string string_field(const Json& object, const char* name) {
     }
     const auto value = object.find(name);
     return value != object.end() && value->is_string() ? trim(value->get<std::string>()) : "";
-}
-
-bool flag(const Json& object, const char* name) {
-    if (!object.contains(name)) {
-        return false;
-    }
-    if (!object.at(name).is_boolean()) {
-        throw std::invalid_argument(std::string(name) + " must be a boolean");
-    }
-    return object.at(name).get<bool>();
-}
-
-bool allows(const Json& privacy, std::string_view host) {
-    const auto allowed = privacy.find("allowed_external");
-    return allowed != privacy.end() && allowed->is_array()
-        && std::find(allowed->begin(), allowed->end(), host) != allowed->end();
 }
 
 bool valid_arxiv_id(const std::string& id) {
@@ -268,11 +253,11 @@ Json ResearchAgent::search_scholar(const std::string& query) {
 }
 
 Json ResearchAgent::run_research(const Json& payload) {
-    if (flag(payload, "airgap_mode") || flag(config_.privacy, "airgap_mode")) {
+    const auto privacy = TaskPrivacy::resolve(config_.privacy, payload);
+    if (privacy.airgap) {
         throw std::invalid_argument("Airgap mode blocks external literature searches");
     }
-    const auto private_mode = flag(payload, "privacy") || flag(config_.privacy, "privacy_mode");
-    if (private_mode && !allows(config_.privacy, "export.arxiv.org")) {
+    if (!privacy.allows_external(config_.privacy, "export.arxiv.org")) {
         throw std::invalid_argument("Privacy settings block arXiv literature searches");
     }
 
@@ -308,7 +293,7 @@ Json ResearchAgent::run_research(const Json& payload) {
             add_id(paper.at("arxiv_id").get<std::string>());
         }
     }
-    if (requested.empty() && (!private_mode || allows(config_.privacy, "api.semanticscholar.org"))) {
+    if (requested.empty() && privacy.allows_external(config_.privacy, "api.semanticscholar.org")) {
         static const std::regex operators(R"(\b[a-z]+:|\b(?:AND|OR|NOT)\b|["()])");
         const auto terms = trim(std::regex_replace(query, operators, " "));
         if (!terms.empty()) {
