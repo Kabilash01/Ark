@@ -654,6 +654,48 @@ int print_run(const ark::Json& result) {
     return result.at("status") == "DONE" ? 0 : 1;
 }
 
+int repair_benchmark(const std::filesystem::path& suite, const std::filesystem::path& report_path) {
+    if (std::filesystem::weakly_canonical(suite) == std::filesystem::weakly_canonical(report_path)) {
+        throw std::invalid_argument("Repair report path must differ from the suite path");
+    }
+    const auto cases = ark::read_json(suite);
+    if (!cases.is_array() || cases.empty()) throw std::invalid_argument("Repair suite requires cases");
+    const auto settings = config(false);
+    const auto redis = version_store();
+    const auto profile = actor_profile("coding_agent", "", redis.get());
+    ark::CurlTransport http;
+    const auto sandbox = docker_sandbox(std::ref(http));
+    const ark::CodingAgent agent(std::ref(http), settings.ollama_url, profile,
+                                 [&](const auto& workspace) { return sandbox.run_tests(workspace); });
+    ark::Json report{{"model", profile.model}, {"max_repairs", 3}, {"total", cases.size()},
+                     {"fixed", 0}, {"cases", ark::Json::array()}, {"by_type", ark::Json::object()}};
+    for (const auto& entry : cases) {
+        const auto type = entry.at("type").get<std::string>();
+        auto& group = report["by_type"][type];
+        if (group.is_null()) group = {{"total", 0}, {"fixed", 0}};
+        const auto start = std::chrono::steady_clock::now();
+        const auto result = agent.run(ark::make_message("benchmark", "coding_agent", "CODE", entry.at("payload")));
+        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
+        const auto& output = result.at("output");
+        const auto baseline = output.value("initial_test_result", ark::Json::object());
+        const bool valid_baseline = baseline.value("exit_code", 0) != 0 && !baseline.value("timed_out", false);
+        const bool fixed = valid_baseline && result.at("status") == "DONE" && output.at("repairs") > 0;
+        auto row = ark::Json{{"id", entry.at("id")}, {"type", type}, {"fixed", fixed},
+                             {"valid_baseline", valid_baseline}, {"agent_version", result.at("agent_version")},
+                             {"repairs", output.value("repairs", -1)}, {"elapsed_ms", elapsed.count()}};
+        if (output.contains("error_message")) row["error"] = output.at("error_message");
+        report["cases"].push_back(std::move(row));
+        report["fixed"] = report.at("fixed").get<int>() + fixed;
+        group["total"] = group.at("total").get<int>() + 1;
+        group["fixed"] = group.at("fixed").get<int>() + fixed;
+        group["rate"] = group.at("fixed").get<double>() / group.at("total").get<double>();
+        report["rate"] = report.at("fixed").get<double>() / cases.size();
+        ark::write_json(report_path, report);
+    }
+    std::cout << report.dump(2) << '\n';
+    return report.at("rate") >= 0.7 ? 0 : 1;
+}
+
 int benchmark(const std::filesystem::path& suite_path, const std::filesystem::path& report_path) {
     if (!report_path.empty() && std::filesystem::weakly_canonical(suite_path) == std::filesystem::weakly_canonical(report_path)) {
         throw std::invalid_argument("Benchmark report path must differ from the suite path");
@@ -824,6 +866,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp terminal < request.json\n"
                      "       ark-cpp github < request.json\n"
                      "       ark-cpp benchmark [suite.json] [report.json]\n"
+                     "       ark-cpp repair-benchmark <suite.json> <report.json>\n"
                      "       ark-cpp browser < actions.json\n"
                      "       ark-cpp serve [port]\n"
                      "Research without an instruction reads an ARKMessage from stdin.\n";
@@ -837,6 +880,9 @@ int main(int argc, char** argv) {
         if (command == "benchmark" && argc <= 4) {
             return benchmark(argc >= 3 ? argv[2] : "benchmarks/arkbench/benchmark_v0.1.json",
                              argc == 4 ? argv[3] : "");
+        }
+        if (command == "repair-benchmark" && argc == 4) {
+            return repair_benchmark(argv[2], argv[3]);
         }
         if ((command == "versions" && argc == 3) || (command == "version-rollback" && argc == 4)
             || ((command == "version-bump" || command == "version-compare") && argc == 5)) {

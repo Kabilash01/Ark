@@ -1,0 +1,121 @@
+{
+  "by_type": {
+    "import": {
+      "fixed": 2,
+      "rate": 1.0,
+      "total": 2
+    },
+    "logic": {
+      "fixed": 3,
+      "rate": 1.0,
+      "total": 3
+    },
+    "syntax": {
+      "fixed": 3,
+      "rate": 1.0,
+      "total": 3
+    },
+    "type": {
+      "fixed": 2,
+      "rate": 1.0,
+      "total": 2
+    }
+  },
+  "cases": [
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "elapsed_ms": 5663,
+      "fixed": true,
+      "id": "missing-colon",
+      "repairs": 1,
+      "type": "syntax",
+      "valid_baseline": true
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "elapsed_ms": 2224,
+      "fixed": true,
+      "id": "bad-indentation",
+      "repairs": 1,
+      "type": "syntax",
+      "valid_baseline": true
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "elapsed_ms": 2508,
+      "fixed": true,
+      "id": "unclosed-list",
+      "repairs": 1,
+      "type": "syntax",
+      "valid_baseline": true
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "elapsed_ms": 2568,
+      "fixed": true,
+      "id": "wrong-json-import",
+      "repairs": 1,
+      "type": "import",
+      "valid_baseline": true
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "elapsed_ms": 2410,
+      "fixed": true,
+      "id": "wrong-collections-symbol",
+      "repairs": 1,
+      "type": "import",
+      "valid_baseline": true
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "elapsed_ms": 2331,
+      "fixed": true,
+      "id": "reversed-bounds",
+      "repairs": 1,
+      "type": "logic",
+      "valid_baseline": true
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "elapsed_ms": 2299,
+      "fixed": true,
+      "id": "off-by-one",
+      "repairs": 1,
+      "type": "logic",
+      "valid_baseline": true
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "elapsed_ms": 3338,
+      "fixed": true,
+      "id": "count-distinct",
+      "repairs": 1,
+      "type": "logic",
+      "valid_baseline": true
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "elapsed_ms": 2175,
+      "fixed": true,
+      "id": "number-format",
+      "repairs": 1,
+      "type": "type",
+      "valid_baseline": true
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "elapsed_ms": 2265,
+      "fixed": true,
+      "id": "join-numbers",
+      "repairs": 1,
+      "type": "type",
+      "valid_baseline": true
+    }
+  ],
+  "fixed": 10,
+  "max_repairs": 3,
+  "model": "ark-day44-qwen3:latest",
+  "rate": 1.0,
+  "total": 10
+}

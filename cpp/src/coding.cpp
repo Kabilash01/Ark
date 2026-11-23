@@ -131,21 +131,7 @@ Json CodingAgent::solve(const Json& payload, const Json& memory, int repairs) co
     if (payload.contains("review_feedback")) {
         input["review_feedback"] = payload.at("review_feedback");
     }
-    Json final;
-    for (int attempt = 0; attempt <= repairs; ++attempt) {
-        if (!tests.empty()) {
-            input["locked_tests"] = tests;
-        }
-        const auto proposed = Json::parse(chat_local(transport_, url_, profile_.model, profile_.prompts.at("system"), input.dump(),
-                                                     coding_format(!tests.empty())));
-        auto filename = proposed.at("filename").get<std::string>();
-        if (!filename.empty() && filename.find('.') == std::string::npos) {
-            filename += ".py";
-        }
-        const Json files{{filename, proposed.at("source")}};
-        if (tests.empty()) {
-            tests = {{"test_solution.py", proposed.at("test_source")}};
-        }
+    const auto evaluate = [&](const Json& files, int attempt) {
         validate_sources(files, tests);
 
         SandboxWorkspace workspace;
@@ -159,14 +145,35 @@ Json CodingAgent::solve(const Json& payload, const Json& memory, int repairs) co
         const bool passed = raw.exit_code == 0 && !raw.timed_out;
         const Json result{{"exit_code", raw.exit_code}, {"timed_out", raw.timed_out},
                           {"stdout", cap(raw.output)}, {"stderr", cap(raw.error)}};
-        final = {{"files", files}, {"tests", tests}, {"passed", passed}, {"repairs", attempt},
-                 {"test_result", result}, {"summary", passed ? "Sandbox tests passed" : "Sandbox tests failed"}};
-        if (passed) {
-            break;
-        }
-        input["previous_files"] = files;
-        input["test_result"] = result;
+        return Json{{"files", files}, {"tests", tests}, {"passed", passed}, {"repairs", attempt},
+                    {"test_result", result}, {"summary", passed ? "Sandbox tests passed" : "Sandbox tests failed"}};
+    };
+    int attempt = 0;
+    Json final;
+    Json initial;
+    if (payload.contains("repair_files")) {
+        final = evaluate(payload.at("repair_files"), attempt++);
+        initial = final.at("test_result");
     }
+    for (; attempt <= repairs && (final.is_null() || final.at("passed") == false); ++attempt) {
+        if (!tests.empty()) input["locked_tests"] = tests;
+        if (!final.is_null()) {
+            input["previous_files"] = final.at("files");
+            input["test_result"] = final.at("test_result");
+        }
+        const auto proposed = Json::parse(chat_local(transport_, url_, profile_.model, profile_.prompts.at("system"), input.dump(),
+                                                     coding_format(!tests.empty())));
+        auto filename = proposed.at("filename").get<std::string>();
+        if (!filename.empty() && filename.find('.') == std::string::npos) filename += ".py";
+        Json files = initial.is_null() ? Json::object() : final.at("files");
+        if (!initial.is_null() && !files.contains(filename)) {
+            throw std::invalid_argument("Repair must return an existing source filename");
+        }
+        files[filename] = proposed.at("source");
+        if (tests.empty()) tests = {{"test_solution.py", proposed.at("test_source")}};
+        final = evaluate(files, attempt);
+    }
+    if (!initial.is_null()) final["initial_test_result"] = std::move(initial);
     return final;
 }
 

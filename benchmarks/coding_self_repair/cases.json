@@ -1,0 +1,132 @@
+[
+  {
+    "id": "missing-colon",
+    "type": "syntax",
+    "payload": {
+      "instruction": "Fix solution.py. Provide increment(n) that returns n plus one.",
+      "repair_files": {
+        "solution.py": "def increment(n)\n    return n + 1\n"
+      },
+      "test_files": {
+        "test_solution.py": "import unittest\nfrom solution import *\n\nclass LockedTest(unittest.TestCase):\n    def test_contract(self):\n        self.assertEqual(increment(3), 4)\n        self.assertEqual(increment(-1), 0)\n"
+      }
+    }
+  },
+  {
+    "id": "bad-indentation",
+    "type": "syntax",
+    "payload": {
+      "instruction": "Fix solution.py. Provide is_even(n) returning a Boolean for evenness.",
+      "repair_files": {
+        "solution.py": "def is_even(n):\nreturn n % 2 == 0\n"
+      },
+      "test_files": {
+        "test_solution.py": "import unittest\nfrom solution import *\n\nclass LockedTest(unittest.TestCase):\n    def test_contract(self):\n        self.assertIs(is_even(0), True)\n        self.assertIs(is_even(3), False)\n"
+      }
+    }
+  },
+  {
+    "id": "unclosed-list",
+    "type": "syntax",
+    "payload": {
+      "instruction": "Fix solution.py. Provide weekdays() returning the names Mon, Tue, Wed, Thu, Fri as a list.",
+      "repair_files": {
+        "solution.py": "def weekdays():\n    return [\"Mon\", \"Tue\", \"Wed\", \"Thu\", \"Fri\"\n"
+      },
+      "test_files": {
+        "test_solution.py": "import unittest\nfrom solution import *\n\nclass LockedTest(unittest.TestCase):\n    def test_contract(self):\n        self.assertEqual(weekdays(), [\"Mon\", \"Tue\", \"Wed\", \"Thu\", \"Fri\"])\n"
+      }
+    }
+  },
+  {
+    "id": "wrong-json-import",
+    "type": "import",
+    "payload": {
+      "instruction": "Fix solution.py. Provide decode(text) that parses JSON and returns the decoded object.",
+      "repair_files": {
+        "solution.py": "import jsno\n\ndef decode(text):\n    return jsno.loads(text)\n"
+      },
+      "test_files": {
+        "test_solution.py": "import unittest\nfrom solution import *\n\nclass LockedTest(unittest.TestCase):\n    def test_contract(self):\n        self.assertEqual(decode('{\"x\": 1}'), {\"x\": 1})\n        self.assertEqual(decode(\"null\"), None)\n"
+      }
+    }
+  },
+  {
+    "id": "wrong-collections-symbol",
+    "type": "import",
+    "payload": {
+      "instruction": "Fix solution.py. Provide frequencies(items) returning a dictionary of counts.",
+      "repair_files": {
+        "solution.py": "from collections import Countr\n\ndef frequencies(items):\n    return dict(Countr(items))\n"
+      },
+      "test_files": {
+        "test_solution.py": "import unittest\nfrom solution import *\n\nclass LockedTest(unittest.TestCase):\n    def test_contract(self):\n        self.assertEqual(frequencies([\"a\", \"b\", \"a\"]), {\"a\": 2, \"b\": 1})\n        self.assertEqual(frequencies([]), {})\n"
+      }
+    }
+  },
+  {
+    "id": "reversed-bounds",
+    "type": "logic",
+    "payload": {
+      "instruction": "Fix solution.py. Provide clamp(n, lower, upper) that bounds n to the inclusive range.",
+      "repair_files": {
+        "solution.py": "def clamp(n, lower, upper):\n    return min(lower, max(upper, n))\n"
+      },
+      "test_files": {
+        "test_solution.py": "import unittest\nfrom solution import *\n\nclass LockedTest(unittest.TestCase):\n    def test_contract(self):\n        self.assertEqual(clamp(5, 0, 10), 5)\n        self.assertEqual(clamp(-5, 0, 10), 0)\n        self.assertEqual(clamp(15, 0, 10), 10)\n"
+      }
+    }
+  },
+  {
+    "id": "off-by-one",
+    "type": "logic",
+    "payload": {
+      "instruction": "Fix solution.py. Provide sum_to(n) that sums the integers from 1 through n inclusive for nonnegative n.",
+      "repair_files": {
+        "solution.py": "def sum_to(n):\n    return sum(range(1, n))\n"
+      },
+      "test_files": {
+        "test_solution.py": "import unittest\nfrom solution import *\n\nclass LockedTest(unittest.TestCase):\n    def test_contract(self):\n        self.assertEqual(sum_to(0), 0)\n        self.assertEqual(sum_to(1), 1)\n        self.assertEqual(sum_to(7), 28)\n"
+      }
+    }
+  },
+  {
+    "id": "count-distinct",
+    "type": "logic",
+    "payload": {
+      "instruction": "Fix solution.py. Provide ordered_unique(items) that returns a list in first-occurrence order with equal items deduplicated.",
+      "repair_files": {
+        "solution.py": "def ordered_unique(items):\n    return sorted(set(items))\n"
+      },
+      "test_files": {
+        "test_solution.py": "import unittest\nfrom solution import *\n\nclass LockedTest(unittest.TestCase):\n    def test_contract(self):\n        self.assertEqual(ordered_unique([3, 1, 3, 2]), [3, 1, 2])\n        self.assertEqual(ordered_unique([\"b\", \"a\", \"b\"]), [\"b\", \"a\"])\n"
+      }
+    }
+  },
+  {
+    "id": "number-format",
+    "type": "type",
+    "payload": {
+      "instruction": "Fix solution.py. Provide label(n) that prefixes an integer with the literal Count: and a space.",
+      "repair_files": {
+        "solution.py": "def label(n):\n    return \"Count: \" + n\n"
+      },
+      "test_files": {
+        "test_solution.py": "import unittest\nfrom solution import *\n\nclass LockedTest(unittest.TestCase):\n    def test_contract(self):\n        self.assertEqual(label(2), \"Count: 2\")\n        self.assertEqual(label(-7), \"Count: -7\")\n"
+      }
+    }
+  },
+  {
+    "id": "join-numbers",
+    "type": "type",
+    "payload": {
+      "instruction": "Fix solution.py. Provide csv_numbers(items) that serializes a list of integers with commas and no spaces.",
+      "repair_files": {
+        "solution.py": "def csv_numbers(items):\n    return \",\".join(items)\n"
+      },
+      "test_files": {
+        "test_solution.py": "import unittest\nfrom solution import *\n\nclass LockedTest(unittest.TestCase):\n    def test_contract(self):\n        self.assertEqual(csv_numbers([1, 2, -7]), \"1,2,-7\")\n        self.assertEqual(csv_numbers([]), \"\")\n"
+      }
+    }
+  }
+]
