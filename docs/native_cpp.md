@@ -6,7 +6,8 @@ can be checked against the same tasks during the transition.
 ## Build and run
 
 Install a C++20 compiler, CMake 3.24 or newer, pkg-config, and the development
-packages for libcurl (7.85+), libxml2, OpenSSL, SQLite, and hiredis. CMake uses
+packages for libcurl (7.85+), libxml2, OpenSSL, SQLite, hiredis, libgit2,
+libzip, Poppler C++, Cairo PDF, and PangoCairo. CMake uses
 system nlohmann/json when available and otherwise downloads the pinned release
 archive. The API uses a pinned cpp-httplib release.
 
@@ -497,3 +498,19 @@ Each push updates the named branch on `origin` (GitHub HTTPS or a local bare
 repository). Set `GH_TOKEN` or
 `GITHUB_TOKEN` with the repository permissions required for private access
 and pull request creation. [GitHub REST pulls](https://docs.github.com/en/rest/pulls/pulls)
+
+## Day 50 document agent
+
+Use `build/ark-cpp document < request.json`. All actions take a local `path`.
+`read_pdf` returns page text, `read_docx` returns paragraphs, and `read_xlsx`
+returns worksheet names and cell rows. PDF extraction uses the embedded text
+layer. XLSX reads return cell values and cached formula results.
+
+`write_docx` and `write_pdf` take a `paragraphs` array of strings and an
+optional `title`. `write_xlsx` takes a `rows` array of cell arrays and creates
+one worksheet. Strings, numbers, Booleans, and null are accepted. The caller
+can replace an existing output file by naming its path explicitly.
+
+```bash
+printf '%s\n' '{"action":"write_docx","path":"build/report.docx","title":"Report","paragraphs":["Findings from the collected evidence."]}' | build/ark-cpp document
+```

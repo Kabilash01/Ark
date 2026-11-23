@@ -3,6 +3,7 @@
 #include "ark/browser.hpp"
 #include "ark/browser_agent.hpp"
 #include "ark/coding.hpp"
+#include "ark/document_agent.hpp"
 #include "ark/done_condition.hpp"
 #include "ark/evaluation.hpp"
 #include "ark/file_system.hpp"
@@ -865,6 +866,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp terminal 'bash command'\n"
                      "       ark-cpp terminal < request.json\n"
                      "       ark-cpp github < request.json\n"
+                     "       ark-cpp document < request.json\n"
                      "       ark-cpp benchmark [suite.json] [report.json]\n"
                      "       ark-cpp repair-benchmark <suite.json> <report.json>\n"
                      "       ark-cpp browser < actions.json\n"
@@ -904,6 +906,10 @@ int main(int argc, char** argv) {
             ark::CurlTransport http;
             const ark::GitHubAgent agent(std::ref(http), env("GH_TOKEN", env("GITHUB_TOKEN")));
             return print_run(agent.run(ark::make_message("user", "github_agent", "GITHUB", ark::Json::parse(std::cin))));
+        }
+        if (command == "document" && argc == 2) {
+            return print_run(ark::DocumentAgent().run(
+                ark::make_message("user", "document_agent", "DOCUMENT", ark::Json::parse(std::cin))));
         }
         if (command == "files" && argc == 2) {
             return print_run(run_file_operation(ark::Json::parse(std::cin)));
