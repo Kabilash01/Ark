@@ -1,6 +1,7 @@
 #include "ark/api_server.hpp"
 #include "ark/benchmark.hpp"
 #include "ark/browser.hpp"
+#include "ark/browser_agent.hpp"
 #include "ark/coding.hpp"
 #include "ark/done_condition.hpp"
 #include "ark/evaluation.hpp"
@@ -176,6 +177,9 @@ ark::AgentProfile actor_profile(std::string_view name, const std::string& genera
     } else if (name == "web_search_agent") {
         defaults = ark::web_search_profile(general_model);
         capabilities = {"BROWSE"};
+    } else if (name == "browser_agent") {
+        defaults = ark::browser_profile(general_model);
+        capabilities = {"BROWSE"};
     } else {
         throw std::invalid_argument("Unknown versioned agent " + std::string(name));
     }
@@ -191,6 +195,13 @@ ark::Json run_web_search(const ark::Transport& http, const ark::ResearchConfig& 
                          const ark::AgentProfile& profile) {
     const ark::WebSearchAgent worker(std::ref(http), settings.ollama_url, profile, env("TAVILY_API_KEY"), settings.privacy);
     return worker.run(std::move(message));
+}
+
+ark::Json run_browser_agent(const ark::Transport& http, const ark::ResearchConfig& settings, ark::Json message,
+                            const ark::AgentProfile& profile, const ark::BrowserActivity& activity = {}) {
+    const ark::BrowserAgent agent(http, settings.ollama_url, profile,
+        {.executable = env("ARK_BROWSER_BINARY", "chromium"), .privacy = settings.privacy});
+    return agent.run(std::move(message), activity);
 }
 
 ark::Json run_file_operation(ark::Json payload) {
@@ -417,6 +428,14 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
             result = run_evaluation(transport, settings, std::move(message), profiles.at(task.agent));
         } else if (task.agent == "web_search_agent") {
             result = run_web_search(transport, settings, std::move(message), profiles.at(task.agent));
+        } else if (task.agent == "browser_agent") {
+            result = run_browser_agent(transport, settings, std::move(message), profiles.at(task.agent),
+                [&](std::string_view action, std::string_view status) {
+                    auto report = source;
+                    report["activity"] = "Browser " + std::string(action);
+                    report["status"] = status;
+                    emit(events, status == "STARTED" ? "tool_called" : "tool_result", report);
+                });
         } else {
             result = ark::ResearchAgent(transport, settings, profiles.at(task.agent)).run(std::move(message));
         }
@@ -511,16 +530,20 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
     std::transform(lower_goal.begin(), lower_goal.end(), lower_goal.begin(),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     const bool explicit_research = lower_goal.starts_with("research ") || lower_goal.find("arxiv:") != std::string::npos;
+    const bool has_browser_site = ark::browser_start_url(goal).has_value();
+    const bool explicit_browse = has_browser_site && (lower_goal.starts_with("browse ") || lower_goal.starts_with("navigate ")
+        || lower_goal.starts_with("visit ") || lower_goal.starts_with("open "));
     std::string intent = "SUPERVISE";
     ark::Json dag;
     for (int attempt = 1; ; ++attempt) {
         try {
             owner = "supervisor_agent";
             emit(events, "agent_started", {{"agent", owner}});
-            intent = planner.classify(goal);
+            intent = explicit_browse ? "BROWSE" : planner.classify(goal);
             emit(events, "agent_done", {{"agent", owner}, {"intent", intent}});
             if (intent == "BROWSE") {
-                dag["tasks"] = ark::Json::array({{{"task_id", "t1"}, {"agent", "web_search_agent"},
+                dag["tasks"] = ark::Json::array({{{"task_id", "t1"},
+                    {"agent", has_browser_site ? "browser_agent" : "web_search_agent"},
                     {"intent", "BROWSE"}, {"instruction", goal}, {"depends_on", ark::Json::array()},
                     {"parallel_with", ark::Json::array()}}});
                 break;
@@ -766,6 +789,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp code [instruction]\n"
                      "       ark-cpp evaluate < message.json\n"
                      "       ark-cpp web-search [--privacy|--airgap] <query>\n"
+                     "       ark-cpp browse [--privacy|--airgap] <instruction>\n"
                      "       ark-cpp files < operation.json\n"
                      "       ark-cpp status [task_id] | list | stop <task_id> | agents | logs\n"
                      "       ark-cpp models [vram-gib]\n"
@@ -826,6 +850,19 @@ int main(int argc, char** argv) {
                 {"privacy", flag == "--privacy"}, {"airgap_mode", flag == "--airgap"}});
             return print_run(run_web_search(std::ref(http), settings, std::move(message),
                                            actor_profile("web_search_agent", settings.model, redis.get())));
+        }
+        if (command == "browse" && (argc == 3 || argc == 4)) {
+            const std::string_view flag = argc == 4 ? argv[2] : "";
+            if (argc == 4 && flag != "--privacy" && flag != "--airgap") {
+                throw std::invalid_argument("Expected --privacy or --airgap before instruction");
+            }
+            const auto settings = config();
+            const auto redis = version_store();
+            ark::CurlTransport http;
+            auto message = ark::make_message("user", "browser_agent", "BROWSE", {{"instruction", argv[argc - 1]},
+                {"privacy", flag == "--privacy"}, {"airgap_mode", flag == "--airgap"}});
+            return print_run(run_browser_agent(std::ref(http), settings, std::move(message),
+                                               actor_profile("browser_agent", settings.model, redis.get())));
         }
         if (command == "research" && argc <= 3) {
             auto message = argc == 3

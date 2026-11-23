@@ -85,6 +85,24 @@ void trusts_docker_results_for_code() {
     check(result.at("quality_score") == 0.85 && result.at("output").at("scores").at("tests_pass") == 1.0, result.dump());
 }
 
+void evaluates_browser_evidence_without_sending_png_bytes() {
+    ark::EvaluationAgent evaluator([](const ark::Request& request) {
+        const auto input = request_input(request);
+        check(input.at("type") == "general", "browser worker requires the general rubric");
+        const auto& artifact = input.at("artifact");
+        check(artifact.at("extractions").at(0).at("items") == Json::array({"Paper A"})
+              && !artifact.at("screenshots").at(0).contains("data"), "incorrect browser evidence sent to evaluation");
+        return judgment({{"correctness", 1.0}, {"completeness", 1.0}, {"clarity", 1.0}});
+    }, "http://localhost:11434", "test-judge");
+    auto message = ark::make_message("router", "evaluation_agent", "EVALUATE", {{"instruction", "Review browser output"}});
+    const Json browser{{"status", "DONE"}, {"intent", "BROWSE"}, {"receiver", "browser_agent"},
+        {"output", {{"extractions", Json::array({{{"items", Json::array({"Paper A"})}}})},
+                    {"screenshots", Json::array({{{"data", "PNG fixture"}, {"mime_type", "image/png"}}})}}}};
+    message["memory_context"] = {{{"tier", "dependencies"}, {"data", {{"site", browser}}}}};
+    const auto result = evaluator.run(message);
+    check(result.at("status") == "DONE" && result.at("output").at("evaluated_task") == "site", result.dump());
+}
+
 } // namespace
 
 int main() {
@@ -92,6 +110,7 @@ int main() {
         applies_each_rubric();
         decisions_and_invalid_scores();
         trusts_docker_results_for_code();
+        evaluates_browser_evidence_without_sending_png_bytes();
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

@@ -147,6 +147,8 @@ constexpr auto visible_element = R"js((selector) => {
 
 } // namespace
 
+std::string browser_url_host(std::string_view url) { return url_host(url); }
+
 struct Browser::Impl {
     explicit Impl(BrowserOptions input)
         : options(std::move(input)),
@@ -197,8 +199,14 @@ struct Browser::Impl {
         return false;
     }
 
+    bool allows_host(std::string_view host) const {
+        return (options.allowed_hosts.empty() || std::find(options.allowed_hosts.begin(), options.allowed_hosts.end(), host)
+                                                  != options.allowed_hosts.end())
+            && (loopback(host) || privacy.allows_external(options.privacy, host));
+    }
+
     void proxy_flags(std::vector<std::string>& arguments) {
-        if (!privacy.enabled) {
+        if (!privacy.enabled && options.allowed_hosts.empty()) {
             arguments.emplace_back("--proxy-server=direct://");
             return;
         }
@@ -216,19 +224,28 @@ struct Browser::Impl {
             system_error("Get Chromium's blocked proxy endpoint");
         }
         arguments.push_back("--proxy-server=http://127.0.0.1:" + std::to_string(ntohs(address.sin_port)));
-        std::string bypass = "--proxy-bypass-list=<-loopback>;localhost;127.0.0.1;[::1]";
-        if (!privacy.airgap && options.privacy.contains("allowed_external")) {
-            static const std::regex host_pattern(R"([a-zA-Z0-9][a-zA-Z0-9.-]*)");
+        std::string bypass = "--proxy-bypass-list=<-loopback>";
+        const auto add_host = [&](const std::string& host) {
+            static const std::regex host_pattern(R"((?:[a-zA-Z0-9][a-zA-Z0-9.-]*|\[[0-9a-fA-F:.]+\]))");
+            if (!std::regex_match(host, host_pattern)) {
+                throw std::invalid_argument("Browser allowlist requires exact host names");
+            }
+            bypass += ";" + lowercase(host);
+        };
+        if (!options.allowed_hosts.empty()) {
+            for (const auto& name : options.allowed_hosts) {
+                if (allows_host(name)) add_host(name);
+            }
+        } else {
+            for (const auto* name : {"localhost", "127.0.0.1", "[::1]"}) add_host(name);
+        }
+        if (options.allowed_hosts.empty() && !privacy.airgap && options.privacy.contains("allowed_external")) {
             const auto& hosts = options.privacy.at("allowed_external");
             if (!hosts.is_array()) {
                 throw std::invalid_argument("Browser privacy allowlist must be an array of hosts");
             }
             for (const auto& host : hosts) {
-                const auto& name = host.get_ref<const std::string&>();
-                if (!std::regex_match(name, host_pattern)) {
-                    throw std::invalid_argument("Browser privacy allowlist requires exact host names");
-                }
-                bypass += ";" + lowercase(name);
+                add_host(host.get_ref<const std::string&>());
             }
         }
         arguments.push_back(std::move(bypass));
@@ -413,9 +430,9 @@ void Browser::close_browser() { impl_.reset(); }
 
 void Browser::navigate(std::string_view url) {
     auto& browser = session();
-    const auto host = url_host(url);
-    if (!loopback(host) && !browser.privacy.allows_external(browser.options.privacy, host)) {
-        throw std::invalid_argument("Browser privacy settings block this host");
+    const auto host = browser_url_host(url);
+    if (!browser.allows_host(host)) {
+        throw std::invalid_argument("Browser scope or privacy settings block this host");
     }
     const auto deadline = Clock::now() + browser.options.timeout;
     browser.ready_loaders.clear();
@@ -530,6 +547,50 @@ Json Browser::extract_table(std::string_view selector) {
         if (!(table instanceof HTMLTableElement)) throw new Error("Selector does not refer to a table");
         return Array.from(table.rows, (row) => Array.from(row.cells, (cell) => cell.innerText.trim()));
     })js", Json(selector)), deadline);
+}
+
+Json Browser::describe_page() {
+    return session().evaluate(R"js((() => {
+        const clean = (value) => value.trim().replace(/\s+/g, " ");
+        const elements = [];
+        const seen = new Set();
+        const candidates = [
+            ...document.querySelectorAll("h1,h2,h3,input,textarea,select,button,p[class],div[class],table"),
+            ...document.querySelectorAll("a[href]")
+        ];
+        for (const element of candidates) {
+            if (elements.length >= 28) break;
+            if (!element.getClientRects().length) continue;
+            const text = clean(element.getAttribute("aria-label") || element.getAttribute("placeholder") || element.innerText || "");
+            if (element.matches("div,p") && (text.length < 3 || text.length > 230)) continue;
+            let selector = element.localName;
+            if (element.id) selector = "#" + CSS.escape(element.id);
+            else if (element.matches("a[href]")) {
+                selector += "[href=" + (CSS.escape(element.getAttribute("href")) || '""') + "]";
+            } else if (element.classList.length) {
+                selector += Array.from(element.classList).slice(0, 2).map((name) => "." + CSS.escape(name)).join("");
+            } else if (element.getAttribute("name")) {
+                selector += "[name=" + CSS.escape(element.getAttribute("name")) + "]";
+            }
+            if (seen.has(selector) || selector.length > 180) continue;
+            seen.add(selector);
+            elements.push({ selector, text: text.slice(0, 150), matches: document.querySelectorAll(selector).length });
+        }
+        return { url: location.href, title: document.title, text: clean(document.body?.innerText || "").slice(0, 2300), elements };
+    })())js");
+}
+
+Json Browser::extract_text(std::string_view selector, std::size_t limit) {
+    return session().evaluate(js_call(R"js(([selector, limit]) => {
+        const values = [];
+        for (const element of document.querySelectorAll(selector)) {
+            if (values.length >= limit) break;
+            if (!element.getClientRects().length || getComputedStyle(element).visibility !== "visible") continue;
+            const text = element.innerText?.trim().replace(/\s+/g, " ");
+            if (text) values.push(text.slice(0, 1800));
+        }
+        return values;
+    })js", Json::array({selector, limit})));
 }
 
 } // namespace ark

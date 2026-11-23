@@ -4,8 +4,11 @@
 
 #include <chrono>
 #include <memory>
+#include <vector>
 
 namespace ark {
+
+std::string browser_url_host(std::string_view url);
 
 struct BrowserOptions {
     std::string executable = "chromium";
@@ -13,6 +16,7 @@ struct BrowserOptions {
     Json privacy = Json::object();
     bool private_mode = false;
     bool airgap = false;
+    std::vector<std::string> allowed_hosts;
 };
 
 class Browser {
@@ -31,6 +35,8 @@ public:
     void fill_form(const Json& fields);
     Json extract_links();
     Json extract_table(std::string_view selector);
+    Json describe_page();
+    Json extract_text(std::string_view selector, std::size_t limit);
     bool wait_for_element(std::string_view selector);
     void close_browser();
 

@@ -38,6 +38,7 @@ endif()
 add_library(ark_native
     cpp/src/benchmark.cpp
     cpp/src/browser.cpp
+    cpp/src/browser_agent.cpp
     cpp/src/coding.cpp
     cpp/src/conflict_resolver.cpp
     cpp/src/done_condition.cpp
@@ -85,6 +86,10 @@ if(BUILD_TESTING)
     target_link_libraries(ark_browser_tests PRIVATE ark_native httplib::httplib)
     add_test(NAME ark_browser_tests COMMAND ark_browser_tests)
     set_tests_properties(ark_browser_tests PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 45)
+    add_executable(ark_browser_agent_tests cpp/tests/browser_agent_test.cpp)
+    target_link_libraries(ark_browser_agent_tests PRIVATE ark_native httplib::httplib)
+    add_test(NAME ark_browser_agent_tests COMMAND ark_browser_agent_tests)
+    set_tests_properties(ark_browser_agent_tests PROPERTIES TIMEOUT 45)
     add_executable(ark_native_tests cpp/tests/research_test.cpp)
     target_link_libraries(ark_native_tests PRIVATE ark_native)
     add_test(NAME ark_native_tests COMMAND ark_native_tests)

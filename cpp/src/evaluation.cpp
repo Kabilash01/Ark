@@ -46,6 +46,15 @@ Artifact artifact_for(const Json& payload, const Json& memory) {
                     return {"code", task.at("output"), id};
                 }
                 const auto intent = task.value("intent", "");
+                if (intent == "BROWSE" && task.value("receiver", "") == "browser_agent") {
+                    auto evidence = task.at("output");
+                    if (evidence.contains("screenshots")) {
+                        for (auto& screenshot : evidence.at("screenshots")) {
+                            screenshot.erase("data");
+                        }
+                    }
+                    return {"general", std::move(evidence), id};
+                }
                 if (intent == "RESEARCH" || intent == "SEARCH" || intent == "BROWSE") {
                     research = {"research", task.at("output"), id};
                 }

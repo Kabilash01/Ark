@@ -270,7 +270,7 @@ services are available in either mode.
 `build/ark-cpp web-search "query"` searches via Tavily using
 `TAVILY_API_KEY`. The local general model summarizes the returned excerpts.
 Citation IDs resolve to the provider's actual result URLs. The supervisor
-routes `BROWSE` goals to this worker. Airgap blocks the request before it
+uses this worker for `BROWSE` goals with no specified site. Airgap blocks the request before it
 reaches Tavily. Private requests require `api.tavily.com` in the configured
 allowlist. [Tavily Search API](https://docs.tavily.com/documentation/api-reference/endpoint/search)
 
@@ -427,3 +427,25 @@ and page resources as well. [Chromium proxy rules](https://chromium.googlesource
 
 Set `ARK_TEST_CHROMIUM` to the executable path when running CTest to include
 the headless Chromium integration checks.
+
+## Day 44 browser agent
+
+```bash
+build/ark-cpp browse 'Browse https://arxiv.org/list/cs.CL/recent and extract the first three paper titles.'
+```
+
+The agent uses the general model from `config/active-models.json` or the
+`ARK_MODEL` override. A saved Redis version pins the model and prompt for the
+`browser_agent` role. Explicit browse goals also route through the normal
+task dispatcher and API.
+
+The local model chooses each action after seeing the previous result and
+the visible page structure. The agent allows up to eight actions and limits
+Chromium to the requested host. It returns the extracted text, links, or
+table cells with their page URL, an action log, and up to two screenshots as
+base64 PNG data. A single explicit count such as “the first three paper titles”
+sets the extraction limit and requires that many results before completion.
+
+Use `--privacy` or `--airgap` before the instruction to apply the same
+privacy policy as the Browser Tool. The requested host must also be allowed
+by that policy. [arXiv recent submissions](https://arxiv.org/list/cs.CL/recent)
