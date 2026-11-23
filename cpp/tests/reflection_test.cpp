@@ -32,11 +32,13 @@ void persists_reflection_skills_and_flags() {
                    {"steps", Json::array({"Preserve the test suite", "Run the tests"})}}},
                {"flag_for_self_improvement", true}, {"agent_version_recommendation", {
                    {"agent_name", "coding_agent"}, {"reason", "Timed out on first attempt"}, {"version", "invented"}}}};
+    bool received_conflict = false;
     ark::ReflectionAgent agent([&](const ark::Request& request) {
         const auto body = Json::parse(request.body);
         check(body.at("model") == "local-reflection", "incorrect reflection model");
         const auto evidence = Json::parse(body.at("messages").at(1).at("content").get<std::string>());
         check(evidence.at("attempts").at(0).at("status") == "RETRY", "failed attempt omitted from evidence");
+        received_conflict = evidence.contains("memory_conflicts_pending_human_review");
         return ark::Response{200, Json{{"message", {{"content", reply.dump()}}}}.dump()};
     }, "http://localhost:11434", ark::reflection_profile("local-reflection"));
     Json task{{"task_id", "source-task"}, {"intent", "CODE"}, {"status", "DONE"}, {"quality_score", 0.9},
@@ -56,10 +58,13 @@ void persists_reflection_skills_and_flags() {
     task["quality_score"] = nullptr;
     check(!agent.run(task, episodes, skills).contains("skill_id") && skills.all().size() == 1,
           "failed task incorrectly added a skill");
+    skills.add("CODE", "Run the contract suite", {"Run a sampled test"}, "coding_agent");
     reply["what_worked"] = 5;
     const auto invalid = agent.run(task, episodes, skills);
     check(invalid.at("status") == "FAILED" && reopened.pending_improvements().size() == 1,
           "invalid output should be logged as a failed reflection");
+    check(received_conflict && invalid.at("memory_conflicts_pending_human_review").size() == 1,
+          "Reflection did not receive the durable memory conflict");
     check(reopened.by_agent("reflection_agent").size() == 3, "missing reflection episodes");
 }
 

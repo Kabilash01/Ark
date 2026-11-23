@@ -864,6 +864,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp memory <query>\n"
                      "       ark-cpp memory search <query> | show <tier> [task_id]\n"
                      "       ark-cpp skill-add < skill.json\n"
+                     "       ark-cpp skill-conflicts [reviewed-conflict-id]\n"
                      "       ark-cpp sandbox < workspace.json\n"
                      "       ark-cpp terminal 'bash command'\n"
                      "       ark-cpp terminal < request.json\n"
@@ -1047,6 +1048,23 @@ int main(int argc, char** argv) {
                                        input.at("steps"), input.value("source", "manual"));
             std::cout << skills.get(id).dump(2) << '\n';
             return 0;
+        }
+        if (command == "skill-conflicts" && argc <= 3) {
+            const auto settings = config(false);
+            ark::CurlTransport http;
+            ark::ProceduralMemory skills(skills_path(), ark::Embeddings(std::ref(http), settings.ollama_url,
+                                                                       settings.embedding_model));
+            if (argc == 2) {
+                std::cout << skills.pending_conflicts().dump(2) << '\n';
+                return 0;
+            }
+            const auto id = ark::Json::parse(argv[2]);
+            if (!id.is_number_integer() || id.get<double>() < 1 || id.get<double>() >= 9223372036854775808.0) {
+                throw std::invalid_argument("Conflict ID must be a positive integer");
+            }
+            const bool reviewed = skills.review_conflict(id.get<std::int64_t>());
+            std::cout << ark::Json{{"reviewed", reviewed}}.dump() << '\n';
+            return reviewed ? 0 : 1;
         }
         if (command == "run" || command == "--privacy" || command == "--airgap" || command == "--until"
             || command == "--max-iter") {

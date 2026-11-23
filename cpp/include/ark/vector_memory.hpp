@@ -60,6 +60,8 @@ public:
     Json record_use(std::string_view id, bool success);
     Json get(std::string_view id);
     Json all(int limit = -1);
+    Json pending_conflicts(int limit = 20);
+    bool review_conflict(std::int64_t id);
 
 private:
     struct Impl;

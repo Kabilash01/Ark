@@ -552,3 +552,17 @@ with a JSON request on stdin. `initialize` creates the uniqueness constraints.
 
 The graph uses `Paper` and `Concept` nodes with `CITES`, `MENTIONS`, and
 `RELATED` relationships. [Neo4j Query API](https://neo4j.com/docs/query-api/current/query/)
+
+## Day 53 procedural memory conflicts
+
+Skills with the same embedding model, intent, and description (ignoring ASCII
+case and surrounding spaces) are treated as revisions of one procedure.
+Storage preserves each skill ID, source, steps, and observed success rate.
+Retrieval chooses the highest success rate within that group before ranking
+it against other procedures. Ties favor the revision with more observations,
+then the earliest entry.
+
+Conflicting steps create a durable review item for the Reflection Agent.
+Use `build/ark-cpp skill-conflicts` to list pending items and
+`build/ark-cpp skill-conflicts <conflict-id>` to acknowledge an item. Review
+status is stored separately from the skill revisions.

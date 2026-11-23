@@ -114,12 +114,38 @@ void skills_persist_and_rank() {
           "candidate pool should be selected by cosine first");
 }
 
+void conflicting_revisions_survive_and_rank() {
+    const auto path = std::filesystem::temp_directory_path() / (ark::random_uuid() + ".db");
+    struct Cleanup {
+        std::filesystem::path path;
+        ~Cleanup() { std::error_code ignored; std::filesystem::remove(path, ignored); }
+    } cleanup{path};
+    const ark::Embeddings encoder(fake_embeddings, "http://127.0.0.1:11434", "fixture-encoder");
+    ark::ProceduralMemory writer(path, encoder);
+    const auto old = writer.add("RESEARCH", "query", {"Choose the first candidate"}, "research_agent");
+    writer.record_use(old, false);
+    ark::ProceduralMemory second(path, encoder);
+    const auto latest = second.add("RESEARCH", " Query ", {"Validate evidence first"}, "reflection_agent");
+    second.record_use(latest, true);
+    ark::ProceduralMemory reopened(path, encoder);
+    const auto queue = reopened.pending_conflicts();
+    const auto selected = reopened.retrieve("query");
+    check(queue.size() == 1 && reopened.all().size() == 2 && selected.size() == 1, "lost versions or review item");
+    const auto& conflict = queue.at(0);
+    check(conflict.at("previous").at("skill_id") == old && conflict.at("proposed").at("source") == "reflection_agent"
+          && conflict.at("proposed").at("success_rate") == 1.0 && selected.at(0).at("skill_id") == latest,
+          "revision provenance or success ranking changed");
+    check(reopened.review_conflict(conflict.at("conflict_id").get<std::int64_t>())
+          && writer.pending_conflicts().empty() && writer.all().size() == 2, "review discarded an original skill");
+}
+
 } // namespace
 
 int main() {
     try {
         semantic_round_trip();
         skills_persist_and_rank();
+        conflicting_revisions_survive_and_rank();
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

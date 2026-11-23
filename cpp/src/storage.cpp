@@ -530,6 +530,18 @@ ProceduralMemory::ProceduralMemory(const std::filesystem::path& path, Embeddings
             last_used TEXT, source TEXT NOT NULL, vector BLOB NOT NULL
         );
         CREATE INDEX IF NOT EXISTS skills_model ON skills (model);
+        CREATE INDEX IF NOT EXISTS skills_group ON skills (model, intent, lower(trim(description)));
+        CREATE TABLE IF NOT EXISTS skill_conflicts (
+            id INTEGER PRIMARY KEY, previous_id TEXT NOT NULL REFERENCES skills(id),
+            new_id TEXT NOT NULL REFERENCES skills(id), created_at TEXT NOT NULL, reviewed_at TEXT
+        );
+        CREATE TRIGGER IF NOT EXISTS skills_conflict_insert AFTER INSERT ON skills BEGIN
+            INSERT INTO skill_conflicts(previous_id, new_id, created_at)
+            SELECT prior.id, new.id, strftime('%Y-%m-%dT%H:%M:%SZ', 'now') FROM skills AS prior
+            WHERE prior.model = new.model AND prior.intent = new.intent
+              AND lower(trim(prior.description)) = lower(trim(new.description)) AND prior.steps != new.steps
+            ORDER BY prior.success_rate DESC, prior.use_count DESC, prior.rowid LIMIT 1;
+        END;
     )sql";
     auto* db = impl_->db.get();
     sqlite_check(sqlite3_exec(db, schema, nullptr, nullptr, nullptr), db);
@@ -585,6 +597,45 @@ Json ProceduralMemory::all(int limit) {
     return entries;
 }
 
+Json ProceduralMemory::pending_conflicts(int limit) {
+    if (limit < 1 || limit > 1000) throw std::invalid_argument("Conflict limit must be between 1 and 1000");
+    const std::lock_guard lock(impl_->mutex);
+    auto* db = impl_->db.get();
+    auto statement = prepare(db, R"sql(
+        SELECT c.id,c.created_at,n.intent,n.description,p.id,p.source,p.success_rate,n.id,n.source,n.success_rate
+        FROM skill_conflicts AS c JOIN skills AS p ON c.previous_id=p.id JOIN skills AS n ON c.new_id=n.id
+        WHERE c.reviewed_at IS NULL AND n.model=? ORDER BY c.id LIMIT ?
+    )sql");
+    bind_text(db, statement.get(), 1, encoder_.model());
+    sqlite_check(sqlite3_bind_int(statement.get(), 2, limit), db);
+    auto rows = Json::array();
+    for (int result; (result = sqlite3_step(statement.get())) != SQLITE_DONE;) {
+        sqlite_check(result, db);
+        const auto version = [&](int i) {
+            return Json{{"skill_id", sqlite_text(statement.get(), i)}, {"source", sqlite_text(statement.get(), i + 1)},
+                        {"success_rate", sqlite3_column_double(statement.get(), i + 2)}};
+        };
+        rows.push_back({{"conflict_id", sqlite3_column_int64(statement.get(), 0)},
+            {"created_at", sqlite_text(statement.get(), 1)}, {"intent", sqlite_text(statement.get(), 2)},
+            {"description", sqlite_text(statement.get(), 3)}, {"previous", version(4)}, {"proposed", version(7)}});
+    }
+    return rows;
+}
+
+bool ProceduralMemory::review_conflict(std::int64_t id) {
+    const std::lock_guard lock(impl_->mutex);
+    auto* db = impl_->db.get();
+    auto statement = prepare(db, R"sql(
+        UPDATE skill_conflicts SET reviewed_at=? WHERE id=? AND reviewed_at IS NULL
+        AND new_id IN (SELECT id FROM skills WHERE model=?)
+    )sql");
+    bind_text(db, statement.get(), 1, utc_timestamp());
+    sqlite_check(sqlite3_bind_int64(statement.get(), 2, id), db);
+    bind_text(db, statement.get(), 3, encoder_.model());
+    sqlite_check(sqlite3_step(statement.get()), db);
+    return sqlite3_changes(db) == 1;
+}
+
 Json ProceduralMemory::retrieve(std::string_view query, std::size_t top_k, std::size_t candidate_pool) {
     if (!top_k || !candidate_pool) {
         return Json::array();
@@ -608,7 +659,11 @@ Json ProceduralMemory::retrieve(std::string_view query, std::size_t top_k, std::
     std::vector<Match> matches;
     {
         const std::lock_guard lock(impl_->mutex);
-        auto statement = prepare(db, std::string("SELECT ") + skill_fields + ",vector FROM skills WHERE model = ?");
+        auto statement = prepare(db, std::string("SELECT ") + skill_fields + R"sql(,vector FROM (
+            SELECT *, row_number() OVER (PARTITION BY intent, lower(trim(description))
+                ORDER BY success_rate DESC, use_count DESC, rowid) AS rank
+            FROM skills WHERE model = ?
+        ) WHERE rank = 1)sql");
         bind_text(db, statement.get(), 1, encoder_.model());
         for (int result; (result = sqlite3_step(statement.get())) != SQLITE_DONE;) {
             sqlite_check(result, db);

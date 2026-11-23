@@ -73,8 +73,11 @@ Json ReflectionAgent::run(const Json& task, EpisodicMemory& episodes, Procedural
     Json report{{"agent_version", std::string(name) + "@" + profile_.version}};
     std::string summary;
     try {
+        auto input = task;
+        const auto conflicts = skills.pending_conflicts(10);
+        if (!conflicts.empty()) input["memory_conflicts_pending_human_review"] = conflicts;
         const auto response = chat_local(transport_, url_, profile_.model, profile_.prompts.at("system"),
-                                        task.dump(-1, ' ', false, Json::error_handler_t::replace));
+                                        input.dump(-1, ' ', false, Json::error_handler_t::replace));
         report.update(validated_report(Json::parse(response), task.at("agent_versions")));
         report["status"] = "DONE";
         summary = report.at("pattern_learned").get<std::string>();
@@ -94,6 +97,11 @@ Json ReflectionAgent::run(const Json& task, EpisodicMemory& episodes, Procedural
         }
     }
     Json metadata{{"reflection", report}};
+    const auto conflicts = skills.pending_conflicts(10);
+    if (!conflicts.empty()) {
+        report["memory_conflicts_pending_human_review"] = conflicts;
+        metadata["reflection"] = report;
+    }
     if (report.value("flag_for_self_improvement", false)) {
         metadata["self_improvement_status"] = "pending";
     }
