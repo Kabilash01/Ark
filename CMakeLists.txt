@@ -56,6 +56,7 @@ add_library(ark_native
     cpp/src/research.cpp
     cpp/src/runtime_files.cpp
     cpp/src/sandbox.cpp
+    cpp/src/security_agent.cpp
     cpp/src/storage.cpp
     cpp/src/terminal.cpp
     cpp/src/vector_memory.cpp

@@ -40,6 +40,8 @@ public:
                             std::chrono::seconds timeout = std::chrono::seconds(30)) const;
     SandboxResult run_command(std::string_view command,
                               std::chrono::seconds timeout = std::chrono::seconds(30)) const;
+    SandboxResult run_project_command(std::string_view command, const SandboxWorkspace& workspace,
+                                       std::chrono::seconds timeout = std::chrono::seconds(30)) const;
 
 private:
     Transport transport_;

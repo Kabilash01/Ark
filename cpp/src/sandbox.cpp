@@ -25,6 +25,8 @@ if request["packages"]:
                    check=True)
     sys.path.insert(0, "/work/site")
 os.chdir(root)
+if "command" in request:
+    os.execv("/bin/bash", ["bash", "--noprofile", "--norc", "-c", request["command"]])
 sys.path.insert(0, str(root))
 if request["tests"]:
     for path in root.rglob("*.py"):
@@ -124,6 +126,11 @@ SandboxResult DockerSandbox::run_command(std::string_view command, std::chrono::
         throw std::invalid_argument("Sandbox command must contain non-whitespace text, be at most 64 KiB, and contain no NUL bytes");
     }
     return run("/bin/bash", {"--noprofile", "--norc", "-c", command}, timeout);
+}
+
+SandboxResult DockerSandbox::run_project_command(std::string_view command, const SandboxWorkspace& workspace,
+                                                 std::chrono::seconds timeout) const {
+    return run_python_bundle({{"command", command}, {"files", workspace.files()}, {"packages", workspace.packages()}}, timeout);
 }
 
 SandboxResult DockerSandbox::run_python_bundle(const Json& input, std::chrono::seconds timeout) const {

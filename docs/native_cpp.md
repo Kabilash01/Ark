@@ -514,3 +514,22 @@ can replace an existing output file by naming its path explicitly.
 ```bash
 printf '%s\n' '{"action":"write_docx","path":"build/report.docx","title":"Report","paragraphs":["Findings from the collected evidence."]}' | build/ark-cpp document
 ```
+
+## Day 51 security agent
+
+```bash
+docker build -t ark-security:local docker/security
+build/ark-cpp security < audit-request.json
+```
+
+Supply a `files` object of relative Python file names and source strings.
+The default `audit` action runs Semgrep's bundled SQL rule and Bandit's
+Python checks inside network-disabled Docker containers. Set `report_path`
+to write HTML alongside the structured result. `run_semgrep` and `run_bandit`
+select one scanner. `ARK_SECURITY_IMAGE` selects a prepared scanner image.
+
+The dependency check compares the supplied `dependencies` object of pinned
+versions with local `advisories` entries containing `id`, `package`, and
+`affected_versions`. Use `check_dependencies` for that check alone. The report
+maps the supported checks to the OWASP 2021 categories for injection,
+vulnerable components, and authentication failures.

@@ -14,6 +14,7 @@
 #include "ark/research.hpp"
 #include "ark/runtime_files.hpp"
 #include "ark/sandbox.hpp"
+#include "ark/security_agent.hpp"
 #include "ark/storage.hpp"
 #include "ark/terminal.hpp"
 #include "ark/vector_memory.hpp"
@@ -867,6 +868,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp terminal < request.json\n"
                      "       ark-cpp github < request.json\n"
                      "       ark-cpp document < request.json\n"
+                     "       ark-cpp security < request.json\n"
                      "       ark-cpp benchmark [suite.json] [report.json]\n"
                      "       ark-cpp repair-benchmark <suite.json> <report.json>\n"
                      "       ark-cpp browser < actions.json\n"
@@ -910,6 +912,12 @@ int main(int argc, char** argv) {
         if (command == "document" && argc == 2) {
             return print_run(ark::DocumentAgent().run(
                 ark::make_message("user", "document_agent", "DOCUMENT", ark::Json::parse(std::cin))));
+        }
+        if (command == "security" && argc == 2) {
+            ark::CurlTransport http;
+            const ark::SecurityAgent agent(ark::DockerSandbox(std::ref(http),
+                env("ARK_DOCKER_SOCKET", "/var/run/docker.sock"), env("ARK_SECURITY_IMAGE", "ark-security:local")));
+            return print_run(agent.run(ark::make_message("user", "security_agent", "SECURITY", ark::Json::parse(std::cin))));
         }
         if (command == "files" && argc == 2) {
             return print_run(run_file_operation(ark::Json::parse(std::cin)));
