@@ -13,6 +13,7 @@
 #include "ark/kernel.hpp"
 #include "ark/privacy.hpp"
 #include "ark/reflection.hpp"
+#include "ark/reflection_study.hpp"
 #include "ark/research.hpp"
 #include "ark/runtime_files.hpp"
 #include "ark/sandbox.hpp"
@@ -813,6 +814,29 @@ int repair_benchmark(const std::filesystem::path& suite, const std::filesystem::
     return report.at("rate") >= 0.7 ? 0 : 1;
 }
 
+int reflection_study(const std::filesystem::path& suite, const std::filesystem::path& report_path) {
+    if (std::filesystem::weakly_canonical(suite) == std::filesystem::weakly_canonical(report_path)) {
+        throw std::invalid_argument("Reflection report path must differ from the study suite path");
+    }
+    const auto settings = config();
+    const auto redis = version_store();
+    const auto coding = actor_profile("coding_agent", settings.model, redis.get());
+    const auto reflection = actor_profile("reflection_agent", settings.model, redis.get());
+    ark::CurlTransport http;
+    const auto sandbox = docker_sandbox(std::ref(http));
+    const ark::CodingAgent coder(std::ref(http), settings.ollama_url, coding,
+                                 [&](const auto& workspace) { return sandbox.run_tests(workspace); });
+    const ark::ReflectionAgent reflector(std::ref(http), settings.ollama_url, reflection);
+    ark::Embeddings encoder(std::ref(http), settings.ollama_url, settings.embedding_model);
+    auto report = ark::run_reflection_study(ark::read_json(suite), coder, reflector, sandbox, std::move(encoder),
+        [&](const auto& partial) { ark::write_json(report_path, partial); });
+    report["coding_model"] = coding.model;
+    report["reflection_model"] = reflection.model;
+    ark::write_json(report_path, report);
+    std::cout << report.at("summary").dump(2) << '\n';
+    return 0;
+}
+
 int benchmark(const std::filesystem::path& suite_path, const std::filesystem::path& report_path) {
     if (!report_path.empty() && std::filesystem::weakly_canonical(suite_path) == std::filesystem::weakly_canonical(report_path)) {
         throw std::invalid_argument("Benchmark report path must differ from the suite path");
@@ -998,6 +1022,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp citation-graph < request.json\n"
                      "       ark-cpp benchmark [suite.json] [report.json]\n"
                      "       ark-cpp repair-benchmark <suite.json> <report.json>\n"
+                     "       ark-cpp reflection-study <suite.json> <report.json>\n"
                      "       ark-cpp infer < request.json\n"
                      "       ark-cpp llama-presets <ollama-model-dir>\n"
                      "       ark-cpp inference-benchmark <suite.json> <report.json>\n"
@@ -1018,6 +1043,7 @@ int main(int argc, char** argv) {
         if (command == "repair-benchmark" && argc == 4) {
             return repair_benchmark(argv[2], argv[3]);
         }
+        if (command == "reflection-study" && argc == 4) return reflection_study(argv[2], argv[3]);
         if (command == "infer" && argc == 2) return infer();
         if (command == "inference-benchmark" && argc == 4) return inference_benchmark(argv[2], argv[3]);
         if (command == "llama-presets" && argc == 3) {

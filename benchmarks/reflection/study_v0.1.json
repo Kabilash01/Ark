@@ -1,0 +1,687 @@
+{
+  "version": "0.1",
+  "training": [
+    {
+      "family": "inclusion",
+      "goal": "Return the sum of positive multiples of 2 at most n, including n when it is a multiple. For n <= 0 return 0.",
+      "broken_source": "def solve(n):\n    return sum(k for k in range(1, n) if k % 2 == 0)\n",
+      "tests": {
+        "test_train.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = 6\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 12)\n        self.assertEqual(case, original)\n        case = 0\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 0)\n        self.assertEqual(case, original)\n        case = -2\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 0)\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "family": "stable_sort",
+      "goal": "Return a new list sorted by descending distance from 12. Keep input order when distances tie and preserve the input list.",
+      "broken_source": "def solve(items):\n    return sorted(items, key=lambda x: (abs(x - 12), x), reverse=True)\n",
+      "tests": {
+        "test_train.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [11, 13, 9, 15]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [9, 15, 11, 13])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "family": "rotation",
+      "goal": "Return a new list with the input rotated right by 2 positions, wrapping around the list. Empty input must return an empty list.",
+      "broken_source": "def solve(xs):\n    k = 2 % len(xs)\n    return xs[-k:] + xs[:-k]\n",
+      "tests": {
+        "test_train.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [1, 2, 3]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [2, 3, 1])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "family": "dedupe",
+      "goal": "Return a new list of distinct values in first-occurrence order using equality. Support unhashable values such as lists.",
+      "broken_source": "def solve(xs):\n    return list(dict.fromkeys(xs))\n",
+      "tests": {
+        "test_train.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [[2], [3], [2], []]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[2], [3], []])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "family": "median",
+      "goal": "Return the median of a list of numbers. Return None for empty input, average the two middle values for even lengths, and leave the argument unchanged.",
+      "broken_source": "def solve(xs):\n    xs.sort()\n    return xs[len(xs)//2]\n",
+      "tests": {
+        "test_train.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [6, 2]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 4)\n        self.assertEqual(case, original)\n        case = [6, 2, 4, 3]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 3.5)\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), None)\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "family": "group",
+      "goal": "Group nonempty strings by their first character lowercased. Preserve original strings and their order inside each group. Ignore empty strings.",
+      "broken_source": "def solve(xs):\n    result = {}\n    for x in xs:\n        result.setdefault(x[0].lower(), []).append(x)\n    return result\n",
+      "tests": {
+        "test_train.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = ['', 'Cz', 'cx', 'Other']\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {'c': ['Cz', 'cx'], 'o': ['Other']})\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {})\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "family": "normalize",
+      "goal": "Split a string on '#', trim whitespace around each piece, lowercase it, and omit blank pieces while preserving order.",
+      "broken_source": "def solve(s):\n    return [x.strip().lower() for x in s.split(\"#\")]\n",
+      "tests": {
+        "test_train.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = '  Z# #   B  '\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), ['z', 'b'])\n        self.assertEqual(case, original)\n        case = ''\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "family": "chunk",
+      "goal": "Split the input into successive sublists of length 2. Include a shorter final group when necessary and leave the input unchanged.",
+      "broken_source": "def solve(xs):\n    return [xs[i:i+2] for i in range(0,len(xs)-1,2)]\n",
+      "tests": {
+        "test_train.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [0, 1, 2]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[0, 1], [2]])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "id": "inclusion-3",
+      "family": "inclusion",
+      "goal": "Implement solution.py with function solve receiving one argument. Return the sum of positive multiples of 3 at most n, including n when it is a multiple. For n <= 0 return 0.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = 5\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 3)\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = 9\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 18)\n        self.assertEqual(case, original)\n        case = 0\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 0)\n        self.assertEqual(case, original)\n        case = -3\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 0)\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "inclusion-4",
+      "family": "inclusion",
+      "goal": "Implement solution.py with function solve receiving one argument. Return the sum of positive multiples of 4 at most n, including n when it is a multiple. For n <= 0 return 0.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = 7\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 4)\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = 12\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 24)\n        self.assertEqual(case, original)\n        case = 0\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 0)\n        self.assertEqual(case, original)\n        case = -4\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 0)\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "inclusion-5",
+      "family": "inclusion",
+      "goal": "Implement solution.py with function solve receiving one argument. Return the sum of positive multiples of 5 at most n, including n when it is a multiple. For n <= 0 return 0.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = 9\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 5)\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = 15\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 30)\n        self.assertEqual(case, original)\n        case = 0\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 0)\n        self.assertEqual(case, original)\n        case = -5\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 0)\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "inclusion-6",
+      "family": "inclusion",
+      "goal": "Implement solution.py with function solve receiving one argument. Return the sum of positive multiples of 6 at most n, including n when it is a multiple. For n <= 0 return 0.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = 11\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 6)\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = 18\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 36)\n        self.assertEqual(case, original)\n        case = 0\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 0)\n        self.assertEqual(case, original)\n        case = -6\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 0)\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "inclusion-7",
+      "family": "inclusion",
+      "goal": "Implement solution.py with function solve receiving one argument. Return the sum of positive multiples of 7 at most n, including n when it is a multiple. For n <= 0 return 0.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = 13\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 7)\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = 21\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 42)\n        self.assertEqual(case, original)\n        case = 0\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 0)\n        self.assertEqual(case, original)\n        case = -7\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 0)\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "inclusion-8",
+      "family": "inclusion",
+      "goal": "Implement solution.py with function solve receiving one argument. Return the sum of positive multiples of 8 at most n, including n when it is a multiple. For n <= 0 return 0.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = 15\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 8)\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = 24\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 48)\n        self.assertEqual(case, original)\n        case = 0\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 0)\n        self.assertEqual(case, original)\n        case = -8\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 0)\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "inclusion-9",
+      "family": "inclusion",
+      "goal": "Implement solution.py with function solve receiving one argument. Return the sum of positive multiples of 9 at most n, including n when it is a multiple. For n <= 0 return 0.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = 17\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 9)\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = 27\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 54)\n        self.assertEqual(case, original)\n        case = 0\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 0)\n        self.assertEqual(case, original)\n        case = -9\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 0)\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "stable_sort-3",
+      "family": "stable_sort",
+      "goal": "Implement solution.py with function solve receiving one argument. Return a new list sorted by descending distance from 13. Keep input order when distances tie and preserve the input list.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [13, 11, 16]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [16, 11, 13])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [12, 14, 10, 16]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [10, 16, 12, 14])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "stable_sort-4",
+      "family": "stable_sort",
+      "goal": "Implement solution.py with function solve receiving one argument. Return a new list sorted by descending distance from 14. Keep input order when distances tie and preserve the input list.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [14, 12, 17]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [17, 12, 14])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [13, 15, 11, 17]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [11, 17, 13, 15])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "stable_sort-5",
+      "family": "stable_sort",
+      "goal": "Implement solution.py with function solve receiving one argument. Return a new list sorted by descending distance from 15. Keep input order when distances tie and preserve the input list.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [15, 13, 18]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [18, 13, 15])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [14, 16, 12, 18]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [12, 18, 14, 16])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "stable_sort-6",
+      "family": "stable_sort",
+      "goal": "Implement solution.py with function solve receiving one argument. Return a new list sorted by descending distance from 16. Keep input order when distances tie and preserve the input list.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [16, 14, 19]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [19, 14, 16])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [15, 17, 13, 19]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [13, 19, 15, 17])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "stable_sort-7",
+      "family": "stable_sort",
+      "goal": "Implement solution.py with function solve receiving one argument. Return a new list sorted by descending distance from 17. Keep input order when distances tie and preserve the input list.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [17, 15, 20]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [20, 15, 17])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [16, 18, 14, 20]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [14, 20, 16, 18])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "stable_sort-8",
+      "family": "stable_sort",
+      "goal": "Implement solution.py with function solve receiving one argument. Return a new list sorted by descending distance from 18. Keep input order when distances tie and preserve the input list.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [18, 16, 21]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [21, 16, 18])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [17, 19, 15, 21]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [15, 21, 17, 19])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "stable_sort-9",
+      "family": "stable_sort",
+      "goal": "Implement solution.py with function solve receiving one argument. Return a new list sorted by descending distance from 19. Keep input order when distances tie and preserve the input list.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [19, 17, 22]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [22, 17, 19])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [18, 20, 16, 22]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [16, 22, 18, 20])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "rotation-3",
+      "family": "rotation",
+      "goal": "Implement solution.py with function solve receiving one argument. Return a new list with the input rotated right by 3 positions, wrapping around the list. Empty input must return an empty list.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [0, 1, 2, 3, 4]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [2, 3, 4, 0, 1])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [1, 2, 3]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [1, 2, 3])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "rotation-4",
+      "family": "rotation",
+      "goal": "Implement solution.py with function solve receiving one argument. Return a new list with the input rotated right by 4 positions, wrapping around the list. Empty input must return an empty list.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [0, 1, 2, 3, 4, 5]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [2, 3, 4, 5, 0, 1])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [1, 2, 3]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [3, 1, 2])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "rotation-5",
+      "family": "rotation",
+      "goal": "Implement solution.py with function solve receiving one argument. Return a new list with the input rotated right by 5 positions, wrapping around the list. Empty input must return an empty list.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [0, 1, 2, 3, 4, 5, 6]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [2, 3, 4, 5, 6, 0, 1])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [1, 2, 3]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [2, 3, 1])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "rotation-6",
+      "family": "rotation",
+      "goal": "Implement solution.py with function solve receiving one argument. Return a new list with the input rotated right by 6 positions, wrapping around the list. Empty input must return an empty list.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [0, 1, 2, 3, 4, 5, 6, 7]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [2, 3, 4, 5, 6, 7, 0, 1])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [1, 2, 3]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [1, 2, 3])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "rotation-7",
+      "family": "rotation",
+      "goal": "Implement solution.py with function solve receiving one argument. Return a new list with the input rotated right by 7 positions, wrapping around the list. Empty input must return an empty list.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [0, 1, 2, 3, 4, 5, 6, 7, 8]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [2, 3, 4, 5, 6, 7, 8, 0, 1])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [1, 2, 3]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [3, 1, 2])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "rotation-8",
+      "family": "rotation",
+      "goal": "Implement solution.py with function solve receiving one argument. Return a new list with the input rotated right by 8 positions, wrapping around the list. Empty input must return an empty list.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [2, 3, 4, 5, 6, 7, 8, 9, 0, 1])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [1, 2, 3]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [2, 3, 1])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "rotation-9",
+      "family": "rotation",
+      "goal": "Implement solution.py with function solve receiving one argument. Return a new list with the input rotated right by 9 positions, wrapping around the list. Empty input must return an empty list.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [1, 2, 3]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [1, 2, 3])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "dedupe-3",
+      "family": "dedupe",
+      "goal": "Implement solution.py with function solve receiving one argument. Return a new list of distinct values in first-occurrence order using equality. Support unhashable values such as lists.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [3, 4, 3]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [3, 4])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [[3], [4], [3], []]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[3], [4], []])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "dedupe-4",
+      "family": "dedupe",
+      "goal": "Implement solution.py with function solve receiving one argument. Return a new list of distinct values in first-occurrence order using equality. Support unhashable values such as lists.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [4, 5, 4]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [4, 5])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [[4], [5], [4], []]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[4], [5], []])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "dedupe-5",
+      "family": "dedupe",
+      "goal": "Implement solution.py with function solve receiving one argument. Return a new list of distinct values in first-occurrence order using equality. Support unhashable values such as lists.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [5, 6, 5]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [5, 6])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [[5], [6], [5], []]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[5], [6], []])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "dedupe-6",
+      "family": "dedupe",
+      "goal": "Implement solution.py with function solve receiving one argument. Return a new list of distinct values in first-occurrence order using equality. Support unhashable values such as lists.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [6, 7, 6]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [6, 7])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [[6], [7], [6], []]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[6], [7], []])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "dedupe-7",
+      "family": "dedupe",
+      "goal": "Implement solution.py with function solve receiving one argument. Return a new list of distinct values in first-occurrence order using equality. Support unhashable values such as lists.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [7, 8, 7]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [7, 8])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [[7], [8], [7], []]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[7], [8], []])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "dedupe-8",
+      "family": "dedupe",
+      "goal": "Implement solution.py with function solve receiving one argument. Return a new list of distinct values in first-occurrence order using equality. Support unhashable values such as lists.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [8, 9, 8]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [8, 9])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [[8], [9], [8], []]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[8], [9], []])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "dedupe-9",
+      "family": "dedupe",
+      "goal": "Implement solution.py with function solve receiving one argument. Return a new list of distinct values in first-occurrence order using equality. Support unhashable values such as lists.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [9, 10, 9]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [9, 10])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [[9], [10], [9], []]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[9], [10], []])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "median-3",
+      "family": "median",
+      "goal": "Implement solution.py with function solve receiving one argument. Return the median of a list of numbers. Return None for empty input, average the two middle values for even lengths, and leave the argument unchanged.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [5, 3, 4]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 4)\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [7, 3]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 5)\n        self.assertEqual(case, original)\n        case = [7, 3, 5, 4]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 4.5)\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), None)\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "median-4",
+      "family": "median",
+      "goal": "Implement solution.py with function solve receiving one argument. Return the median of a list of numbers. Return None for empty input, average the two middle values for even lengths, and leave the argument unchanged.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [6, 4, 5]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 5)\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [8, 4]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 6)\n        self.assertEqual(case, original)\n        case = [8, 4, 6, 5]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 5.5)\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), None)\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "median-5",
+      "family": "median",
+      "goal": "Implement solution.py with function solve receiving one argument. Return the median of a list of numbers. Return None for empty input, average the two middle values for even lengths, and leave the argument unchanged.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [7, 5, 6]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 6)\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [9, 5]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 7)\n        self.assertEqual(case, original)\n        case = [9, 5, 7, 6]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 6.5)\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), None)\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "median-6",
+      "family": "median",
+      "goal": "Implement solution.py with function solve receiving one argument. Return the median of a list of numbers. Return None for empty input, average the two middle values for even lengths, and leave the argument unchanged.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [8, 6, 7]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 7)\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [10, 6]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 8)\n        self.assertEqual(case, original)\n        case = [10, 6, 8, 7]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 7.5)\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), None)\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "median-7",
+      "family": "median",
+      "goal": "Implement solution.py with function solve receiving one argument. Return the median of a list of numbers. Return None for empty input, average the two middle values for even lengths, and leave the argument unchanged.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [9, 7, 8]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 8)\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [11, 7]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 9)\n        self.assertEqual(case, original)\n        case = [11, 7, 9, 8]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 8.5)\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), None)\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "median-8",
+      "family": "median",
+      "goal": "Implement solution.py with function solve receiving one argument. Return the median of a list of numbers. Return None for empty input, average the two middle values for even lengths, and leave the argument unchanged.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [10, 8, 9]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 9)\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [12, 8]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 10)\n        self.assertEqual(case, original)\n        case = [12, 8, 10, 9]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 9.5)\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), None)\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "median-9",
+      "family": "median",
+      "goal": "Implement solution.py with function solve receiving one argument. Return the median of a list of numbers. Return None for empty input, average the two middle values for even lengths, and leave the argument unchanged.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [11, 9, 10]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 10)\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [13, 9]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 11)\n        self.assertEqual(case, original)\n        case = [13, 9, 11, 10]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), 10.5)\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), None)\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "group-3",
+      "family": "group",
+      "goal": "Implement solution.py with function solve receiving one argument. Group nonempty strings by their first character lowercased. Preserve original strings and their order inside each group. Ignore empty strings.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = ['Dz', 'Dx']\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {'d': ['Dz', 'Dx']})\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = ['', 'Dz', 'dx', 'Other']\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {'d': ['Dz', 'dx'], 'o': ['Other']})\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {})\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "group-4",
+      "family": "group",
+      "goal": "Implement solution.py with function solve receiving one argument. Group nonempty strings by their first character lowercased. Preserve original strings and their order inside each group. Ignore empty strings.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = ['Ez', 'Ex']\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {'e': ['Ez', 'Ex']})\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = ['', 'Ez', 'ex', 'Other']\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {'e': ['Ez', 'ex'], 'o': ['Other']})\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {})\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "group-5",
+      "family": "group",
+      "goal": "Implement solution.py with function solve receiving one argument. Group nonempty strings by their first character lowercased. Preserve original strings and their order inside each group. Ignore empty strings.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = ['Fz', 'Fx']\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {'f': ['Fz', 'Fx']})\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = ['', 'Fz', 'fx', 'Other']\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {'f': ['Fz', 'fx'], 'o': ['Other']})\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {})\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "group-6",
+      "family": "group",
+      "goal": "Implement solution.py with function solve receiving one argument. Group nonempty strings by their first character lowercased. Preserve original strings and their order inside each group. Ignore empty strings.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = ['Gz', 'Gx']\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {'g': ['Gz', 'Gx']})\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = ['', 'Gz', 'gx', 'Other']\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {'g': ['Gz', 'gx'], 'o': ['Other']})\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {})\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "group-7",
+      "family": "group",
+      "goal": "Implement solution.py with function solve receiving one argument. Group nonempty strings by their first character lowercased. Preserve original strings and their order inside each group. Ignore empty strings.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = ['Hz', 'Hx']\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {'h': ['Hz', 'Hx']})\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = ['', 'Hz', 'hx', 'Other']\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {'h': ['Hz', 'hx'], 'o': ['Other']})\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {})\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "group-8",
+      "family": "group",
+      "goal": "Implement solution.py with function solve receiving one argument. Group nonempty strings by their first character lowercased. Preserve original strings and their order inside each group. Ignore empty strings.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = ['Iz', 'Ix']\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {'i': ['Iz', 'Ix']})\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = ['', 'Iz', 'ix', 'Other']\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {'i': ['Iz', 'ix'], 'o': ['Other']})\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {})\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "group-9",
+      "family": "group",
+      "goal": "Implement solution.py with function solve receiving one argument. Group nonempty strings by their first character lowercased. Preserve original strings and their order inside each group. Ignore empty strings.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = ['Jz', 'Jx']\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {'j': ['Jz', 'Jx']})\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = ['', 'Jz', 'jx', 'Other']\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {'j': ['Jz', 'jx'], 'o': ['Other']})\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), {})\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "normalize-3",
+      "family": "normalize",
+      "goal": "Implement solution.py with function solve receiving one argument. Split a string on '$', trim whitespace around each piece, lowercase it, and omit blank pieces while preserving order.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = 'A$B'\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), ['a', 'b'])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = '  Z$ $   B  '\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), ['z', 'b'])\n        self.assertEqual(case, original)\n        case = ''\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "normalize-4",
+      "family": "normalize",
+      "goal": "Implement solution.py with function solve receiving one argument. Split a string on '%', trim whitespace around each piece, lowercase it, and omit blank pieces while preserving order.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = 'A%B'\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), ['a', 'b'])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = '  Z% %   B  '\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), ['z', 'b'])\n        self.assertEqual(case, original)\n        case = ''\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "normalize-5",
+      "family": "normalize",
+      "goal": "Implement solution.py with function solve receiving one argument. Split a string on '&', trim whitespace around each piece, lowercase it, and omit blank pieces while preserving order.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = 'A&B'\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), ['a', 'b'])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = '  Z& &   B  '\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), ['z', 'b'])\n        self.assertEqual(case, original)\n        case = ''\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "normalize-6",
+      "family": "normalize",
+      "goal": "Implement solution.py with function solve receiving one argument. Split a string on \"'\", trim whitespace around each piece, lowercase it, and omit blank pieces while preserving order.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = \"A'B\"\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), ['a', 'b'])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = \"  Z' '   B  \"\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), ['z', 'b'])\n        self.assertEqual(case, original)\n        case = ''\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "normalize-7",
+      "family": "normalize",
+      "goal": "Implement solution.py with function solve receiving one argument. Split a string on '(', trim whitespace around each piece, lowercase it, and omit blank pieces while preserving order.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = 'A(B'\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), ['a', 'b'])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = '  Z( (   B  '\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), ['z', 'b'])\n        self.assertEqual(case, original)\n        case = ''\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "normalize-8",
+      "family": "normalize",
+      "goal": "Implement solution.py with function solve receiving one argument. Split a string on ')', trim whitespace around each piece, lowercase it, and omit blank pieces while preserving order.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = 'A)B'\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), ['a', 'b'])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = '  Z) )   B  '\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), ['z', 'b'])\n        self.assertEqual(case, original)\n        case = ''\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "normalize-9",
+      "family": "normalize",
+      "goal": "Implement solution.py with function solve receiving one argument. Split a string on '*', trim whitespace around each piece, lowercase it, and omit blank pieces while preserving order.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = 'A*B'\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), ['a', 'b'])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = '  Z* *   B  '\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), ['z', 'b'])\n        self.assertEqual(case, original)\n        case = ''\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "chunk-3",
+      "family": "chunk",
+      "goal": "Implement solution.py with function solve receiving one argument. Split the input into successive sublists of length 3. Include a shorter final group when necessary and leave the input unchanged.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [0, 1, 2]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[0, 1, 2]])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [0, 1, 2, 3]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[0, 1, 2], [3]])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "chunk-4",
+      "family": "chunk",
+      "goal": "Implement solution.py with function solve receiving one argument. Split the input into successive sublists of length 4. Include a shorter final group when necessary and leave the input unchanged.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [0, 1, 2, 3]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[0, 1, 2, 3]])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [0, 1, 2, 3, 4]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[0, 1, 2, 3], [4]])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "chunk-5",
+      "family": "chunk",
+      "goal": "Implement solution.py with function solve receiving one argument. Split the input into successive sublists of length 5. Include a shorter final group when necessary and leave the input unchanged.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [0, 1, 2, 3, 4]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[0, 1, 2, 3, 4]])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [0, 1, 2, 3, 4, 5]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[0, 1, 2, 3, 4], [5]])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "chunk-6",
+      "family": "chunk",
+      "goal": "Implement solution.py with function solve receiving one argument. Split the input into successive sublists of length 6. Include a shorter final group when necessary and leave the input unchanged.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [0, 1, 2, 3, 4, 5]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[0, 1, 2, 3, 4, 5]])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [0, 1, 2, 3, 4, 5, 6]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[0, 1, 2, 3, 4, 5], [6]])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "chunk-7",
+      "family": "chunk",
+      "goal": "Implement solution.py with function solve receiving one argument. Split the input into successive sublists of length 7. Include a shorter final group when necessary and leave the input unchanged.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [0, 1, 2, 3, 4, 5, 6]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[0, 1, 2, 3, 4, 5, 6]])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [0, 1, 2, 3, 4, 5, 6, 7]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[0, 1, 2, 3, 4, 5, 6], [7]])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "chunk-8",
+      "family": "chunk",
+      "goal": "Implement solution.py with function solve receiving one argument. Split the input into successive sublists of length 8. Include a shorter final group when necessary and leave the input unchanged.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [0, 1, 2, 3, 4, 5, 6, 7]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[0, 1, 2, 3, 4, 5, 6, 7]])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [0, 1, 2, 3, 4, 5, 6, 7, 8]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[0, 1, 2, 3, 4, 5, 6, 7], [8]])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    },
+    {
+      "id": "chunk-9",
+      "family": "chunk",
+      "goal": "Implement solution.py with function solve receiving one argument. Split the input into successive sublists of length 9. Include a shorter final group when necessary and leave the input unchanged.",
+      "smoke": {
+        "test_smoke.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [0, 1, 2, 3, 4, 5, 6, 7, 8]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[0, 1, 2, 3, 4, 5, 6, 7, 8]])\n        self.assertEqual(case, original)\n"
+      },
+      "holdout": {
+        "test_holdout.py": "import copy\nimport unittest\nfrom solution import solve\n\nclass Contract(unittest.TestCase):\n    def test_contract(self):\n        case = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [[0, 1, 2, 3, 4, 5, 6, 7, 8], [9]])\n        self.assertEqual(case, original)\n        case = []\n        original = copy.deepcopy(case)\n        self.assertEqual(solve(case), [])\n        self.assertEqual(case, original)\n"
+      }
+    }
+  ]
+}

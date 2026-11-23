@@ -81,7 +81,7 @@ endforeach()
 configure_file(dashboard/assets.hpp.in generated/ark/dashboard_assets.hpp @ONLY)
 target_include_directories(ark_api PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
-add_executable(ark-cpp cpp/src/main.cpp cpp/src/tool_benchmark.cpp)
+add_executable(ark-cpp cpp/src/main.cpp cpp/src/tool_benchmark.cpp cpp/src/reflection_study.cpp)
 target_link_libraries(ark-cpp PRIVATE ark_api httplib::httplib)
 install(TARGETS ark-cpp RUNTIME DESTINATION bin)
 

@@ -1,0 +1,1007 @@
+{
+  "coding_model": "ark-study-code",
+  "finished_at": "2026-11-23T18:01:48+00:00",
+  "guidance": {
+    "chunk": {
+      "agent_version": "reflection_agent@1.0.0",
+      "pattern": "The task requires that if the input length is odd, the final group should be shorter, but the agent's implementation did not handle this correctly."
+    },
+    "dedupe": {
+      "agent_version": "reflection_agent@1.0.0",
+      "pattern": "To support unhashable values like lists, a different approach is needed, such as using a list to track seen elements and iterating through the input list while checking for duplicates."
+    },
+    "group": {
+      "agent_version": "reflection_agent@1.0.0",
+      "pattern": "The error suggests that the code is trying to access the first character of a string that may be empty, which should be checked before accessing the first character."
+    },
+    "inclusion": {
+      "agent_version": "reflection_agent@1.0.0",
+      "pattern": "The agent's code likely did not correctly identify all multiples of 2 up to n. The error suggests that the code may have only considered half of the multiples, leading to an incorrect result."
+    },
+    "median": {
+      "agent_version": "reflection_agent@1.0.0",
+      "pattern": "The agent's implementation did not correctly handle the median calculation for even-length lists, particularly when the two middle values are not equal."
+    },
+    "normalize": {
+      "agent_version": "reflection_agent@1.0.0",
+      "pattern": "The task requires careful handling of string splitting, trimming, and filtering out blank elements while preserving order."
+    },
+    "rotation": {
+      "agent_version": "reflection_agent@1.0.0",
+      "pattern": "The code needs to check if the input list is empty before attempting to perform modulo operations on its length to avoid division by zero."
+    },
+    "stable_sort": {
+      "agent_version": "reflection_agent@1.0.0",
+      "pattern": "When distances are equal, the input order should be preserved, and the list should not be modified."
+    }
+  },
+  "pairs": [
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "inclusion",
+      "id": "inclusion-3",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "inclusion",
+      "id": "inclusion-4",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "inclusion",
+      "id": "inclusion-5",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "inclusion",
+      "id": "inclusion-6",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      }
+    },
+    {
+      "baseline": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      },
+      "family": "inclusion",
+      "id": "inclusion-7",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      }
+    },
+    {
+      "baseline": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      },
+      "family": "inclusion",
+      "id": "inclusion-8",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "inclusion",
+      "id": "inclusion-9",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "stable_sort",
+      "id": "stable_sort-3",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "stable_sort",
+      "id": "stable_sort-4",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "stable_sort",
+      "id": "stable_sort-5",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "stable_sort",
+      "id": "stable_sort-6",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "stable_sort",
+      "id": "stable_sort-7",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "stable_sort",
+      "id": "stable_sort-8",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "stable_sort",
+      "id": "stable_sort-9",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      },
+      "family": "rotation",
+      "id": "rotation-3",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 1,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      },
+      "family": "rotation",
+      "id": "rotation-4",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 1,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      },
+      "family": "rotation",
+      "id": "rotation-5",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "rotation",
+      "id": "rotation-6",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 1,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      },
+      "family": "rotation",
+      "id": "rotation-7",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 1,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      },
+      "family": "rotation",
+      "id": "rotation-8",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 1,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      }
+    },
+    {
+      "baseline": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      },
+      "family": "rotation",
+      "id": "rotation-9",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "dedupe",
+      "id": "dedupe-3",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "dedupe",
+      "id": "dedupe-4",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "dedupe",
+      "id": "dedupe-5",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "dedupe",
+      "id": "dedupe-6",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "dedupe",
+      "id": "dedupe-7",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "dedupe",
+      "id": "dedupe-8",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "dedupe",
+      "id": "dedupe-9",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "median",
+      "id": "median-3",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "median",
+      "id": "median-4",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "median",
+      "id": "median-5",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "median",
+      "id": "median-6",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "median",
+      "id": "median-7",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "median",
+      "id": "median-8",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "median",
+      "id": "median-9",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      },
+      "family": "group",
+      "id": "group-3",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      }
+    },
+    {
+      "baseline": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      },
+      "family": "group",
+      "id": "group-4",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      }
+    },
+    {
+      "baseline": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      },
+      "family": "group",
+      "id": "group-5",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      }
+    },
+    {
+      "baseline": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      },
+      "family": "group",
+      "id": "group-6",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      }
+    },
+    {
+      "baseline": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      },
+      "family": "group",
+      "id": "group-7",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      }
+    },
+    {
+      "baseline": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      },
+      "family": "group",
+      "id": "group-8",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      }
+    },
+    {
+      "baseline": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      },
+      "family": "group",
+      "id": "group-9",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "normalize",
+      "id": "normalize-3",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "normalize",
+      "id": "normalize-4",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "normalize",
+      "id": "normalize-5",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "normalize",
+      "id": "normalize-6",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 1,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      },
+      "family": "normalize",
+      "id": "normalize-7",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 1,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "normalize",
+      "id": "normalize-8",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": true,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 0,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      },
+      "family": "normalize",
+      "id": "normalize-9",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 1,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      },
+      "family": "chunk",
+      "id": "chunk-3",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "chunk",
+      "id": "chunk-4",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "chunk",
+      "id": "chunk-5",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "chunk",
+      "id": "chunk-6",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "chunk",
+      "id": "chunk-7",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 1,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "chunk",
+      "id": "chunk-8",
+      "reflected_first": false,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "holdout_exit_code": 1,
+        "holdout_timed_out": false,
+        "smoke_passed": true
+      }
+    },
+    {
+      "baseline": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      },
+      "family": "chunk",
+      "id": "chunk-9",
+      "reflected_first": true,
+      "with_reflection": {
+        "accepted": false,
+        "agent_version": "coding_agent@1.0.0",
+        "smoke_passed": false
+      }
+    }
+  ],
+  "reflection_model": "ark-study-reflect",
+  "started_at": "2026-11-23T18:00:12+00:00",
+  "study": "0.1",
+  "summary": {
+    "baseline_passed": 12,
+    "coding_runs": 112,
+    "harmed": 3,
+    "improved": 5,
+    "pairs": 56,
+    "with_reflection_passed": 14
+  },
+  "by_family": {
+    "inclusion": {
+      "pairs": 7,
+      "baseline_passed": 2,
+      "with_reflection_passed": 7
+    },
+    "stable_sort": {
+      "pairs": 7,
+      "baseline_passed": 0,
+      "with_reflection_passed": 0
+    },
+    "rotation": {
+      "pairs": 7,
+      "baseline_passed": 2,
+      "with_reflection_passed": 0
+    },
+    "dedupe": {
+      "pairs": 7,
+      "baseline_passed": 0,
+      "with_reflection_passed": 0
+    },
+    "median": {
+      "pairs": 7,
+      "baseline_passed": 0,
+      "with_reflection_passed": 0
+    },
+    "group": {
+      "pairs": 7,
+      "baseline_passed": 7,
+      "with_reflection_passed": 7
+    },
+    "normalize": {
+      "pairs": 7,
+      "baseline_passed": 1,
+      "with_reflection_passed": 0
+    },
+    "chunk": {
+      "pairs": 7,
+      "baseline_passed": 0,
+      "with_reflection_passed": 0
+    }
+  },
+  "suite_sha256": "29c820e39ede105fb77630f71f5921df648a187aa2ef68df87129bd68a2763d2",
+  "explicit_agent_errors": 0
+}
