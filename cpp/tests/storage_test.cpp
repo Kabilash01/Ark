@@ -106,6 +106,13 @@ void redis_round_trip(int port) {
 
 int main() {
     try {
+        const auto task = ark::random_uuid();
+        ark::WorkingMemory offline(nullptr);
+        offline.set(task, "result", Json{{"done", true}});
+        ark::WorkingMemory another(nullptr);
+        check(another.get(task, "result").at("done") == true && another.all(task).size() == 1, "offline working state was lost");
+        another.clear(task);
+        check(!offline.exists(task, "result"), "offline working state was not cleared");
         sqlite_round_trip();
         if (const auto* port = std::getenv("ARK_TEST_REDIS_PORT")) {
             redis_round_trip(std::stoi(port));

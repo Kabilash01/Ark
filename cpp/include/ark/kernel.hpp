@@ -54,7 +54,8 @@ AgentProfile planner_profile(std::string model);
 class Planner {
 public:
     Planner(Transport transport, std::string local_url, std::string model);
-    Planner(Transport transport, std::string local_url, AgentProfile supervisor, AgentProfile planner);
+    Planner(Transport transport, std::string local_url, AgentProfile supervisor, AgentProfile planner,
+            std::string groq_model = {}, std::string groq_key = {});
 
     std::string classify(std::string_view goal) const;
     Json plan(std::string_view goal, const std::vector<std::string>& agents,
@@ -65,6 +66,10 @@ private:
     std::string local_url_;
     AgentProfile supervisor_;
     AgentProfile planner_;
+    std::string groq_model_;
+    std::string groq_key_;
+    std::string request(const AgentProfile& profile, std::string_view input, const Json& format,
+                        std::string_view cloud_input) const;
 };
 
 } // namespace ark

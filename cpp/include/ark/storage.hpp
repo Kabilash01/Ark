@@ -5,9 +5,15 @@
 #include <chrono>
 #include <filesystem>
 #include <memory>
+#include <stdexcept>
 #include <vector>
 
 namespace ark {
+
+class RedisUnavailable : public std::runtime_error {
+public:
+    using std::runtime_error::runtime_error;
+};
 
 // A synchronous Redis connection. Use a separate connection for subscriptions.
 class Redis {
@@ -27,7 +33,8 @@ private:
 
 class WorkingMemory {
 public:
-    explicit WorkingMemory(Redis& redis) : redis_(redis) {}
+    explicit WorkingMemory(Redis& redis) : WorkingMemory(&redis) {}
+    explicit WorkingMemory(Redis* redis) : redis_(redis) {}
     void set(std::string_view task_id, std::string_view key, const Json& value, int ttl = 3600);
     Json get(std::string_view task_id, std::string_view key);
     Json all(std::string_view task_id);
@@ -37,7 +44,7 @@ public:
     void finish(std::string_view task_id, int ttl = 3600);
 
 private:
-    Redis& redis_;
+    Redis* redis_;
 };
 
 class MessageBus {

@@ -39,6 +39,10 @@ public:
     void used(const Json& rows);
     std::vector<std::string> unused(std::int64_t cutoff);
     void remove(const std::vector<std::string>& ids);
+    Json query(const std::vector<float>& vector, const Json& filter, int limit);
+    Json pending();
+    void mark_synced(const Json& points);
+    int count();
 
 private:
     struct Impl;
@@ -59,6 +63,8 @@ public:
 
 private:
     bool exists() const;
+    void upload(const Json& points);
+    bool sync();
     Transport transport_;
     std::string collection_;
     Embeddings encoder_;

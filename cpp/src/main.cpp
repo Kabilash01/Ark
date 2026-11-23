@@ -203,12 +203,29 @@ ark::AgentProfile actor_profile(std::string_view name, const std::string& genera
     } else {
         throw std::invalid_argument("Unknown versioned agent " + std::string(name));
     }
-    return redis ? ark::AgentVersioner(*redis).ensure(name, capabilities, defaults) : defaults;
+    if (redis) {
+        try { return ark::AgentVersioner(*redis).ensure(name, capabilities, defaults); }
+        catch (const ark::RedisUnavailable&) {}
+    }
+    return defaults;
 }
 
-std::unique_ptr<ark::Redis> version_store(bool required = false) {
-    const auto port = env("ARK_REDIS_PORT", required ? "6379" : "");
-    return port.empty() ? nullptr : std::make_unique<ark::Redis>(std::stoi(port), std::stoi(env("ARK_REDIS_DB", "0")));
+std::unique_ptr<ark::Redis> runtime_redis(int port, int db) {
+    try { return std::make_unique<ark::Redis>(port, db); }
+    catch (const ark::RedisUnavailable&) { return nullptr; }
+}
+
+std::unique_ptr<ark::Redis> version_store(bool use_default_port = false, bool strict = false) {
+    const auto port = env("ARK_REDIS_PORT", use_default_port ? "6379" : "");
+    if (port.empty()) return nullptr;
+    const auto db = std::stoi(env("ARK_REDIS_DB", "0"));
+    return strict ? std::make_unique<ark::Redis>(std::stoi(port), db) : runtime_redis(std::stoi(port), db);
+}
+
+void audit_event(ark::Redis* redis, ark::Json event) {
+    if (!redis) return;
+    try { ark::MessageBus(*redis).log(std::move(event)); }
+    catch (const ark::RedisUnavailable&) {}
 }
 
 ark::Json run_web_search(const ark::Transport& http, const ark::ResearchConfig& settings, ark::Json message,
@@ -288,7 +305,7 @@ void record_escalations(std::string_view task_id, const ark::Json& reports,
                        {"summary", "Escalation: " + report.at("detail").get<std::string>()},
                        {"metadata", {{"event", "task_escalated"}, {"report", report}}}});
         if (redis) {
-            ark::MessageBus(*redis).log({{"event", "task_escalated"}, {"task_id", task_id}, {"report", report}});
+            audit_event(redis, {{"event", "task_escalated"}, {"task_id", task_id}, {"report", report}});
         }
     }
 }
@@ -379,8 +396,8 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     std::unique_ptr<ark::Redis> redis;
     std::unique_ptr<ark::EpisodicMemory> episodes;
     if (!redis_port.empty()) {
-        redis = std::make_unique<ark::Redis>(std::stoi(redis_port), redis_db);
-        ark::MessageBus(*redis).log({{"event", "dispatch_start"}, {"task_id", parent_id}});
+        redis = runtime_redis(std::stoi(redis_port), redis_db);
+        audit_event(redis.get(), {{"event", "dispatch_start"}, {"task_id", parent_id}});
     }
     const auto profiles = [&] {
         std::map<std::string, ark::AgentProfile, std::less<>> resolved;
@@ -431,9 +448,9 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         if (feedback.contains("output_conflicts")) {
             message["payload"]["output_conflicts"] = feedback.at("output_conflicts");
         }
-        if (!redis_port.empty()) {
-            ark::Redis worker_bus(std::stoi(redis_port), redis_db);
-            ark::MessageBus(worker_bus).log({{"event", "worker_start"}, {"task_id", message.at("task_id")},
+        if (redis) {
+            const auto worker_bus = runtime_redis(std::stoi(redis_port), redis_db);
+            audit_event(worker_bus.get(), {{"event", "worker_start"}, {"task_id", message.at("task_id")},
                                             {"parent_task_id", parent_id}, {"agent", task.agent},
                                             {"plan_task_id", task.id}, {"attempt", attempt}});
         }
@@ -502,9 +519,11 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         if (!redis) {
             return true;
         }
-        auto registry = ark::AgentRegistry(*redis);
-        const auto record = registry.get(name);
-        return !record.is_null() && record.at("status") != "OFFLINE" && registry.heartbeat(name);
+        try {
+            auto registry = ark::AgentRegistry(*redis);
+            const auto record = registry.get(name);
+            return !record.is_null() && record.at("status") != "OFFLINE" && registry.heartbeat(name);
+        } catch (const ark::RedisUnavailable&) { return true; }
     }, 4, [&](const ark::Json& research, const ark::Json& coding) {
         ark::CurlTransport http;
         const ark::Json source{{"agent", "supervisor_agent"}};
@@ -514,7 +533,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     for (auto report : conflicts) {
         report["task_id"] = parent_id;
         emit(events, "conflict_detected", report);
-        if (redis) ark::MessageBus(*redis).log({{"event", "conflict_detected"}, {"task_id", parent_id}, {"report", report}});
+        audit_event(redis.get(), {{"event", "conflict_detected"}, {"task_id", parent_id}, {"report", report}});
     }
     record_escalations(parent_id, escalations, episodes.get(), redis.get(),
                        versions.value("supervisor_agent", "1.0.0"));
@@ -530,14 +549,11 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     }
     ark::write_state(state_path, goal, parent_id, done ? "DONE" : "FAILED", privacy.enabled,
                      static_cast<int>(results.size()), last);
-    if (redis) {
-        ark::WorkingMemory working(*redis);
-        working.set(parent_id, "results", results);
-        working.finish(parent_id);
-        emit(events, "memory_written", {{"tier", "working"}});
-        ark::MessageBus(*redis).log({{"event", "dispatch_done"}, {"task_id", parent_id},
-                                     {"status", done ? "DONE" : "FAILED"}});
-    }
+    ark::WorkingMemory working(redis.get());
+    working.set(parent_id, "results", results);
+    working.finish(parent_id);
+    emit(events, "memory_written", {{"tier", "working"}});
+    audit_event(redis.get(), {{"event", "dispatch_done"}, {"task_id", parent_id}, {"status", done ? "DONE" : "FAILED"}});
     ark::Json result{{"task_id", parent_id}, {"intent", intent}, {"status", done ? "DONE" : "FAILED"},
                      {"dag", dag}, {"results", results}, {"quality_score", quality}, {"escalations", escalations},
                      {"agent_versions", versions}, {"output_conflicts", conflicts}};
@@ -558,7 +574,8 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
     const auto plan_profile = actor_profile("planner_agent", settings.model, redis.get());
     std::string_view owner = "supervisor_agent";
     const ark::Planner planner([&](const auto& request) { return report_request(events, http, request, {{"agent", owner}}); },
-                               settings.ollama_url, supervisor, plan_profile);
+                               settings.ollama_url, supervisor, plan_profile, env("ARK_GROQ_MODEL"),
+                               task_privacy.enabled ? std::string{} : env("ARK_GROQ_API_KEY"));
     ark::Json versions{{"supervisor_agent", supervisor.version}};
     auto lower_goal = std::string(goal);
     std::transform(lower_goal.begin(), lower_goal.end(), lower_goal.begin(),
@@ -832,7 +849,7 @@ void api_command(std::string_view path, std::string_view method = "GET") {
 }
 
 int manage_versions(std::string_view command, std::string_view agent, char** arguments) {
-    const auto redis = version_store(true);
+    const auto redis = version_store(true, true);
     ark::AgentVersioner versioner(*redis);
     ark::Json result;
     if (command == "versions") {
@@ -854,8 +871,8 @@ int manage_versions(std::string_view command, std::string_view agent, char** arg
 
 ark::Json memory_tier(std::string_view tier, std::string_view query, std::string_view task_id, int limit) {
     if (tier == "working" && !task_id.empty()) {
-        ark::Redis redis(std::stoi(env("ARK_REDIS_PORT", "6379")), std::stoi(env("ARK_REDIS_DB", "0")));
-        return ark::WorkingMemory(redis).all(task_id);
+        const auto redis = version_store(true);
+        return ark::WorkingMemory(redis.get()).all(task_id);
     }
     if (tier == "episodic") {
         const std::filesystem::path path = env("ARK_EPISODIC_DB", "data/episodic_memory.db");
@@ -897,8 +914,8 @@ int serve(int port) {
                             task.at("task_id").get<std::string>(), events);
         },
         [=] {
-            ark::Redis redis(redis_port, redis_db);
-            return ark::AgentRegistry(redis).all();
+            const auto redis = runtime_redis(redis_port, redis_db);
+            return redis ? ark::AgentRegistry(*redis).all() : ark::Json::array();
         },
         [=](std::string_view name) {
             ark::Redis redis(redis_port, redis_db);
@@ -908,8 +925,8 @@ int serve(int port) {
         },
         memory_tier,
         [=](const ark::Json& report) {
-            ark::Redis redis(redis_port, redis_db);
-            ark::MessageBus(redis).log({{"event", "conflict_detected"}, {"task_id", report.at("task_id")},
+            const auto redis = runtime_redis(redis_port, redis_db);
+            audit_event(redis.get(), {{"event", "conflict_detected"}, {"task_id", report.at("task_id")},
                                       {"report", report}});
         },
         [=](std::string_view cursor) {
@@ -1119,7 +1136,7 @@ int main(int argc, char** argv) {
         }
         if (command == "agents" && argc == 2) {
             auto redis = version_store(true);
-            std::cout << ark::AgentRegistry(*redis).all().dump(2) << '\n';
+            std::cout << (redis ? ark::AgentRegistry(*redis).all() : ark::Json::array()).dump(2) << '\n';
             return 0;
         }
         if (command == "list" && argc == 2) {
@@ -1232,9 +1249,11 @@ int main(int argc, char** argv) {
             const auto settings = config();
             ark::CurlTransport http;
             const auto redis = version_store();
+            const auto policy = ark::TaskPrivacy::resolve(settings.privacy, ark::Json::object());
             const ark::Planner planner(std::ref(http), settings.ollama_url,
                 actor_profile("supervisor_agent", settings.model, redis.get()),
-                actor_profile("planner_agent", settings.model, redis.get()));
+                actor_profile("planner_agent", settings.model, redis.get()), env("ARK_GROQ_MODEL"),
+                policy.enabled ? std::string{} : env("ARK_GROQ_API_KEY"));
             if (command == "classify") {
                 std::cout << ark::Json{{"intent", planner.classify(argv[2])}}.dump() << '\n';
                 return 0;

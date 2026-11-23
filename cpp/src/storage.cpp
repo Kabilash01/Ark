@@ -9,6 +9,7 @@
 #include <cstring>
 #include <ctime>
 #include <iomanip>
+#include <map>
 #include <mutex>
 #include <sstream>
 #include <stdexcept>
@@ -65,6 +66,26 @@ std::vector<std::string> scan(Redis& redis, const std::string& pattern) {
 
 std::string working_key(std::string_view task_id, std::string_view key) {
     return "working:" + std::string(task_id) + ":" + std::string(key);
+}
+
+using Clock = std::chrono::steady_clock;
+struct WorkingEntry { Json value; Clock::time_point expires; };
+std::mutex working_mutex;
+std::map<std::string, WorkingEntry, std::less<>> fallback_working;
+
+bool redis_only(Redis* redis, const auto& operate) {
+    if (!redis) return false;
+    try {
+        operate(*redis);
+        return true;
+    } catch (const RedisUnavailable&) {
+        return false;
+    }
+}
+
+void reap_working() {
+    const auto now = Clock::now();
+    std::erase_if(fallback_working, [&](const auto& entry) { return entry.second.expires <= now; });
 }
 
 Json parse_list(const Json& items) {
@@ -137,10 +158,10 @@ Redis::Redis(int port, int database) : impl_(std::make_unique<Impl>()) {
     if (port < 1 || port > 65535 || database < 0) {
         throw std::invalid_argument("Invalid Redis port or database");
     }
-    const timeval timeout{5, 0};
+    const timeval timeout{1, 0};
     impl_->context.reset(redisConnectWithTimeout("127.0.0.1", port, timeout));
     if (!impl_->context || impl_->context->err || redisSetTimeout(impl_->context.get(), timeout) != REDIS_OK) {
-        throw std::runtime_error("Unable to connect to loopback Redis");
+        throw RedisUnavailable("Unable to connect to loopback Redis");
     }
     if (database != 0) {
         command({"SELECT", std::to_string(database)});
@@ -163,7 +184,7 @@ Json Redis::command(const std::vector<std::string>& args) {
         static_cast<redisReply*>(redisCommandArgv(impl_->context.get(), static_cast<int>(values.size()),
                                                  values.data(), lengths.data())), freeReplyObject);
     if (!reply) {
-        throw std::runtime_error(std::string("Redis command failed: ") + impl_->context->errstr);
+        throw RedisUnavailable(std::string("Redis connection failed: ") + impl_->context->errstr);
     }
     return redis_value(*reply);
 }
@@ -182,48 +203,93 @@ void WorkingMemory::set(std::string_view task_id, std::string_view key, const Js
     if (ttl <= 0) {
         throw std::invalid_argument("Working memory TTL must be positive");
     }
-    redis_.command({"SET", working_key(task_id, key), value.dump(), "EX", std::to_string(ttl)});
+    const auto id = working_key(task_id, key);
+    const bool stored = redis_only(redis_, [&](Redis& redis) { redis.command({"SET", id, value.dump(), "EX", std::to_string(ttl)}); });
+    const std::lock_guard lock(working_mutex);
+    if (stored) {
+        fallback_working.erase(id);
+        return;
+    }
+    reap_working();
+    if (fallback_working.size() >= 512 && !fallback_working.contains(id)) {
+        const auto oldest = std::min_element(fallback_working.begin(), fallback_working.end(),
+            [](const auto& left, const auto& right) { return left.second.expires < right.second.expires; });
+        fallback_working.erase(oldest);
+    }
+    fallback_working[id] = {value, Clock::now() + std::chrono::seconds(ttl)};
 }
 
 Json WorkingMemory::get(std::string_view task_id, std::string_view key) {
-    const auto value = redis_.command({"GET", working_key(task_id, key)});
-    return value.is_null() ? Json(nullptr) : Json::parse(value.get_ref<const std::string&>());
+    const auto id = working_key(task_id, key);
+    Json value;
+    redis_only(redis_, [&](Redis& redis) { value = redis.command({"GET", id}); });
+    if (!value.is_null()) return Json::parse(value.get_ref<const std::string&>());
+    const std::lock_guard lock(working_mutex);
+    reap_working();
+    const auto local = fallback_working.find(id);
+    return local == fallback_working.end() ? Json(nullptr) : local->second.value;
 }
 
 bool WorkingMemory::exists(std::string_view task_id, std::string_view key) {
-    return redis_.command({"EXISTS", working_key(task_id, key)}) == 1;
+    const auto id = working_key(task_id, key);
+    bool stored = false;
+    redis_only(redis_, [&](Redis& redis) { stored = redis.command({"EXISTS", id}) == 1; });
+    if (stored) return true;
+    const std::lock_guard lock(working_mutex);
+    reap_working();
+    return fallback_working.contains(id);
 }
 
 Json WorkingMemory::all(std::string_view task_id) {
     const auto prefix = working_key(task_id, "");
     auto output = Json::object();
-    for (const auto& key : scan(redis_, glob_escape(prefix) + "*")) {
-        const auto value = redis_.command({"GET", key});
-        if (!value.is_null()) {
-            output[key.substr(prefix.size())] = Json::parse(value.get_ref<const std::string&>());
+    {
+        const std::lock_guard lock(working_mutex);
+        reap_working();
+        for (auto it = fallback_working.lower_bound(prefix); it != fallback_working.end() && it->first.starts_with(prefix); ++it) {
+            output[it->first.substr(prefix.size())] = it->second.value;
         }
     }
+    redis_only(redis_, [&](Redis& redis) {
+        for (const auto& key : scan(redis, glob_escape(prefix) + "*")) {
+            const auto value = redis.command({"GET", key});
+            if (!value.is_null()) output[key.substr(prefix.size())] = Json::parse(value.get_ref<const std::string&>());
+        }
+    });
     return output;
 }
 
 void WorkingMemory::erase(std::string_view task_id, std::string_view key) {
-    redis_.command({"DEL", working_key(task_id, key)});
+    const auto id = working_key(task_id, key);
+    redis_only(redis_, [&](Redis& redis) { redis.command({"DEL", id}); });
+    const std::lock_guard lock(working_mutex);
+    fallback_working.erase(id);
 }
 
 void WorkingMemory::finish(std::string_view task_id, int ttl) {
     if (ttl <= 0) throw std::invalid_argument("Working memory TTL must be positive");
-    for (const auto& key : scan(redis_, glob_escape(working_key(task_id, "")) + "*")) {
-        redis_.command({"EXPIRE", key, std::to_string(ttl), "LT"});
+    const auto prefix = working_key(task_id, "");
+    redis_only(redis_, [&](Redis& redis) {
+        for (const auto& key : scan(redis, glob_escape(prefix) + "*")) redis.command({"EXPIRE", key, std::to_string(ttl), "LT"});
+    });
+    const std::lock_guard lock(working_mutex);
+    const auto deadline = Clock::now() + std::chrono::seconds(ttl);
+    for (auto it = fallback_working.lower_bound(prefix); it != fallback_working.end() && it->first.starts_with(prefix); ++it) {
+        it->second.expires = std::min(it->second.expires, deadline);
     }
 }
 
 void WorkingMemory::clear(std::string_view task_id) {
-    const auto keys = scan(redis_, glob_escape(working_key(task_id, "")) + "*");
-    if (!keys.empty()) {
+    const auto prefix = working_key(task_id, "");
+    redis_only(redis_, [&](Redis& redis) {
+        const auto keys = scan(redis, glob_escape(prefix) + "*");
+        if (keys.empty()) return;
         std::vector<std::string> command{"DEL"};
         command.insert(command.end(), keys.begin(), keys.end());
-        redis_.command(command);
-    }
+        redis.command(command);
+    });
+    const std::lock_guard lock(working_mutex);
+    std::erase_if(fallback_working, [&](const auto& entry) { return entry.first.starts_with(prefix); });
 }
 
 int MessageBus::publish(std::string_view agent, const Json& message) {
@@ -554,6 +620,12 @@ SemanticIndex::SemanticIndex(const std::filesystem::path& path, std::string mode
             PRIMARY KEY (model, id)
         );
         CREATE INDEX IF NOT EXISTS semantic_retention ON semantic_points (model, use_count, first_seen);
+        CREATE TABLE IF NOT EXISTS semantic_pending (
+            model TEXT NOT NULL, id TEXT NOT NULL, revision TEXT NOT NULL, PRIMARY KEY(model,id)
+        );
+        CREATE TRIGGER IF NOT EXISTS semantic_pending_cleanup AFTER DELETE ON semantic_points BEGIN
+            DELETE FROM semantic_pending WHERE model=old.model AND id=old.id;
+        END;
     )sql";
     auto* db = impl_->db.get();
     sqlite_check(sqlite3_exec(db, schema, nullptr, nullptr, nullptr), db);
@@ -569,6 +641,11 @@ void SemanticIndex::store(const Json& points) {
         ON CONFLICT(model,id) DO UPDATE SET payload=excluded.payload, vector=excluded.vector
     )sql");
     bind_text(db, statement.get(), 1, model_);
+    const auto pending = prepare(db, R"sql(
+        INSERT INTO semantic_pending(model,id,revision) VALUES(?,?,?)
+        ON CONFLICT(model,id) DO UPDATE SET revision=excluded.revision
+    )sql");
+    bind_text(db, pending.get(), 1, model_);
     sqlite_check(sqlite3_exec(db, "BEGIN IMMEDIATE", nullptr, nullptr, nullptr), db);
     try {
         for (const auto& point : points) {
@@ -578,6 +655,10 @@ void SemanticIndex::store(const Json& points) {
             sqlite_check(sqlite3_bind_blob64(statement.get(), 4, vector.data(), vector.size() * sizeof(float), SQLITE_TRANSIENT), db);
             sqlite_check(sqlite3_step(statement.get()), db);
             sqlite_check(sqlite3_reset(statement.get()), db);
+            bind_text(db, pending.get(), 2, point.at("id").get<std::string>());
+            bind_text(db, pending.get(), 3, random_uuid());
+            sqlite_check(sqlite3_step(pending.get()), db);
+            sqlite_check(sqlite3_reset(pending.get()), db);
         }
         sqlite_check(sqlite3_exec(db, "COMMIT", nullptr, nullptr, nullptr), db);
     } catch (...) {
@@ -620,6 +701,92 @@ void SemanticIndex::remove(const std::vector<std::string>& ids) {
     bind_text(db, statement.get(), 1, model_);
     bind_text(db, statement.get(), 2, Json(ids).dump());
     sqlite_check(sqlite3_step(statement.get()), db);
+}
+
+Json SemanticIndex::query(const std::vector<float>& vector, const Json& filter, int limit) {
+    const std::lock_guard lock(impl_->mutex);
+    auto* db = impl_->db.get();
+    const auto statement = prepare(db, "SELECT id,payload,vector FROM semantic_points WHERE model=? ORDER BY id");
+    bind_text(db, statement.get(), 1, model_);
+    auto rows = Json::array();
+    std::vector<float> other(vector.size());
+    const auto higher = [](const Json& left, const Json& right) { return left.at("score") > right.at("score"); };
+    for (int step; (step = sqlite3_step(statement.get())) != SQLITE_DONE;) {
+        sqlite_check(step, db);
+        if (static_cast<int>(rows.size()) == limit && vector.empty()) break;
+        Json score;
+        if (!vector.empty()) {
+            const auto bytes = other.size() * sizeof(float);
+            if (static_cast<std::size_t>(sqlite3_column_bytes(statement.get(), 2)) != bytes) continue;
+            std::memcpy(other.data(), sqlite3_column_blob(statement.get(), 2), bytes);
+            double dot = 0.0, left = 0.0, right = 0.0;
+            for (std::size_t i = 0; i < vector.size(); ++i) {
+                dot += static_cast<double>(other[i]) * vector[i];
+                left += static_cast<double>(other[i]) * other[i];
+                right += static_cast<double>(vector[i]) * vector[i];
+            }
+            if (left == 0 || right == 0) continue;
+            score = dot / std::sqrt(left * right);
+            if (static_cast<int>(rows.size()) == limit && score <= rows.front().at("score")) continue;
+        }
+        auto payload = Json::parse(sqlite_text(statement.get(), 1));
+        bool matches = true;
+        for (const auto& [key, value] : filter.items()) {
+            if (!payload.contains(key) || payload.at(key) != value) { matches = false; break; }
+        }
+        if (!matches) continue;
+        if (!vector.empty() && static_cast<int>(rows.size()) == limit) {
+            std::pop_heap(rows.begin(), rows.end(), higher);
+            rows.erase(rows.end() - 1);
+        }
+        rows.push_back({{"id", sqlite_text(statement.get(), 0)}, {"payload", std::move(payload)}, {"score", score}});
+        if (!vector.empty()) std::push_heap(rows.begin(), rows.end(), higher);
+    }
+    if (!vector.empty()) std::sort_heap(rows.begin(), rows.end(), higher);
+    return rows;
+}
+
+Json SemanticIndex::pending() {
+    const std::lock_guard lock(impl_->mutex);
+    auto* db = impl_->db.get();
+    const auto statement = prepare(db, R"sql(
+        SELECT p.id,p.revision,s.payload,s.vector FROM semantic_pending AS p
+        JOIN semantic_points AS s USING(model,id) WHERE p.model=? ORDER BY p.id LIMIT 250
+    )sql");
+    bind_text(db, statement.get(), 1, model_);
+    auto rows = Json::array();
+    for (int step; (step = sqlite3_step(statement.get())) != SQLITE_DONE;) {
+        sqlite_check(step, db);
+        const auto bytes = static_cast<std::size_t>(sqlite3_column_bytes(statement.get(), 3));
+        if (bytes == 0 || bytes % sizeof(float)) throw std::runtime_error("Invalid indexed embedding bytes");
+        std::vector<float> vector(bytes / sizeof(float));
+        std::memcpy(vector.data(), sqlite3_column_blob(statement.get(), 3), bytes);
+        rows.push_back({{"revision", sqlite_text(statement.get(), 1)}, {"point", {{"id", sqlite_text(statement.get(), 0)},
+            {"payload", Json::parse(sqlite_text(statement.get(), 2))}, {"vector", std::move(vector)}}}});
+    }
+    return rows;
+}
+
+void SemanticIndex::mark_synced(const Json& points) {
+    const std::lock_guard lock(impl_->mutex);
+    auto* db = impl_->db.get();
+    const auto statement = prepare(db, R"sql(
+        DELETE FROM semantic_pending WHERE model=? AND revision IN (SELECT value FROM json_each(?))
+    )sql");
+    auto revisions = Json::array();
+    for (const auto& row : points) revisions.push_back(row.at("revision"));
+    bind_text(db, statement.get(), 1, model_);
+    bind_text(db, statement.get(), 2, revisions.dump());
+    sqlite_check(sqlite3_step(statement.get()), db);
+}
+
+int SemanticIndex::count() {
+    const std::lock_guard lock(impl_->mutex);
+    auto* db = impl_->db.get();
+    const auto statement = prepare(db, "SELECT count(*) FROM semantic_points WHERE model=?");
+    bind_text(db, statement.get(), 1, model_);
+    sqlite_check(sqlite3_step(statement.get()), db);
+    return sqlite3_column_int(statement.get(), 0);
 }
 
 struct ProceduralMemory::Impl {

@@ -440,15 +440,35 @@ AgentProfile planner_profile(std::string model) {
     return {"1.0.0", std::move(model), {{"system", std::string(planner)}}};
 }
 
-Planner::Planner(Transport transport, std::string local_url, AgentProfile supervisor, AgentProfile plan)
+Planner::Planner(Transport transport, std::string local_url, AgentProfile supervisor, AgentProfile plan,
+                 std::string groq_model, std::string groq_key)
     : transport_(std::move(transport)), local_url_(local_base_url(local_url)), supervisor_(std::move(supervisor)),
-      planner_(std::move(plan)) {}
+      planner_(std::move(plan)), groq_model_(std::move(groq_model)), groq_key_(std::move(groq_key)) {}
+
+std::string Planner::request(const AgentProfile& profile, std::string_view input, const Json& format,
+                             std::string_view cloud_input) const {
+    const auto& system = profile.prompts.at("system");
+    if (!groq_model_.empty() && !groq_key_.empty()) {
+        const Json body{{"model", groq_model_}, {"temperature", 0}, {"response_format", {{"type", "json_object"}}},
+            {"messages", {{{"role", "system"}, {"content", system}}, {{"role", "user"}, {"content", cloud_input}}}}};
+        try {
+            const auto response = transport_({"https://api.groq.com/openai/v1/chat/completions", "POST", body.dump(),
+                {"Content-Type: application/json", "Authorization: Bearer " + groq_key_}, std::chrono::seconds(12)});
+            response.require_success("Groq planning");
+            const auto text = Json::parse(response.body).at("choices").at(0).at("message").at("content").get<std::string>();
+            if (Json::parse(text, nullptr, false).is_object()) return text;
+        } catch (const std::exception&) {
+            // Cloud planning is optional. The local profile remains available.
+        }
+    }
+    return chat_local(transport_, local_url_, profile.model, system, input, format);
+}
 
 std::string Planner::classify(std::string_view goal) const {
     static constexpr std::array allowed{
         "RESEARCH", "SEARCH", "CODE", "EXECUTE", "EVALUATE", "DISCOVER", "BROWSE", "SECURITY", "VISION",
     };
-    const auto output = Json::parse(chat_local(transport_, local_url_, supervisor_.model, supervisor_.prompts.at("system"), goal));
+    const auto output = Json::parse(request(supervisor_, goal, "json", goal));
     const auto intent = output.at("intent").get<std::string>();
     if (!contains(allowed, intent)) {
         throw std::runtime_error("Local model returned an unknown goal intent");
@@ -460,12 +480,12 @@ Json Planner::plan(std::string_view goal, const std::vector<std::string>& agents
     if (agents.empty()) {
         throw std::invalid_argument("At least one worker must be available for planning");
     }
-    Json input{{"goal", goal}, {"available_agents", agents}};
+    const Json cloud{{"goal", goal}, {"available_agents", agents}};
+    auto input = cloud;
     if (!context.empty()) {
         input["memory_context"] = context;
     }
-    const auto output = Json::parse(chat_local(transport_, local_url_, planner_.model, planner_.prompts.at("system"),
-                                               input.dump(), plan_format(agents)));
+    const auto output = Json::parse(request(planner_, input.dump(), plan_format(agents), cloud.dump()));
     for (const auto& layer : order_tasks(output)) {
         for (const auto& task : layer) {
             if (!contains(agents, task.agent)) {

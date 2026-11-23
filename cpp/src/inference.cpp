@@ -81,6 +81,17 @@ LocalInference::LocalInference(Transport transport, std::string_view url, Infere
     }
 }
 
+Response LocalInference::send(const Request& request) const {
+    const auto service = provider_ == InferenceProvider::llama_cpp ? "llama.cpp" : "Ollama";
+    try {
+        auto response = transport_(request);
+        response.require_success(service);
+        return response;
+    } catch (const TransientHttpError& error) {
+        throw TransientHttpError(std::string(service) + " inference unavailable at " + url_ + ": " + error.what());
+    }
+}
+
 Generation LocalInference::generate(std::string_view model, const Json& messages, const Json& schema,
                                     int max_tokens, double temperature, const TextStream& stream) const {
     if (model.empty() || !messages.is_array() || messages.empty() || max_tokens < 1 || max_tokens > 8192
@@ -104,8 +115,7 @@ Generation LocalInference::generate(std::string_view model, const Json& messages
     Request request{url_ + (llama ? "/v1/chat/completions" : "/api/chat"), "POST", payload.dump(), headers_, timeout};
     Generation result;
     if (!streaming) {
-        const auto response = transport_(request);
-        response.require_success("Local model");
+        const auto response = send(request);
         collect(result, Json::parse(response.body), llama, false, {});
         return result;
     }
@@ -131,8 +141,7 @@ Generation LocalInference::generate(std::string_view model, const Json& messages
         }
         unfinished.erase(0, start);
     };
-    const auto response = transport_(request);
-    response.require_success("Local model");
+    (void)send(request);
     process(unfinished);
     return result;
 }
@@ -140,8 +149,7 @@ Generation LocalInference::generate(std::string_view model, const Json& messages
 std::vector<std::vector<float>> LocalInference::embed(std::string_view model, const std::vector<std::string>& texts) const {
     const bool llama = provider_ == InferenceProvider::llama_cpp;
     const Json payload{{"model", model}, {"input", texts}};
-    const auto response = transport_({url_ + (llama ? "/v1/embeddings" : "/api/embed"), "POST", payload.dump(), headers_, timeout});
-    response.require_success("Local embedding");
+    const auto response = send({url_ + (llama ? "/v1/embeddings" : "/api/embed"), "POST", payload.dump(), headers_, timeout});
     const auto body = Json::parse(response.body);
     if (!llama) return body.at("embeddings").get<std::vector<std::vector<float>>>();
     std::vector<std::vector<float>> vectors(texts.size());

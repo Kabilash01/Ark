@@ -139,6 +139,32 @@ void conflicting_revisions_survive_and_rank() {
           && writer.pending_conflicts().empty() && writer.all().size() == 2, "review discarded an original skill");
 }
 
+void mirrors_vectors_through_qdrant_outage() {
+    const auto path = std::filesystem::temp_directory_path() / (ark::random_uuid() + ".db");
+    struct Cleanup {
+        std::filesystem::path path;
+        ~Cleanup() { std::error_code ignored; std::filesystem::remove(path, ignored); }
+    } cleanup{path};
+    const ark::Embeddings encoder(fake_embeddings, "http://localhost:11434", "fixture-encoder");
+    bool connected = false;
+    Json uploaded = Json::array();
+    ark::SemanticMemory memory([&](const ark::Request& request) -> ark::Response {
+        if (!connected) throw ark::TransientHttpError("fixture Qdrant is offline");
+        if (request.url.ends_with("/points?wait=true")) uploaded = Json::parse(request.body).at("points");
+        if (request.url.ends_with("/points/query")) return {200, Json{{"result", {{"points", uploaded}}}}.dump()};
+        return {200, "{}"};
+    }, "http://localhost:6333", encoder, path);
+    memory.store({{"alpha", "query", {{"source", "local"}}}});
+    memory.store({{"beta", "different", {{"source", "other"}}}});
+    check(memory.retrieve("query", 1).at(0).at("id") == "alpha" && memory.count() == 2,
+          "offline cosine search lost mirrored data");
+    check(memory.by_metadata({{"source", "other"}}, 1).at(0).at("id") == "beta", "offline metadata failed");
+    connected = true;
+    check(memory.retrieve("query").size() == 2 && uploaded.size() == 2, "offline writes did not replay after recovery");
+    ark::SemanticIndex index(path, encoder.model());
+    check(index.pending().empty(), "published mirror revisions remained pending");
+}
+
 } // namespace
 
 int main() {
@@ -146,6 +172,7 @@ int main() {
         semantic_round_trip();
         skills_persist_and_rank();
         conflicting_revisions_survive_and_rank();
+        mirrors_vectors_through_qdrant_outage();
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

@@ -200,6 +200,26 @@ void reconciles_output_conflicts_with_both_workers() {
     }
 }
 
+void optional_cloud_failure_falls_back_to_local() {
+    int cloud = 0;
+    int local = 0;
+    ark::Planner model([&](const ark::Request& request) -> ark::Response {
+        if (request.url.starts_with("https://api.groq.com/")) {
+            ++cloud;
+            check(request.body.find("private fixture") == std::string::npos, "cloud received local memory context");
+            return {503, ""};
+        }
+        ++local;
+        if (local == 2) check(request.body.find("private fixture") != std::string::npos, "fallback omitted local memory");
+        const auto answer = local == 1 ? Json{{"intent", "RESEARCH"}} : Json{{"tasks", {task("t1")}}};
+        return {200, Json{{"message", {{"content", answer.dump()}}}}.dump()};
+    }, "http://localhost:11434", ark::supervisor_profile("fixture-local"), ark::planner_profile("fixture-local"),
+        "fixture-cloud", "fixture-key");
+    check(model.classify("goal") == "RESEARCH", "unavailable cloud blocked classification");
+    check(model.plan("goal", {"research_agent"}, {"private fixture"}).at("tasks").size() == 1 && cloud == 2 && local == 2,
+          "planner failed to use the local fallback");
+}
+
 } // namespace
 
 int main() {
@@ -212,6 +232,7 @@ int main() {
         escalates_exhaustion_and_permanent_errors();
         model_plans_are_validated();
         reconciles_output_conflicts_with_both_workers();
+        optional_cloud_failure_falls_back_to_local();
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

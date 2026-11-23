@@ -685,3 +685,20 @@ generation request fell from 607 ms to 36 ms. The other tuned timings were
 task, and 2.8 seconds for evaluation. The evaluator returned a valid retry
 decision in both runs. SQLite changed from a sort to a covering-index scan.
 [Raw performance profile](../benchmarks/performance/day60.json)
+
+## Day 61 service degradation
+
+- Local planning is the default. Set both `ARK_GROQ_MODEL` and
+  `ARK_GROQ_API_KEY` to opt into Groq classification and planning for public
+  tasks. Failed requests fall back to the configured local models. Private
+  and airgap tasks use local planning. Retrieved memory stays local.
+  [Groq API reference](https://console.groq.com/docs/api-reference)
+- When Redis is unavailable, active tasks continue with configured agent
+  profiles and bounded process-local working state. Registry records and
+  version changes require Redis. SQLite episode logs continue independently.
+- Qdrant writes are mirrored in SQLite. During an outage the runtime ranks
+  mirrored vectors by exact cosine similarity, and pending writes replay
+  when Qdrant returns. The fallback covers records already mirrored under
+  the active embedding model.
+- A failed local model request names the unavailable Ollama or llama.cpp
+  endpoint. The supervisor reports a failed task after bounded retries.

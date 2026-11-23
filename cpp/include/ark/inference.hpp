@@ -27,6 +27,7 @@ public:
     std::vector<std::vector<float>> embed(std::string_view model, const std::vector<std::string>& texts) const;
 
 private:
+    Response send(const Request& request) const;
     Transport transport_;
     std::string url_;
     InferenceProvider provider_;

@@ -122,9 +122,16 @@ void SemanticMemory::store(const std::vector<SemanticRecord>& records) {
         metadata["text"] = record.text;
         points.push_back({{"id", record.id}, {"payload", metadata}, {"vector", vectors[i]}});
     }
+    if (index_) {
+        index_->store(points);
+        (void)sync();
+    } else upload(points);
+}
+
+void SemanticMemory::upload(const Json& points) {
     if (!exists()) {
         const auto created = send(transport_, collection_, "PUT", {
-            {"vectors", {{"size", vectors.front().size()}, {"distance", "Cosine"}}},
+            {"vectors", {{"size", points.front().at("vector").size()}, {"distance", "Cosine"}}},
         });
         if (created.status != 409) {
             created.require_success("Qdrant collection creation");
@@ -132,18 +139,44 @@ void SemanticMemory::store(const std::vector<SemanticRecord>& records) {
     }
     send(transport_, collection_ + "/points?wait=true", "PUT", {{"points", points}})
         .require_success("Qdrant upsert");
-    if (index_) index_->store(points);
+}
+
+bool SemanticMemory::sync() {
+    if (!index_) return exists();
+    static std::mutex synchronization;
+    const std::lock_guard lock(synchronization);
+    try {
+        for (int batch = 0; batch < 4; ++batch) {
+            const auto pending = index_->pending();
+            if (pending.empty()) return exists();
+            auto points = Json::array();
+            for (const auto& item : pending) points.push_back(item.at("point"));
+            upload(points);
+            index_->mark_synced(pending);
+        }
+    } catch (const TransientHttpError&) {
+        return false;
+    }
+    return false;
 }
 
 Json SemanticMemory::retrieve(std::string_view query, int limit) {
     validate_limit(limit);
-    if (!exists()) {
-        return Json::array();
+    const bool available = sync();
+    if (!available && (!index_ || index_->count() == 0)) return Json::array();
+    const auto vector = encoder_.encode({std::string(query)}).at(0);
+    Json result;
+    if (available) {
+        try {
+            const auto response = send(transport_, collection_ + "/points/query", "POST", {
+                {"query", vector}, {"with_payload", true}, {"limit", limit},
+            });
+            result = flatten(payload_result(response, "Qdrant semantic search").at("points"));
+        } catch (const TransientHttpError&) {
+            if (!index_) throw;
+        }
     }
-    const auto response = send(transport_, collection_ + "/points/query", "POST", {
-        {"query", encoder_.encode({std::string(query)}).at(0)}, {"with_payload", true}, {"limit", limit},
-    });
-    auto result = flatten(payload_result(response, "Qdrant semantic search").at("points"));
+    if (result.is_null()) result = flatten(index_->query(vector, Json::object(), limit));
     if (index_ && !result.empty()) index_->used(result);
     return result;
 }
@@ -153,9 +186,7 @@ Json SemanticMemory::by_metadata(const Json& filter, int limit) {
     if (!filter.is_object()) {
         throw std::invalid_argument("Metadata filter must be an object");
     }
-    if (!exists()) {
-        return Json::array();
-    }
+    if (!sync()) return index_ ? flatten(index_->query({}, filter, limit)) : Json::array();
     auto fields = Json::array();
     for (const auto& [key, value] : filter.items()) {
         fields.push_back({{"key", key}, {"match", {{"value", value}}}});
@@ -164,16 +195,24 @@ Json SemanticMemory::by_metadata(const Json& filter, int limit) {
     if (!fields.empty()) {
         request["filter"] = {{"must", fields}};
     }
-    const auto response = send(transport_, collection_ + "/points/scroll", "POST", request);
-    return flatten(payload_result(response, "Qdrant metadata search").at("points"));
+    try {
+        const auto response = send(transport_, collection_ + "/points/scroll", "POST", request);
+        return flatten(payload_result(response, "Qdrant metadata search").at("points"));
+    } catch (const TransientHttpError&) {
+        if (!index_) throw;
+        return flatten(index_->query({}, filter, limit));
+    }
 }
 
 int SemanticMemory::count() {
-    if (!exists()) {
-        return 0;
+    if (!sync()) return index_ ? index_->count() : 0;
+    try {
+        const auto response = send(transport_, collection_ + "/points/count", "POST", {{"exact", true}});
+        return payload_result(response, "Qdrant count").at("count").get<int>();
+    } catch (const TransientHttpError&) {
+        if (!index_) throw;
+        return index_->count();
     }
-    const auto response = send(transport_, collection_ + "/points/count", "POST", {{"exact", true}});
-    return payload_result(response, "Qdrant count").at("count").get<int>();
 }
 
 void SemanticMemory::remove(std::string_view id) {
