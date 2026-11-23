@@ -627,3 +627,18 @@ ctest --test-dir build -R ark_phase2_integration_tests --output-on-failure
 Build the [Day 51 scanner image](#day-51-security-agent) first. Use an unused
 artifact directory to keep the research summary, patched Python module,
 security audit, DOCX report, reflection log, and fourteen-component manifest.
+
+## Day 57 output conflicts
+
+For a coding task with a direct research dependency, the supervisor compares
+the research findings with passing test evidence. If the local reviewer finds
+a contradiction, both workers receive the other's evidence and may revise
+their output in up to two rounds. The Coding Agent keeps the same tests.
+An unresolved pair retains its artifacts, flags the coding task for human
+review, and marks dependent results skipped. The task result records these
+decisions under `output_conflicts`.
+
+`ark-cpp conflict-check < evidence.json` reviews one pair with top-level
+`research` and `code` outputs. Five controlled comparisons used real Docker
+observations. All five were detected after calibrating the review prompt on
+those cases. [Controlled comparisons](../benchmarks/conflicts/output_conflicts.json)

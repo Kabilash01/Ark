@@ -131,6 +131,7 @@ Json CodingAgent::solve(const Json& payload, const Json& memory, int repairs) co
     if (payload.contains("review_feedback")) {
         input["review_feedback"] = payload.at("review_feedback");
     }
+    if (payload.contains("output_conflicts")) input["output_conflicts"] = payload.at("output_conflicts");
     const auto evaluate = [&](const Json& files, int attempt) {
         validate_sources(files, tests);
 

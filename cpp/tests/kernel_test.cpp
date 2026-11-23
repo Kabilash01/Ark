@@ -173,6 +173,33 @@ void model_plans_are_validated() {
     throw std::runtime_error("planner allowed an unavailable agent");
 }
 
+void reconciles_output_conflicts_with_both_workers() {
+    auto code = task("code", {"research"}, "coding_agent");
+    code["intent"] = "CODE";
+    const Json plan{{"tasks", {task("research"), code, task("dependent", {"code"}), task("unrelated")}}};
+    for (const bool can_resolve : {true, false}) {
+        int verdicts = 0;
+        int unrelated = 0;
+        const auto run = ark::supervise_plan(plan, [&](const ark::Task& work, const Json&, int attempt, const Json& feedback) {
+            if (work.id == "unrelated") ++unrelated;
+            if (attempt > 1 && (work.id == "research" || work.id == "code")) {
+                const auto& comparison = feedback.at("output_conflicts").at(0);
+                check(comparison.at("peer_task") == (work.id == "research" ? "code" : "research"), comparison.dump());
+                if (work.id == "code") check(feedback.at("tests").at("test_contract.py") == "fixed", "tests changed");
+            }
+            return Json{{"status", "DONE"}, {"output", {{"summary", work.id}, {"tests", {{"test_contract.py", "fixed"}}}}}};
+        }, [](std::string_view) { return true; }, 1, [&](const Json& research, const Json& coding) {
+            check(research.at("summary") == "research" && coding.at("summary") == "code", "wrong compared pair");
+            ++verdicts;
+            return Json{{"conflict", !can_resolve || verdicts == 1}, {"reason", "different observed outcome"}};
+        });
+        check(unrelated == 1 && verdicts == (can_resolve ? 2 : 3), "changed reconciliation limit or unrelated work replayed");
+        check(run.conflicts.back().at("status") == (can_resolve ? "RESOLVED" : "HUMAN_REVIEW"), run.conflicts.dump());
+        check(run.results.at("dependent").at("status") == (can_resolve ? "DONE" : "SKIPPED"), run.results.dump());
+        if (!can_resolve) check(run.results.at("code").at("output").at("human_review_required") == true, run.results.dump());
+    }
+}
+
 } // namespace
 
 int main() {
@@ -184,6 +211,7 @@ int main() {
         retries_the_graded_artifact_with_feedback();
         escalates_exhaustion_and_permanent_errors();
         model_plans_are_validated();
+        reconciles_output_conflicts_with_both_workers();
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

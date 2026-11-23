@@ -1,0 +1,56 @@
+{
+  "model": "Qwen3-4B Q4_K_M",
+  "kind": "controlled Docker execution",
+  "cases": [
+    {
+      "id": "negative-remainder",
+      "claim": "Python evaluates (-7) % 3 as -1.",
+      "observed": "2",
+      "test_passed": true,
+      "review": {
+        "conflict": true,
+        "reason": "The research findings state that Python evaluates (-7) % 3 as -1, but the tested implementation shows that (-7) % 3 evaluates to 2. The two outcomes are different for the same input."
+      }
+    },
+    {
+      "id": "integer-division",
+      "claim": "Python evaluates 7 // 2 as 3.5.",
+      "observed": "3",
+      "test_passed": true,
+      "review": {
+        "conflict": true,
+        "reason": "The research claim states that Python evaluates 7 // 2 as 3.5, but the tested implementation shows that 7 // 2 evaluates to 3. The observed behavior in the passing test is 3, which is different from the claimed outcome of 3.5. Therefore, the claim and the passing test demonstrate different outcomes for the same case."
+      }
+    },
+    {
+      "id": "zero-power",
+      "claim": "Python evaluates 0 ** 0 as 0.",
+      "observed": "1",
+      "test_passed": true,
+      "review": {
+        "conflict": true,
+        "reason": "The research claim states that Python evaluates 0 ** 0 as 0, but the tested implementation shows that 0 ** 0 evaluates to 1. This indicates a discrepancy between the research claim and the observed behavior in the passing test."
+      }
+    },
+    {
+      "id": "boolean-sum",
+      "claim": "Python evaluates sum([True, True, False]) as 0.",
+      "observed": "2",
+      "test_passed": true,
+      "review": {
+        "conflict": true,
+        "reason": "The research claim states that Python evaluates sum([True, True, False]) as 0, but the tested implementation shows that the sum is 2. This indicates a discrepancy between the claimed behavior and the actual observed outcome."
+      }
+    },
+    {
+      "id": "ordered-deduplication",
+      "claim": "Applying list(dict.fromkeys([3, 1, 3, 2])) returns [1, 2, 3].",
+      "observed": "[3, 1, 2]",
+      "test_passed": true,
+      "review": {
+        "conflict": true,
+        "reason": "The research claim states that applying list(dict.fromkeys([3, 1, 3, 2])) returns [1, 2, 3], but the tested implementation shows that the result is [3, 1, 2]. The input is the same [3, 1, 3, 2], and the outcomes are different."
+      }
+    }
+  ]
+}

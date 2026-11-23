@@ -344,6 +344,7 @@ Json ResearchAgent::run_research(const Json& payload) {
     if (payload.contains("review_feedback")) {
         synthesis["review_feedback"] = payload.at("review_feedback");
     }
+    if (payload.contains("output_conflicts")) synthesis["output_conflicts"] = payload.at("output_conflicts");
     return validate_summary(query, chat(profile_.prompts.at("synthesis"), synthesis.dump()), citations);
 }
 

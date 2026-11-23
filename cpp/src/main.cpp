@@ -406,7 +406,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     if (!episode_path.empty()) {
         episodes = std::make_unique<ark::EpisodicMemory>(episode_path);
     }
-    const auto [results, escalations] = ark::supervise_plan(dag, [&](const ark::Task& task, const ark::Json& dependencies,
+    const auto [results, escalations, conflicts] = ark::supervise_plan(dag, [&](const ark::Task& task, const ark::Json& dependencies,
                                                                    int attempt, const ark::Json& feedback) {
         ark::CurlTransport http;
         const ark::Json source{{"agent", task.agent}, {"plan_task_id", task.id}, {"attempt", attempt}};
@@ -426,6 +426,9 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         message["retry_count"] = attempt - 1;
         if (feedback.contains("review")) {
             message["payload"]["review_feedback"] = feedback.at("review");
+        }
+        if (feedback.contains("output_conflicts")) {
+            message["payload"]["output_conflicts"] = feedback.at("output_conflicts");
         }
         if (!redis_port.empty()) {
             ark::Redis worker_bus(std::stoi(redis_port), redis_db);
@@ -501,7 +504,17 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         auto registry = ark::AgentRegistry(*redis);
         const auto record = registry.get(name);
         return !record.is_null() && record.at("status") != "OFFLINE" && registry.heartbeat(name);
+    }, 4, [&](const ark::Json& research, const ark::Json& coding) {
+        ark::CurlTransport http;
+        const ark::Json source{{"agent", "supervisor_agent"}};
+        return ark::review_output_conflict([&](const auto& request) { return report_request(events, http, request, source); },
+                                           settings.ollama_url, env("ARK_EVAL_MODEL", settings.model), research, coding);
     });
+    for (auto report : conflicts) {
+        report["task_id"] = parent_id;
+        emit(events, "conflict_detected", report);
+        if (redis) ark::MessageBus(*redis).log({{"event", "conflict_detected"}, {"task_id", parent_id}, {"report", report}});
+    }
     record_escalations(parent_id, escalations, episodes.get(), redis.get(),
                        versions.value("supervisor_agent", "1.0.0"));
     const bool done = std::all_of(results.begin(), results.end(), [](const auto& result) {
@@ -524,7 +537,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     }
     ark::Json result{{"task_id", parent_id}, {"intent", intent}, {"status", done ? "DONE" : "FAILED"},
                      {"dag", dag}, {"results", results}, {"quality_score", quality}, {"escalations", escalations},
-                     {"agent_versions", versions}};
+                     {"agent_versions", versions}, {"output_conflicts", conflicts}};
     attach_reflection(result, settings, goal, attempts, redis.get(), episodes.get(), events);
     return result;
 }
@@ -935,6 +948,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp run [--privacy] [--airgap] [--until <condition>] [--max-iter <n>] <goal> [tests.json]\n"
                      "       ark-cpp --privacy|--airgap <goal> [tests.json]\n"
                      "       ark-cpp dispatch < dag.json\n"
+                     "       ark-cpp conflict-check < evidence.json\n"
                      "       ark-cpp audit|episodes\n"
                      "       ark-cpp reflection-queue\n"
                      "       ark-cpp versions <agent>\n"
@@ -1085,6 +1099,14 @@ int main(int argc, char** argv) {
         }
         if (command == "dispatch" && argc == 2) {
             return print_run(dispatch(ark::Json::parse(std::cin), config()));
+        }
+        if (command == "conflict-check" && argc == 2) {
+            const auto input = ark::Json::parse(std::cin);
+            const auto settings = config();
+            ark::CurlTransport http;
+            std::cout << ark::review_output_conflict(std::ref(http), settings.ollama_url, env("ARK_EVAL_MODEL", settings.model),
+                                                     input.at("research"), input.at("code")).dump(2) << '\n';
+            return 0;
         }
         if ((command == "audit" || command == "logs") && argc == 2) {
             ark::Redis redis(std::stoi(env("ARK_REDIS_PORT", "6379")), std::stoi(env("ARK_REDIS_DB", "0")));
