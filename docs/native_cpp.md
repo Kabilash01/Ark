@@ -533,3 +533,22 @@ versions with local `advisories` entries containing `id`, `package`, and
 `affected_versions`. Use `check_dependencies` for that check alone. The report
 maps the supported checks to the OWASP 2021 categories for injection,
 vulnerable components, and authentication failures.
+
+## Day 52 citation graph
+
+Point `ARK_NEO4J_URL` at your local Neo4j HTTP endpoint (defaults to
+`http://127.0.0.1:7474`). Use `ARK_NEO4J_USER`, `ARK_NEO4J_PASSWORD`, and
+`ARK_NEO4J_DATABASE` for connection settings. Run `build/ark-cpp citation-graph`
+with a JSON request on stdin. `initialize` creates the uniqueness constraints.
+
+| `action` | Fields |
+| --- | --- |
+| `add_paper` | `id`, `title`, optional `concepts` array |
+| `add_citation` | `from` and `to` paper IDs |
+| `add_related` | `from` and `to` concept names |
+| `list_citations` | source paper `id`, optional `limit` |
+| `find_concept_gaps` | optional `limit`, ranks co-mentioned pairs without a direct relation |
+| `find_bridge_concepts` | optional `limit`, ranks concepts connecting otherwise unlinked pairs |
+
+The graph uses `Paper` and `Concept` nodes with `CITES`, `MENTIONS`, and
+`RELATED` relationships. [Neo4j Query API](https://neo4j.com/docs/query-api/current/query/)

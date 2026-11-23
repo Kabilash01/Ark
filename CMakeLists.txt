@@ -41,6 +41,7 @@ add_library(ark_native
     cpp/src/benchmark.cpp
     cpp/src/browser.cpp
     cpp/src/browser_agent.cpp
+    cpp/src/citation_graph.cpp
     cpp/src/coding.cpp
     cpp/src/conflict_resolver.cpp
     cpp/src/document_agent.cpp
