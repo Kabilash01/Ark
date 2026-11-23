@@ -151,6 +151,10 @@ if(BUILD_TESTING)
     target_link_libraries(ark_api_tests PRIVATE ark_api httplib::httplib)
     add_test(NAME ark_api_tests COMMAND ark_api_tests)
     set_tests_properties(ark_api_tests PROPERTIES TIMEOUT 15)
+    add_executable(ark_phase2_integration_tests cpp/tests/phase2_integration_test.cpp)
+    target_link_libraries(ark_phase2_integration_tests PRIVATE ark_native httplib::httplib)
+    add_test(NAME ark_phase2_integration_tests COMMAND ark_phase2_integration_tests)
+    set_tests_properties(ark_phase2_integration_tests PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 120 LABELS integration)
     if(ARK_ENABLE_LIVE_MVP)
         add_test(NAME ark_live_mvp COMMAND ${CMAKE_COMMAND}
             -Dark=$<TARGET_FILE:ark-cpp> -Dsource_dir=${CMAKE_SOURCE_DIR}

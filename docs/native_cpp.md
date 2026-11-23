@@ -605,3 +605,25 @@ averaged 280 versus 307 tokens per second, so the guide's throughput improvement
 target remains unmet on this setup. All ten llama.cpp responses matched the
 structured output contract. This measures generation, with the locked Docker
 repair results recorded separately. [Benchmark results](../benchmarks/inference/results.json)
+
+## Day 55 Phase 2 integration
+
+The integration test classifies and plans a defensive code-review task,
+passes fixture research evidence to the Coding Agent, and checks a patched
+SQL lookup with locked tests and offline static analysis. It also verifies
+search and browser evidence, issue lookup, terminal output, working memory,
+document generation, reflection, and filesystem writes. The model, arXiv,
+Tavily, Qdrant, and GitHub responses are fixtures. Chromium, Docker, Redis,
+and SQLite run locally.
+
+```bash
+ARK_TEST_CHROMIUM=/usr/bin/chromium \
+ARK_TEST_DOCKER_SOCKET=/var/run/docker.sock \
+ARK_TEST_REDIS_PORT=16379 \
+ARK_TEST_PHASE2_ARTIFACTS="$PWD/build/phase2-report" \
+ctest --test-dir build -R ark_phase2_integration_tests --output-on-failure
+```
+
+Build the [Day 51 scanner image](#day-51-security-agent) first. Use an unused
+artifact directory to keep the research summary, patched Python module,
+security audit, DOCX report, reflection log, and fourteen-component manifest.
