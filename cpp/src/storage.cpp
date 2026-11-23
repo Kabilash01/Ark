@@ -210,6 +210,13 @@ void WorkingMemory::erase(std::string_view task_id, std::string_view key) {
     redis_.command({"DEL", working_key(task_id, key)});
 }
 
+void WorkingMemory::finish(std::string_view task_id, int ttl) {
+    if (ttl <= 0) throw std::invalid_argument("Working memory TTL must be positive");
+    for (const auto& key : scan(redis_, glob_escape(working_key(task_id, "")) + "*")) {
+        redis_.command({"EXPIRE", key, std::to_string(ttl), "LT"});
+    }
+}
+
 void WorkingMemory::clear(std::string_view task_id) {
     const auto keys = scan(redis_, glob_escape(working_key(task_id, "")) + "*");
     if (!keys.empty()) {
@@ -403,7 +410,19 @@ EpisodicMemory::EpisodicMemory(const std::filesystem::path& db) : impl_(std::mak
             task_id TEXT NOT NULL, agent_name TEXT NOT NULL, agent_version TEXT NOT NULL,
             intent TEXT NOT NULL, summary TEXT NOT NULL, quality_score REAL,
             timestamp TEXT NOT NULL, metadata TEXT
-        )
+        );
+        CREATE TABLE IF NOT EXISTS episodes_archive (
+            id INTEGER PRIMARY KEY, task_id TEXT NOT NULL, agent_name TEXT NOT NULL,
+            agent_version TEXT NOT NULL, intent TEXT NOT NULL, summary TEXT NOT NULL,
+            quality_score REAL, timestamp TEXT NOT NULL, metadata TEXT
+        );
+        CREATE TRIGGER IF NOT EXISTS episodes_retention AFTER INSERT ON episodes
+        WHEN new.id - (SELECT min(id) FROM episodes) >= 10000 BEGIN
+            INSERT INTO episodes_archive SELECT * FROM episodes WHERE id <= (
+                SELECT id FROM episodes ORDER BY id DESC LIMIT 1 OFFSET 10000
+            );
+            DELETE FROM episodes WHERE id <= (SELECT max(id) FROM episodes_archive);
+        END;
     )sql";
     sqlite_check(sqlite3_exec(connection, sql, nullptr, nullptr, nullptr), connection);
 }
@@ -430,14 +449,15 @@ std::int64_t EpisodicMemory::log(const Json& episode) {
     return sqlite3_last_insert_rowid(db);
 }
 
-Json EpisodicMemory::query(std::string_view predicate, const std::vector<std::string>& params, int limit) {
+Json EpisodicMemory::query(std::string_view predicate, const std::vector<std::string>& params, int limit, bool archive) {
     if (limit < 0) {
         throw std::invalid_argument("Episode query limit cannot be negative");
     }
     const std::lock_guard lock(impl_->mutex);
     auto* db = impl_->connection.get();
+    const auto table = std::string(archive ? "episodes_archive" : "episodes");
     auto statement = prepare(db, "SELECT id,task_id,agent_name,agent_version,intent,summary,quality_score,"
-                                 "timestamp,metadata FROM episodes WHERE " + std::string(predicate)
+                                 "timestamp,metadata FROM " + table + " WHERE " + std::string(predicate)
                                  + " ORDER BY timestamp DESC, id DESC LIMIT ?");
     int index = 1;
     for (const auto& param : params) {
@@ -462,6 +482,7 @@ Json EpisodicMemory::query(std::string_view predicate, const std::vector<std::st
 }
 
 Json EpisodicMemory::recent(int limit) { return query("1", {}, limit); }
+Json EpisodicMemory::archived(int limit) { return query("1", {}, limit, true); }
 Json EpisodicMemory::by_agent(std::string_view agent, int limit) {
     return query("agent_name = ?", {std::string(agent)}, limit);
 }
@@ -514,6 +535,89 @@ std::vector<float> normalized(const Embeddings& embeddings, std::string_view tex
 }
 
 } // namespace
+
+struct SemanticIndex::Impl {
+    explicit Impl(const std::filesystem::path& path) : db(open_database(path)) {}
+    Database db;
+    std::mutex mutex;
+};
+
+SemanticIndex::SemanticIndex(const std::filesystem::path& path, std::string model)
+    : impl_(std::make_unique<Impl>(path)), model_(std::move(model)) {
+    constexpr auto schema = R"sql(
+        CREATE TABLE IF NOT EXISTS semantic_points (
+            model TEXT NOT NULL, id TEXT NOT NULL, payload TEXT NOT NULL, vector BLOB NOT NULL,
+            first_seen INTEGER NOT NULL, use_count INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (model, id)
+        );
+        CREATE INDEX IF NOT EXISTS semantic_retention ON semantic_points (model, use_count, first_seen);
+    )sql";
+    auto* db = impl_->db.get();
+    sqlite_check(sqlite3_exec(db, schema, nullptr, nullptr, nullptr), db);
+}
+
+SemanticIndex::~SemanticIndex() = default;
+
+void SemanticIndex::store(const Json& points) {
+    const std::lock_guard lock(impl_->mutex);
+    auto* db = impl_->db.get();
+    const auto statement = prepare(db, R"sql(
+        INSERT INTO semantic_points(model,id,payload,vector,first_seen) VALUES(?,?,?,?,unixepoch())
+        ON CONFLICT(model,id) DO UPDATE SET payload=excluded.payload, vector=excluded.vector
+    )sql");
+    bind_text(db, statement.get(), 1, model_);
+    sqlite_check(sqlite3_exec(db, "BEGIN IMMEDIATE", nullptr, nullptr, nullptr), db);
+    try {
+        for (const auto& point : points) {
+            const auto vector = point.at("vector").get<std::vector<float>>();
+            bind_text(db, statement.get(), 2, point.at("id").get<std::string>());
+            bind_text(db, statement.get(), 3, point.at("payload").dump());
+            sqlite_check(sqlite3_bind_blob64(statement.get(), 4, vector.data(), vector.size() * sizeof(float), SQLITE_TRANSIENT), db);
+            sqlite_check(sqlite3_step(statement.get()), db);
+            sqlite_check(sqlite3_reset(statement.get()), db);
+        }
+        sqlite_check(sqlite3_exec(db, "COMMIT", nullptr, nullptr, nullptr), db);
+    } catch (...) {
+        sqlite3_exec(db, "ROLLBACK", nullptr, nullptr, nullptr);
+        throw;
+    }
+}
+
+void SemanticIndex::used(const Json& rows) {
+    auto ids = Json::array();
+    for (const auto& row : rows) ids.push_back(row.at("id"));
+    const std::lock_guard lock(impl_->mutex);
+    auto* db = impl_->db.get();
+    const auto statement = prepare(db, R"sql(
+        UPDATE semantic_points SET use_count=1 WHERE model=? AND use_count=0 AND id IN (SELECT value FROM json_each(?))
+    )sql");
+    bind_text(db, statement.get(), 1, model_);
+    bind_text(db, statement.get(), 2, ids.dump());
+    sqlite_check(sqlite3_step(statement.get()), db);
+}
+
+std::vector<std::string> SemanticIndex::unused(std::int64_t cutoff) {
+    const std::lock_guard lock(impl_->mutex);
+    auto* db = impl_->db.get();
+    const auto statement = prepare(db, "SELECT id FROM semantic_points WHERE model=? AND use_count=0 AND first_seen <= ? LIMIT 1000");
+    bind_text(db, statement.get(), 1, model_);
+    sqlite_check(sqlite3_bind_int64(statement.get(), 2, cutoff), db);
+    std::vector<std::string> ids;
+    for (int step; (step = sqlite3_step(statement.get())) != SQLITE_DONE;) {
+        sqlite_check(step, db);
+        ids.push_back(sqlite_text(statement.get(), 0));
+    }
+    return ids;
+}
+
+void SemanticIndex::remove(const std::vector<std::string>& ids) {
+    const std::lock_guard lock(impl_->mutex);
+    auto* db = impl_->db.get();
+    const auto statement = prepare(db, "DELETE FROM semantic_points WHERE model=? AND id IN (SELECT value FROM json_each(?))");
+    bind_text(db, statement.get(), 1, model_);
+    bind_text(db, statement.get(), 2, Json(ids).dump());
+    sqlite_check(sqlite3_step(statement.get()), db);
+}
 
 struct ProceduralMemory::Impl {
     explicit Impl(const std::filesystem::path& path) : db(open_database(path)) {}
@@ -634,6 +738,18 @@ bool ProceduralMemory::review_conflict(std::int64_t id) {
     bind_text(db, statement.get(), 3, encoder_.model());
     sqlite_check(sqlite3_step(statement.get()), db);
     return sqlite3_changes(db) == 1;
+}
+
+std::size_t ProceduralMemory::evict_low_success() {
+    const std::lock_guard lock(impl_->mutex);
+    auto* db = impl_->db.get();
+    const auto statement = prepare(db, R"sql(
+        DELETE FROM skills WHERE model=? AND use_count>0 AND success_rate < 0.30
+        AND NOT EXISTS (SELECT 1 FROM skill_conflicts WHERE previous_id=skills.id OR new_id=skills.id)
+    )sql");
+    bind_text(db, statement.get(), 1, encoder_.model());
+    sqlite_check(sqlite3_step(statement.get()), db);
+    return static_cast<std::size_t>(sqlite3_changes64(db));
 }
 
 Json ProceduralMemory::retrieve(std::string_view query, std::size_t top_k, std::size_t candidate_pool) {

@@ -359,7 +359,7 @@ void ResearchAgent::persist(const Json& sources) {
         records.push_back({point_id(url), paper.at("abstract").get<std::string>(), std::move(metadata)});
     }
     Embeddings encoder(transport_, config_.ollama_url, config_.embedding_model);
-    SemanticMemory(transport_, config_.qdrant_url, std::move(encoder)).store(records);
+    SemanticMemory(transport_, config_.qdrant_url, std::move(encoder), config_.semantic_db).store(records);
 }
 
 } // namespace ark

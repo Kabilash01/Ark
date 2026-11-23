@@ -62,6 +62,7 @@ ark::ResearchConfig config(bool chat_required = true) {
     config.embedding_model = env("ARK_EMBEDDING_MODEL", config.embedding_model);
     config.ollama_url = env("ARK_OLLAMA_URL", config.ollama_url);
     config.qdrant_url = env("ARK_QDRANT_URL", config.qdrant_url);
+    config.semantic_db = env("ARK_SEMANTIC_DB", "data/semantic_cpp.db");
     config.scholar_key = env("SEMANTIC_SCHOLAR_API_KEY");
     return config;
 }
@@ -261,7 +262,7 @@ void ensure_evaluation(ark::Json& dag) {
 ark::Json recall(const ark::ResearchConfig& settings, std::string_view goal) {
     ark::CurlTransport http;
     const ark::Embeddings encoder(std::ref(http), settings.ollama_url, settings.embedding_model);
-    ark::SemanticMemory semantic(std::ref(http), settings.qdrant_url, encoder);
+    ark::SemanticMemory semantic(std::ref(http), settings.qdrant_url, encoder, settings.semantic_db);
     const auto path = skills_path();
     std::unique_ptr<ark::ProceduralMemory> skills;
     if (std::filesystem::exists(path)) {
@@ -530,7 +531,9 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     ark::write_state(state_path, goal, parent_id, done ? "DONE" : "FAILED", privacy.enabled,
                      static_cast<int>(results.size()), last);
     if (redis) {
-        ark::WorkingMemory(*redis).set(parent_id, "results", results);
+        ark::WorkingMemory working(*redis);
+        working.set(parent_id, "results", results);
+        working.finish(parent_id);
         emit(events, "memory_written", {{"tier", "working"}});
         ark::MessageBus(*redis).log({{"event", "dispatch_done"}, {"task_id", parent_id},
                                      {"status", done ? "DONE" : "FAILED"}});
@@ -869,7 +872,7 @@ ark::Json memory_tier(std::string_view tier, std::string_view query, std::string
     ark::CurlTransport http;
     ark::Embeddings encoder(std::ref(http), settings.ollama_url, settings.embedding_model);
     if (tier == "semantic") {
-        ark::SemanticMemory semantic(std::ref(http), settings.qdrant_url, std::move(encoder));
+        ark::SemanticMemory semantic(std::ref(http), settings.qdrant_url, std::move(encoder), settings.semantic_db);
         return query.empty() ? semantic.by_metadata(ark::Json::object(), limit) : semantic.retrieve(query, limit);
     }
     if (tier == "procedural" && std::filesystem::exists(skills_path())) {
@@ -950,6 +953,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp dispatch < dag.json\n"
                      "       ark-cpp conflict-check < evidence.json\n"
                      "       ark-cpp audit|episodes\n"
+                     "       ark-cpp episodes-archive | memory-prune\n"
                      "       ark-cpp reflection-queue\n"
                      "       ark-cpp versions <agent>\n"
                      "       ark-cpp version-bump <agent> <patch|minor|major> <change.json>\n"
@@ -1130,14 +1134,26 @@ int main(int argc, char** argv) {
             api_command("/tasks?limit=1");
             return 0;
         }
-        if ((command == "episodes" || command == "reflection-queue") && argc == 2) {
+        if ((command == "episodes" || command == "episodes-archive" || command == "reflection-queue") && argc == 2) {
             const std::filesystem::path path = env("ARK_EPISODIC_DB", "data/episodic_memory.db");
             auto entries = ark::Json::array();
             if (std::filesystem::exists(path)) {
                 ark::EpisodicMemory episodes(path);
-                entries = command == "episodes" ? episodes.recent() : episodes.pending_improvements();
+                if (command == "episodes") entries = episodes.recent();
+                else if (command == "episodes-archive") entries = episodes.archived();
+                else entries = episodes.pending_improvements();
             }
             std::cout << entries.dump(2) << '\n';
+            return 0;
+        }
+        if (command == "memory-prune" && argc == 2) {
+            const auto settings = config(false);
+            ark::CurlTransport http;
+            const ark::Embeddings encoder(std::ref(http), settings.ollama_url, settings.embedding_model);
+            ark::SemanticMemory semantic(std::ref(http), settings.qdrant_url, encoder, settings.semantic_db);
+            ark::ProceduralMemory skills(skills_path(), encoder);
+            std::cout << ark::Json{{"semantic_evicted", semantic.evict_unused()},
+                                   {"procedural_evicted", skills.evict_low_success()}}.dump(2) << '\n';
             return 0;
         }
         if (command == "memory" && (argc == 3 || (argc == 4 && std::string_view(argv[2]) == "search"))) {

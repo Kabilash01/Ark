@@ -34,6 +34,7 @@ public:
     bool exists(std::string_view task_id, std::string_view key);
     void erase(std::string_view task_id, std::string_view key);
     void clear(std::string_view task_id);
+    void finish(std::string_view task_id, int ttl = 3600);
 
 private:
     Redis& redis_;
@@ -89,11 +90,12 @@ public:
     Json by_time(std::string_view start, std::string_view end, int limit = 50);
     Json search(std::string_view keyword, int limit = 50);
     Json pending_improvements(int limit = 50);
+    Json archived(int limit = 50);
 
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
-    Json query(std::string_view predicate, const std::vector<std::string>& params, int limit);
+    Json query(std::string_view predicate, const std::vector<std::string>& params, int limit, bool archive = false);
 };
 
 } // namespace ark

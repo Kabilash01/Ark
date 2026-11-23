@@ -29,20 +29,38 @@ struct SemanticRecord {
     Json metadata = Json::object();
 };
 
+class SemanticIndex {
+public:
+    SemanticIndex(const std::filesystem::path& path, std::string model);
+    ~SemanticIndex();
+    void store(const Json& points);
+    void used(const Json& rows);
+    std::vector<std::string> unused(std::int64_t cutoff);
+    void remove(const std::vector<std::string>& ids);
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
+    std::string model_;
+};
+
 class SemanticMemory {
 public:
-    SemanticMemory(Transport transport, std::string_view local_url, Embeddings encoder);
+    SemanticMemory(Transport transport, std::string_view local_url, Embeddings encoder,
+                   const std::filesystem::path& index_path = {});
     void store(const std::vector<SemanticRecord>& records);
     Json retrieve(std::string_view query, int limit = 5);
     Json by_metadata(const Json& filter, int limit = 50);
     int count();
     void remove(std::string_view id);
+    std::size_t evict_unused(std::chrono::hours age = std::chrono::hours(30 * 24));
 
 private:
     bool exists() const;
     Transport transport_;
     std::string collection_;
     Embeddings encoder_;
+    std::unique_ptr<SemanticIndex> index_;
 };
 
 // SQLite stores records and normalized vectors in one transaction. An exact
@@ -62,6 +80,7 @@ public:
     Json all(int limit = -1);
     Json pending_conflicts(int limit = 20);
     bool review_conflict(std::int64_t id);
+    std::size_t evict_low_success();
 
 private:
     struct Impl;

@@ -15,6 +15,7 @@ struct ResearchConfig {
     std::string embedding_model = "bge-large:latest";
     std::string ollama_url = "http://127.0.0.1:11434";
     std::string qdrant_url = "http://127.0.0.1:6333";
+    std::filesystem::path semantic_db;
     std::chrono::seconds arxiv_interval{3};
     std::string scholar_key;
     Json privacy = Json::object();

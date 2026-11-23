@@ -656,3 +656,16 @@ Both misses were advanced SQL examples. The 75% recall applies to these
 selected source files. The workflow inspects source without launching the
 application. [WebGoat release](https://github.com/WebGoat/WebGoat/releases/tag/v2025.3)
 [Per-file results](../benchmarks/security/webgoat_source_results.json)
+
+## Day 59 memory retention
+
+Completed tasks retain working state in Redis for up to one hour. SQLite
+moves older episodes into an archive after the latest 10,000 active entries.
+`ark-cpp episodes-archive` shows the most recent archived records.
+
+The SQLite semantic index (`ARK_SEMANTIC_DB`) records when a vector was first
+ingested and whether it appeared in a semantic search. `ark-cpp memory-prune`
+removes indexed vectors at least 30 days old with zero retrievals and
+procedural skills with observed success below 0.30. Skills linked to a
+conflict retain their review history. Semantic records created before the
+index was added enter retention tracking when re-ingested.

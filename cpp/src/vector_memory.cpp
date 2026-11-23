@@ -67,10 +67,13 @@ std::vector<std::vector<float>> Embeddings::encode(const std::vector<std::string
     return vectors;
 }
 
-SemanticMemory::SemanticMemory(Transport transport, std::string_view local_url, Embeddings encoder)
+SemanticMemory::SemanticMemory(Transport transport, std::string_view local_url, Embeddings encoder,
+                               const std::filesystem::path& index_path)
     : transport_(std::move(transport)),
       collection_(local_base_url(local_url) + "/collections/ark_cpp_" + point_id(encoder.model())),
-      encoder_(std::move(encoder)) {}
+      encoder_(std::move(encoder)) {
+    if (!index_path.empty()) index_ = std::make_unique<SemanticIndex>(index_path, encoder_.model());
+}
 
 bool SemanticMemory::exists() const {
     const auto response = transport_({collection_});
@@ -110,6 +113,7 @@ void SemanticMemory::store(const std::vector<SemanticRecord>& records) {
     }
     send(transport_, collection_ + "/points?wait=true", "PUT", {{"points", points}})
         .require_success("Qdrant upsert");
+    if (index_) index_->store(points);
 }
 
 Json SemanticMemory::retrieve(std::string_view query, int limit) {
@@ -120,7 +124,9 @@ Json SemanticMemory::retrieve(std::string_view query, int limit) {
     const auto response = send(transport_, collection_ + "/points/query", "POST", {
         {"query", encoder_.encode({std::string(query)}).at(0)}, {"with_payload", true}, {"limit", limit},
     });
-    return flatten(payload_result(response, "Qdrant semantic search").at("points"));
+    auto result = flatten(payload_result(response, "Qdrant semantic search").at("points"));
+    if (index_ && !result.empty()) index_->used(result);
+    return result;
 }
 
 Json SemanticMemory::by_metadata(const Json& filter, int limit) {
@@ -156,6 +162,25 @@ void SemanticMemory::remove(std::string_view id) {
         send(transport_, collection_ + "/points/delete?wait=true", "POST", {{"points", {id}}})
             .require_success("Qdrant deletion");
     }
+    if (index_) index_->remove({std::string(id)});
+}
+
+std::size_t SemanticMemory::evict_unused(std::chrono::hours age) {
+    if (age.count() < 0) throw std::invalid_argument("Semantic retention age cannot be negative");
+    if (!index_) return 0;
+    const auto cutoff = std::chrono::duration_cast<std::chrono::seconds>(
+        (std::chrono::system_clock::now() - age).time_since_epoch()).count();
+    std::size_t removed = 0;
+    auto ids = index_->unused(cutoff);
+    if (ids.empty()) return removed;
+    const bool remote = exists();
+    for (; !ids.empty(); ids = index_->unused(cutoff)) {
+        if (remote) send(transport_, collection_ + "/points/delete?wait=true", "POST", {{"points", ids}})
+            .require_success("Qdrant retention deletion");
+        index_->remove(ids);
+        removed += ids.size();
+    }
+    return removed;
 }
 
 Json memory_context(std::string_view task_id, std::string_view query,
