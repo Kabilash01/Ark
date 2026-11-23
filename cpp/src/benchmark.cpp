@@ -16,6 +16,10 @@ namespace {
 constexpr auto producer_id = "produce";
 constexpr auto judge_id = "evaluate";
 
+bool tool_case(std::string_view kind) {
+    return kind == "security" || kind == "browser" || kind == "terminal" || kind == "document";
+}
+
 void validate_tests(const Json& files, std::string_view id, std::string_view field) {
     static const std::regex name(R"(test_[a-zA-Z0-9_]+\.py)");
     if (!files.is_object() || files.empty()) {
@@ -67,8 +71,16 @@ void validate_suite(const Json& suite) {
                     throw std::invalid_argument(id + " requires unique base arXiv IDs");
                 }
             }
+        } else if (tool_case(kind)) {
+            if (!task.at("fixture").is_object() || !task.at("expected").is_object() || task.at("expected").empty()) {
+                throw std::invalid_argument(id + " requires a fixture and expected tool evidence");
+            }
+            for (const auto& [key, value] : task.at("expected").items()) {
+                if (!key.starts_with('/')) throw std::invalid_argument(id + " requires JSON pointers for expected evidence");
+                (void)Json::json_pointer(key);
+            }
         } else {
-            throw std::invalid_argument(id + " must be a research or coding task");
+            throw std::invalid_argument(id + " has an unsupported benchmark task kind");
         }
     }
 }
@@ -179,6 +191,32 @@ void score_case(const Json& task, const Json& run, Json& row, const TestRunner& 
     row["notes"] = assessment.value("summary", "Evaluation completed");
 }
 
+void score_tool(const Json& task, const BenchmarkTool& execute, Json& row) {
+    if (!execute) throw std::invalid_argument("Benchmark requires a tool runner for this task kind");
+    const auto result = execute(task);
+    row["agent_version"] = result.at("agent_version");
+    const auto version = result.at("agent_version").get<std::string>();
+    const auto separator = version.find('@');
+    if (separator == std::string::npos || separator == 0 || separator + 1 == version.size()) {
+        throw std::runtime_error("Tool result is missing its agent version");
+    }
+    row["agent_versions"] = {{version.substr(0, separator), version.substr(separator + 1)}};
+    auto evidence = Json::object();
+    const auto& output = result.at("output");
+    bool passed = result.at("status") == task.value("expected_status", "DONE");
+    for (const auto& [key, expected] : task.at("expected").items()) {
+        const auto pointer = Json::json_pointer(key);
+        const bool matches = output.contains(pointer) && output.at(pointer) == expected;
+        evidence[key] = {{"matched", matches}};
+        if (output.contains(pointer) && output.at(pointer).dump().size() < 1200) evidence[key]["observed"] = output.at(pointer);
+        passed = passed && matches;
+    }
+    row["status"] = passed ? "DONE" : "FAILED";
+    row["score"] = passed ? 1.0 : 0.0;
+    row["notes"] = passed ? "Matched the locked tool evidence" : output.value("error_message", "Tool evidence did not match");
+    row["evidence"] = std::move(evidence);
+}
+
 Json summary(const Json& rows, std::size_t total) {
     std::size_t scored = 0;
     std::size_t completed = 0;
@@ -197,7 +235,7 @@ Json summary(const Json& rows, std::size_t total) {
 } // namespace
 
 Json run_benchmark(const Json& suite, const BenchmarkDispatch& dispatch, const TestRunner& run_tests,
-                   const BenchmarkProgress& progress) {
+                   const BenchmarkProgress& progress, const BenchmarkTool& run_tool) {
     validate_suite(suite);
     if (!dispatch || !run_tests) {
         throw std::invalid_argument("Benchmark requires a dispatcher and an acceptance test runner");
@@ -211,7 +249,8 @@ Json run_benchmark(const Json& suite, const BenchmarkDispatch& dispatch, const T
         Json row{{"task_id", task.at("task_id")}, {"kind", task.at("kind")}, {"status", "FAILED"},
                  {"score", nullptr}, {"agent_version", nullptr}, {"agent_versions", Json::object()}, {"evidence", Json::object()}};
         try {
-            score_case(task, dispatch(plan(task)), row, run_tests);
+            if (tool_case(task.at("kind").get_ref<const std::string&>())) score_tool(task, run_tool, row);
+            else score_case(task, dispatch(plan(task)), row, run_tests);
         } catch (const std::exception& error) {
             row["notes"] = error.what();
         }

@@ -711,3 +711,21 @@ Each agent's version panel charts measured ARKBench scores by run date and
 producer version. It uses completed reports from `ARK_BENCHMARK_RESULTS`
 (defaults to `benchmarks/arkbench/results`). Tooltips and a text list give
 the dataset version, agent version, score, and number of scored cases.
+
+## Day 64 ARKBench v0.5
+
+```bash
+build/ark-cpp benchmark benchmarks/arkbench/benchmark_v0.5.json build/arkbench-v0.5-report.json
+```
+
+The suite keeps the original ten research and coding tasks and adds ten
+dependency checks based on public CVE advisories and ten browser, document,
+and terminal tasks. The dependency checks use offline pinned versions. The
+browser cases use local Chromium pages. The new cases score against fixed
+tool expectations. The original cases retain their acceptance tests and
+model evaluator.
+
+The intermediate run scored all 30 tasks, completed 23, and averaged 0.7853.
+The original ten averaged 0.3560 in this replay, and every new tool contract
+passed. The larger suite uses a different mix of scoring methods than the
+Month 2 baseline. [Intermediate results](../benchmarks/arkbench/results/month4_intermediate.json)

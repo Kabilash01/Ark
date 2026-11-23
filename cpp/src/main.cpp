@@ -19,6 +19,7 @@
 #include "ark/security_agent.hpp"
 #include "ark/storage.hpp"
 #include "ark/terminal.hpp"
+#include "ark/tool_benchmark.hpp"
 #include "ark/vector_memory.hpp"
 #include "ark/versions.hpp"
 #include "ark/web_search.hpp"
@@ -827,6 +828,11 @@ int benchmark(const std::filesystem::path& suite_path, const std::filesystem::pa
             if (!report_path.empty()) {
                 ark::write_json(report_path, partial);
             }
+        }, [&](const ark::Json& task) {
+            const auto redis = task.at("kind") == "browser" ? version_store() : nullptr;
+            return ark::run_tool_case(task, std::ref(http), settings.ollama_url,
+                actor_profile("browser_agent", settings.model, redis.get()),
+                {.executable = env("ARK_BROWSER_BINARY", "chromium"), .privacy = settings.privacy}, sandbox);
         });
     if (!report_path.empty()) {
         ark::write_json(report_path, report);

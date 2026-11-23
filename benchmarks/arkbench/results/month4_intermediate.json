@@ -1,0 +1,697 @@
+{
+  "benchmark": "ARKBench",
+  "dataset_version": "0.5",
+  "started_at": "2026-11-23T17:52:08+00:00",
+  "finished_at": "2026-11-23T17:58:26+00:00",
+  "duration_unit": "seconds",
+  "results": [
+    {
+      "agent_version": "research_agent@1.0.0",
+      "agent_versions": {
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0",
+        "research_agent": "1.0.0"
+      },
+      "duration": 48.986888086,
+      "evidence": {
+        "citations": [
+          "1706.03762v7"
+        ],
+        "missing_arxiv_ids": []
+      },
+      "kind": "research",
+      "notes": "The artifact provides accurate information about the Transformer architecture, including the components it replaces with attention, the reason for changes in training parallelism, and a specific translation result. The distinction between the reported result and a general performance claim is also made. However, the artifact does not explicitly cite the source in the required format for the 'citation_accuracy' criterion. The citation is present but not in the format specified in the criteria. The coverage and clarity criteria are met adequately.",
+      "run_task_id": "ark_20261123_175208_e96274",
+      "score": 0.18,
+      "status": "FAILED",
+      "task_id": "research-01-transformer"
+    },
+    {
+      "agent_version": "research_agent@1.0.0",
+      "agent_versions": {
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0",
+        "research_agent": "1.0.0"
+      },
+      "duration": 30.706123214,
+      "evidence": {
+        "citations": [
+          "1512.03385v1"
+        ],
+        "missing_arxiv_ids": []
+      },
+      "kind": "research",
+      "notes": "The artifact provides a detailed summary of the paper 'Deep Residual Learning for Image Recognition' and correctly identifies the training difficulty addressed by residual learning as the challenge of training deeper neural networks. It also correctly explains that a residual block learns the difference between the input and the output, focusing on the residual information. The artifact also correctly describes one result from the image recognition experiments, identifying the ImageNet dataset and noting that the result concerns an ensemble of residual networks. The artifact meets all the criteria and provides a clear and accurate explanation of the training difficulty and residual block functionality, as well as the result from the experiments. The citation is accurate and the coverage is comprehensive. The clarity of the explanation is high.",
+      "run_task_id": "ark_20261123_175257_9de664",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "research-02-residual-learning"
+    },
+    {
+      "agent_version": "research_agent@1.0.0",
+      "agent_versions": {
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0",
+        "research_agent": "1.0.0"
+      },
+      "duration": 43.715497957,
+      "evidence": {
+        "citations": [
+          "1810.04805v2",
+          "1907.11692v1"
+        ],
+        "missing_arxiv_ids": []
+      },
+      "kind": "research",
+      "notes": "The artifact provides accurate citations for both BERT and RoBERTa papers. The findings section correctly identifies the central contribution of BERT and the changes in interpretation of benchmark gains in RoBERTa. It also correctly identifies what the two abstracts leave unresolved. The artifact meets all the criteria with high accuracy.",
+      "run_task_id": "ark_20261123_175328_a26eac",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "research-03-language-pretraining"
+    },
+    {
+      "agent_version": "research_agent@1.0.0",
+      "agent_versions": {
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0",
+        "research_agent": "1.0.0"
+      },
+      "duration": 64.869061653,
+      "evidence": {
+        "citations": [
+          "1711.05101v3",
+          "1412.6980v9"
+        ],
+        "missing_arxiv_ids": []
+      },
+      "kind": "research",
+      "notes": "The artifact provides a clear explanation of the purpose of Adam and how decoupled weight decay changes the treatment of regularization for adaptive optimization. It distinguishes the algorithmic change from the empirical claims and supports the comparison with both abstracts. The citations are accurate and relevant to the task. The summary is well-structured and addresses all aspects of the query. The artifact meets all the criteria effectively.",
+      "run_task_id": "ark_20261123_175412_0bdaa5",
+      "score": 0.34,
+      "status": "FAILED",
+      "task_id": "research-04-adam-weight-decay"
+    },
+    {
+      "agent_version": "research_agent@1.0.0",
+      "agent_versions": {
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0",
+        "research_agent": "1.0.0"
+      },
+      "duration": 46.55558737,
+      "evidence": {
+        "citations": [
+          "1910.01108v4"
+        ],
+        "missing_arxiv_ids": []
+      },
+      "kind": "research",
+      "notes": "The artifact provides accurate information about DistilBERT, including its goal to create a smaller, faster, and cheaper alternative to BERT. It correctly identifies the trade-offs for model size, speed, and retained performance, and specifies the comparison baseline as BERT. The artifact also correctly cites the arXiv paper and ties the reported numbers to the abstract measures. The information is clear and well-structured, making it suitable for the task.",
+      "run_task_id": "ark_20261123_175517_554c9d",
+      "score": 0.34,
+      "status": "FAILED",
+      "task_id": "research-05-model-distillation"
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "agent_versions": {
+        "coding_agent": "1.0.0",
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0"
+      },
+      "duration": 16.397105328,
+      "evidence": {
+        "acceptance_tests": {
+          "exit_code": 1,
+          "timed_out": false
+        },
+        "smoke_tests_passed": true
+      },
+      "kind": "coding",
+      "notes": "Solution failed the separate Docker acceptance tests",
+      "run_task_id": "ark_20261123_175603_4a8650",
+      "score": 0.0,
+      "status": "FAILED",
+      "task_id": "coding-01-merge-intervals"
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "agent_versions": {
+        "coding_agent": "1.0.0",
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0"
+      },
+      "duration": 18.423380382,
+      "evidence": {
+        "acceptance_tests": {
+          "exit_code": 1,
+          "timed_out": false
+        },
+        "smoke_tests_passed": true
+      },
+      "kind": "coding",
+      "notes": "Solution failed the separate Docker acceptance tests",
+      "run_task_id": "ark_20261123_175620_d954f1",
+      "score": 0.0,
+      "status": "FAILED",
+      "task_id": "coding-02-rolling-mean"
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "agent_versions": {
+        "coding_agent": "1.0.0",
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0"
+      },
+      "duration": 22.708171778,
+      "evidence": {
+        "acceptance_tests": {
+          "exit_code": 0,
+          "timed_out": false
+        },
+        "smoke_tests_passed": true
+      },
+      "kind": "coding",
+      "notes": "The artifact provides a solution to the topological_order problem, which correctly implements Kahn's algorithm with lexicographical selection. The code handles edge cases such as undeclared nodes and cycles. The code is well-structured and includes error handling for invalid inputs. However, the artifact does not provide any additional information beyond the code itself, which limits its usefulness for evaluation. The code is correct and meets the specified criteria.",
+      "run_task_id": "ark_20261123_175638_0576f0",
+      "score": 0.7,
+      "status": "DONE",
+      "task_id": "coding-03-topological-order"
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "agent_versions": {
+        "coding_agent": "1.0.0",
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0"
+      },
+      "duration": 44.633626242,
+      "evidence": {
+        "smoke_tests_passed": false
+      },
+      "kind": "coding",
+      "notes": "Solution failed the Docker smoke tests",
+      "run_task_id": "ark_20261123_175701_f66243",
+      "score": 0.0,
+      "status": "FAILED",
+      "task_id": "coding-04-csv-aggregation"
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "agent_versions": {
+        "coding_agent": "1.0.0",
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0"
+      },
+      "duration": 35.319347447,
+      "evidence": {
+        "acceptance_tests": {
+          "exit_code": 1,
+          "timed_out": false
+        },
+        "smoke_tests_passed": true
+      },
+      "kind": "coding",
+      "notes": "Solution failed the separate Docker acceptance tests",
+      "run_task_id": "ark_20261123_175745_411802",
+      "score": 0.0,
+      "status": "FAILED",
+      "task_id": "coding-05-run-length-encoding"
+    },
+    {
+      "agent_version": "security_agent@1.0.0",
+      "agent_versions": {
+        "security_agent": "1.0.0"
+      },
+      "duration": 7.1684e-05,
+      "evidence": {
+        "/matched_advisories": {
+          "matched": true,
+          "observed": [
+            "CVE-2024-34069"
+          ]
+        }
+      },
+      "kind": "security",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-S01"
+    },
+    {
+      "agent_version": "security_agent@1.0.0",
+      "agent_versions": {
+        "security_agent": "1.0.0"
+      },
+      "duration": 3.756e-05,
+      "evidence": {
+        "/matched_advisories": {
+          "matched": true,
+          "observed": []
+        }
+      },
+      "kind": "security",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-S02"
+    },
+    {
+      "agent_version": "security_agent@1.0.0",
+      "agent_versions": {
+        "security_agent": "1.0.0"
+      },
+      "duration": 3.6548e-05,
+      "evidence": {
+        "/matched_advisories": {
+          "matched": true,
+          "observed": [
+            "CVE-2023-30861"
+          ]
+        }
+      },
+      "kind": "security",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-S03"
+    },
+    {
+      "agent_version": "security_agent@1.0.0",
+      "agent_versions": {
+        "security_agent": "1.0.0"
+      },
+      "duration": 3.3152e-05,
+      "evidence": {
+        "/matched_advisories": {
+          "matched": true,
+          "observed": []
+        }
+      },
+      "kind": "security",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-S04"
+    },
+    {
+      "agent_version": "security_agent@1.0.0",
+      "agent_versions": {
+        "security_agent": "1.0.0"
+      },
+      "duration": 3.8422e-05,
+      "evidence": {
+        "/matched_advisories": {
+          "matched": true,
+          "observed": [
+            "CVE-2024-35195"
+          ]
+        }
+      },
+      "kind": "security",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-S05"
+    },
+    {
+      "agent_version": "security_agent@1.0.0",
+      "agent_versions": {
+        "security_agent": "1.0.0"
+      },
+      "duration": 3.1679e-05,
+      "evidence": {
+        "/matched_advisories": {
+          "matched": true,
+          "observed": []
+        }
+      },
+      "kind": "security",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-S06"
+    },
+    {
+      "agent_version": "security_agent@1.0.0",
+      "agent_versions": {
+        "security_agent": "1.0.0"
+      },
+      "duration": 3.771e-05,
+      "evidence": {
+        "/matched_advisories": {
+          "matched": true,
+          "observed": [
+            "CVE-2024-37891"
+          ]
+        }
+      },
+      "kind": "security",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-S07"
+    },
+    {
+      "agent_version": "security_agent@1.0.0",
+      "agent_versions": {
+        "security_agent": "1.0.0"
+      },
+      "duration": 3.1319e-05,
+      "evidence": {
+        "/matched_advisories": {
+          "matched": true,
+          "observed": []
+        }
+      },
+      "kind": "security",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-S08"
+    },
+    {
+      "agent_version": "security_agent@1.0.0",
+      "agent_versions": {
+        "security_agent": "1.0.0"
+      },
+      "duration": 3.3662e-05,
+      "evidence": {
+        "/matched_advisories": {
+          "matched": true,
+          "observed": [
+            "CVE-2023-50447"
+          ]
+        }
+      },
+      "kind": "security",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-S09"
+    },
+    {
+      "agent_version": "security_agent@1.0.0",
+      "agent_versions": {
+        "security_agent": "1.0.0"
+      },
+      "duration": 3.3703e-05,
+      "evidence": {
+        "/matched_advisories": {
+          "matched": true,
+          "observed": []
+        }
+      },
+      "kind": "security",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-S10"
+    },
+    {
+      "agent_version": "browser_agent@1.0.0",
+      "agent_versions": {
+        "browser_agent": "1.0.0"
+      },
+      "duration": 30.284573775,
+      "evidence": {
+        "/extractions/0/items": {
+          "matched": true,
+          "observed": [
+            "Vector report",
+            "Search methods"
+          ]
+        }
+      },
+      "kind": "browser",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-B01"
+    },
+    {
+      "agent_version": "browser_agent@1.0.0",
+      "agent_versions": {
+        "browser_agent": "1.0.0"
+      },
+      "duration": 16.247623067,
+      "evidence": {
+        "/screenshot_count": {
+          "matched": true,
+          "observed": 1
+        }
+      },
+      "kind": "browser",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-B02"
+    },
+    {
+      "agent_version": "browser_agent@1.0.0",
+      "agent_versions": {
+        "browser_agent": "1.0.0"
+      },
+      "duration": 3.395417082,
+      "evidence": {
+        "/extractions/0/items": {
+          "matched": true,
+          "observed": [
+            "Ready for review"
+          ]
+        }
+      },
+      "kind": "browser",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-B03"
+    },
+    {
+      "agent_version": "document_agent@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0"
+      },
+      "duration": 0.000686311,
+      "evidence": {
+        "/paragraphs": {
+          "matched": true,
+          "observed": [
+            "Audit summary",
+            "Reviewed & approved.",
+            "Source < archive >."
+          ]
+        }
+      },
+      "kind": "document",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-D01"
+    },
+    {
+      "agent_version": "document_agent@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0"
+      },
+      "duration": 0.020035214,
+      "evidence": {
+        "/pages": {
+          "matched": true,
+          "observed": [
+            "Stable sentence for PDF extraction."
+          ]
+        }
+      },
+      "kind": "document",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-D02"
+    },
+    {
+      "agent_version": "document_agent@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0"
+      },
+      "duration": 0.000549947,
+      "evidence": {
+        "/sheets/0/rows": {
+          "matched": true,
+          "observed": [
+            [
+              "Project",
+              "Count",
+              "Ready",
+              "Comment"
+            ],
+            [
+              "Index",
+              7,
+              true,
+              null
+            ]
+          ]
+        }
+      },
+      "kind": "document",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-D03"
+    },
+    {
+      "agent_version": "terminal_agent@1.0.0",
+      "agent_versions": {
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 0.205168475,
+      "evidence": {
+        "/exit_code": {
+          "matched": true,
+          "observed": 0
+        },
+        "/stderr": {
+          "matched": true,
+          "observed": "diagnostic\n"
+        },
+        "/stdout": {
+          "matched": true,
+          "observed": "beta\n"
+        }
+      },
+      "kind": "terminal",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-T01"
+    },
+    {
+      "agent_version": "terminal_agent@1.0.0",
+      "agent_versions": {
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 0.198651996,
+      "evidence": {
+        "/exit_code": {
+          "matched": true,
+          "observed": 7
+        },
+        "/stdout": {
+          "matched": true,
+          "observed": "report\n"
+        },
+        "/timed_out": {
+          "matched": true,
+          "observed": false
+        }
+      },
+      "kind": "terminal",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-T02"
+    },
+    {
+      "agent_version": "terminal_agent@1.0.0",
+      "agent_versions": {
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 0.212100108,
+      "evidence": {
+        "/missing_module": {
+          "matched": true,
+          "observed": "ark_benchmark_missing"
+        },
+        "/suggestion": {
+          "matched": true,
+          "observed": "python -m pip install ark_benchmark_missing"
+        }
+      },
+      "kind": "terminal",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-T03"
+    },
+    {
+      "agent_version": "terminal_agent@1.0.0",
+      "agent_versions": {
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 1.214285578,
+      "evidence": {
+        "/exit_code": {
+          "matched": true,
+          "observed": 124
+        },
+        "/stdout": {
+          "matched": true,
+          "observed": "started\n"
+        },
+        "/timed_out": {
+          "matched": true,
+          "observed": true
+        }
+      },
+      "kind": "terminal",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-T04"
+    }
+  ],
+  "summary": {
+    "total": 30,
+    "scored": 30,
+    "completed": 23,
+    "mean_score": 0.7853333333333333
+  },
+  "by_kind": {
+    "research": {
+      "total": 5,
+      "scored": 5,
+      "completed": 2,
+      "mean_score": 0.572
+    },
+    "coding": {
+      "total": 5,
+      "scored": 5,
+      "completed": 1,
+      "mean_score": 0.13999999999999999
+    },
+    "security": {
+      "total": 10,
+      "scored": 10,
+      "completed": 10,
+      "mean_score": 1.0
+    },
+    "browser": {
+      "total": 3,
+      "scored": 3,
+      "completed": 3,
+      "mean_score": 1.0
+    },
+    "document": {
+      "total": 3,
+      "scored": 3,
+      "completed": 3,
+      "mean_score": 1.0
+    },
+    "terminal": {
+      "total": 4,
+      "scored": 4,
+      "completed": 4,
+      "mean_score": 1.0
+    }
+  },
+  "provenance": {
+    "dataset_sha256": "9281371b839f262db7a961a3e883d8b52b342d6257b0b7294ebea4ed487f1dba",
+    "execution": "original ten replay and twenty added tool cases",
+    "generation": "local llama.cpp, Qwen3-4B Q4_K_M",
+    "embedding": "BGE-small-en-v1.5 Q8_0",
+    "browser": "local Chromium fixtures",
+    "sandbox": "python:3.11-slim",
+    "security": "offline exact version advisory contracts"
+  }
+}
