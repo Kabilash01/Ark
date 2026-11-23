@@ -6,6 +6,7 @@
 #include "ark/done_condition.hpp"
 #include "ark/evaluation.hpp"
 #include "ark/file_system.hpp"
+#include "ark/github_agent.hpp"
 #include "ark/kernel.hpp"
 #include "ark/privacy.hpp"
 #include "ark/reflection.hpp"
@@ -821,6 +822,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp sandbox < workspace.json\n"
                      "       ark-cpp terminal 'bash command'\n"
                      "       ark-cpp terminal < request.json\n"
+                     "       ark-cpp github < request.json\n"
                      "       ark-cpp benchmark [suite.json] [report.json]\n"
                      "       ark-cpp browser < actions.json\n"
                      "       ark-cpp serve [port]\n"
@@ -851,6 +853,11 @@ int main(int argc, char** argv) {
         }
         if (command == "terminal" && argc <= 3) {
             return run_terminal(argc == 3 ? argv[2] : nullptr);
+        }
+        if (command == "github" && argc == 2) {
+            ark::CurlTransport http;
+            const ark::GitHubAgent agent(std::ref(http), env("GH_TOKEN", env("GITHUB_TOKEN")));
+            return print_run(agent.run(ark::make_message("user", "github_agent", "GITHUB", ark::Json::parse(std::cin))));
         }
         if (command == "files" && argc == 2) {
             return print_run(run_file_operation(ark::Json::parse(std::cin)));

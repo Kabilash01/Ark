@@ -476,3 +476,24 @@ slots, and three arXiv API slots. Requests for the same tool wait in arrival
 order when its slots are full. Browser closure, container cleanup, and request
 completion release their slots, including on errors. arXiv requests still
 follow the runtime's paced, serial request policy.
+
+## Day 47 GitHub agent
+
+The native build uses libgit2 for local Git operations. Run
+`build/ark-cpp github < request.json` with one of these JSON actions.
+
+| `action` | Fields |
+| --- | --- |
+| `clone_repo` | `repository` (`owner/name`, or `local_source` for a local repository), new `path` |
+| `list_changed_files` | `path` |
+| `create_branch` | `path`, `branch`, optional `checkout` (defaults to true) |
+| `commit_files` | `path`, `files` array of worktree paths, `message` |
+| `push_branch` | `path`, `branch` |
+| `get_open_issues` | `repository`, optional `page` |
+| `create_pull_request` | `repository`, `title`, `head`, `base`, optional `body` and `draft` |
+
+Commits use the local Git author identity and require a clean staging area.
+Each push updates the named branch on `origin` (GitHub HTTPS or a local bare
+repository). Set `GH_TOKEN` or
+`GITHUB_TOKEN` with the repository permissions required for private access
+and pull request creation. [GitHub REST pulls](https://docs.github.com/en/rest/pulls/pulls)

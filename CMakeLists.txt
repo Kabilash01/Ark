@@ -11,6 +11,7 @@ find_package(Threads REQUIRED)
 find_package(SQLite3 REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(HIREDIS REQUIRED IMPORTED_TARGET hiredis)
+pkg_check_modules(LIBGIT2 REQUIRED IMPORTED_TARGET libgit2)
 if(TARGET SQLite3::SQLite3)
     set(ARK_SQLITE_TARGET SQLite3::SQLite3)
 else()
@@ -44,6 +45,7 @@ add_library(ark_native
     cpp/src/done_condition.cpp
     cpp/src/evaluation.cpp
     cpp/src/file_system.cpp
+    cpp/src/github_agent.cpp
     cpp/src/http.cpp
     cpp/src/kernel.cpp
     cpp/src/message.cpp
@@ -61,7 +63,7 @@ target_compile_features(ark_native PUBLIC cxx_std_20)
 target_include_directories(ark_native PUBLIC cpp/include)
 target_link_libraries(ark_native PUBLIC nlohmann_json::nlohmann_json
     PRIVATE CURL::libcurl LibXml2::LibXml2 OpenSSL::Crypto Threads::Threads
-    ${ARK_SQLITE_TARGET} PkgConfig::HIREDIS)
+    ${ARK_SQLITE_TARGET} PkgConfig::HIREDIS PkgConfig::LIBGIT2)
 set_target_properties(ark_native PROPERTIES CXX_EXTENSIONS OFF)
 
 add_library(ark_api STATIC cpp/src/api_server.cpp)
@@ -113,6 +115,9 @@ if(BUILD_TESTING)
     add_executable(ark_web_search_tests cpp/tests/web_search_test.cpp)
     target_link_libraries(ark_web_search_tests PRIVATE ark_native)
     add_test(NAME ark_web_search_tests COMMAND ark_web_search_tests)
+    add_executable(ark_github_tests cpp/tests/github_test.cpp)
+    target_link_libraries(ark_github_tests PRIVATE ark_native)
+    add_test(NAME ark_github_tests COMMAND ark_github_tests)
     add_executable(ark_storage_tests cpp/tests/storage_test.cpp)
     target_link_libraries(ark_storage_tests PRIVATE ark_native)
     add_test(NAME ark_storage_tests COMMAND ark_storage_tests)
