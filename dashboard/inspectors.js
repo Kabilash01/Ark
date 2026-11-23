@@ -24,6 +24,7 @@ export function inspectors({ create, request, badge, eventRow, title, labelById,
     const anchor = current?.anchor;
     current = undefined;
     clearTimeout(taskRefresh);
+    graphObserver?.disconnect();
     if (anchor?.dataset.target) {
       document.querySelector(`button[data-target="${CSS.escape(anchor.dataset.target)}"]`)?.focus();
     } else if (anchor?.isConnected) anchor.focus();
@@ -50,11 +51,22 @@ export function inspectors({ create, request, badge, eventRow, title, labelById,
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  const svg = (tag, attributes = {}) => {
+    const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, value);
+    return node;
+  };
+  let graphObserver;
+
   function taskGraph(plan, results) {
+    graphObserver?.disconnect();
     if (!Array.isArray(plan) || !plan.length) return create("p", "empty", "No plan available yet.");
     const graph = create("div", "dag");
+    const connections = svg("svg", { class: "dag-connections", "aria-hidden": "true" });
+    graph.append(connections);
     let remaining = [...plan];
     const placed = new Set();
+    const nodes = new Map();
     const dependencies = (task) => Array.isArray(task.depends_on) ? task.depends_on : [];
     while (remaining.length) {
       let layer = remaining.filter((task) => dependencies(task).every((id) => placed.has(id)));
@@ -64,16 +76,42 @@ export function inspectors({ create, request, badge, eventRow, title, labelById,
         const node = create("article", "dag-node");
         const actor = labelById.get(task.agent) || title(task.agent);
         const taskStatus = results?.[task.task_id]?.status;
+        node.dataset.status = taskStatus?.toLowerCase() || "pending";
+        node.dataset.taskId = task.task_id;
         node.append(create("strong", "", task.task_id), create("span", "version", actor));
         if (taskStatus) node.append(badge(taskStatus.toLowerCase()));
         const parents = dependencies(task);
         if (parents.length) node.append(create("p", "", `Depends on ${parents.join(", ")}`));
         placed.add(task.task_id);
+        nodes.set(task.task_id, node);
         row.append(node);
       }
       graph.append(row);
       remaining = remaining.filter((task) => !placed.has(task.task_id));
     }
+    const draw = () => {
+      if (!graph.isConnected) return;
+      const origin = graph.getBoundingClientRect();
+      connections.setAttribute("viewBox", `0 0 ${origin.width} ${origin.height}`);
+      const edges = [];
+      for (const task of plan) {
+        const to = nodes.get(task.task_id).getBoundingClientRect();
+        for (const id of dependencies(task)) {
+          const from = nodes.get(id)?.getBoundingClientRect();
+          if (!from) continue;
+          const x1 = from.left + from.width / 2 - origin.left;
+          const x2 = to.left + to.width / 2 - origin.left;
+          const y1 = from.bottom - origin.top;
+          const y2 = to.top - origin.top;
+          const middle = (y1 + y2) / 2;
+          edges.push(svg("path", { d: `M${x1},${y1} C${x1},${middle} ${x2},${middle} ${x2},${y2 - 3}` }),
+            svg("path", { d: `M${x2 - 4},${y2 - 7} L${x2},${y2 - 3} L${x2 + 4},${y2 - 7}` }));
+        }
+      }
+      connections.replaceChildren(...edges);
+    };
+    graphObserver = new ResizeObserver(draw);
+    graphObserver.observe(graph);
     return graph;
   }
 
@@ -153,20 +191,55 @@ export function inspectors({ create, request, badge, eventRow, title, labelById,
     return wrap;
   }
 
+  function scoreTimeline(history) {
+    const observations = history.filter((row) => Number.isFinite(row.score) && row.score >= 0 && row.score <= 1);
+    if (!observations.length) return create("p", "empty", "No measured ARKBench scores for this agent.");
+    const wrap = create("div", "score-history");
+    const chart = svg("svg", { viewBox: "0 0 640 190", role: "img", "aria-label": "ARKBench scores on a scale from zero to one" });
+    const left = 36, right = 614, top = 12, bottom = 156;
+    const y = (value) => bottom - value * (bottom - top);
+    const first = new Date(observations[0].time).valueOf();
+    const last = new Date(observations.at(-1).time).valueOf();
+    const x = (row, i) => Number.isFinite(first) && last > first
+      ? left + (right - left) * (new Date(row.time).valueOf() - first) / (last - first)
+      : observations.length === 1 ? (left + right) / 2 : left + (right - left) * i / (observations.length - 1);
+    for (const tick of [0, 0.5, 1]) {
+      chart.append(svg("line", { x1: left, x2: right, y1: y(tick), y2: y(tick), class: "chart-grid" }));
+      const label = svg("text", { x: left - 7, y: y(tick) + 4, "text-anchor": "end" });
+      label.textContent = tick.toFixed(1);
+      chart.append(label);
+    }
+    const path = observations.map((row, i) => `${x(row, i)},${y(row.score)}`).join(" ");
+    chart.append(svg("polyline", { points: path, class: "chart-line" }));
+    const key = create("ul", "score-points");
+    observations.forEach((row, i) => {
+      const point = svg("circle", { cx: x(row, i), cy: y(row.score), r: 5, class: "chart-point" });
+      const note = svg("title");
+      const date = new Date(row.time);
+      const displayDate = Number.isNaN(date.valueOf()) ? "Date unavailable" : dateFormat.format(date);
+      note.textContent = `v${row.version} · ARKBench ${row.dataset} · ${row.score.toFixed(3)} · ${row.samples} cases · ${displayDate}`;
+      point.append(note);
+      chart.append(point);
+      key.append(create("li", "", note.textContent));
+    });
+    wrap.append(chart, key);
+    return wrap;
+  }
+
   async function loadVersions(view, message = "") {
     try {
-      const [entries, registry] = await Promise.all([
+      const [entries, registry, history] = await Promise.all([
         request(`/agents/${encodeURIComponent(view.id)}/versions`).catch((error) => {
           if (error.status === 404) return [];
           throw error;
-        }), request("/agents"),
+        }), request("/agents"), request(`/agents/${encodeURIComponent(view.id)}/benchmark-history`).catch(() => []),
       ]);
       if (current !== view) return;
       const active = registry.find((agent) => agent.name === view.id)?.version;
       const note = create("p", "empty", message);
       note.hidden = !message;
       note.setAttribute("role", "status");
-      body.replaceChildren(note, versionTable(entries, active, view));
+      body.replaceChildren(note, section("ARKBench score timeline", scoreTimeline(history)), versionTable(entries, active, view));
     } catch (error) {
       if (current === view) body.replaceChildren(create("p", "task-error", error.message));
     }

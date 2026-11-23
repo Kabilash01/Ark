@@ -30,7 +30,7 @@ const eventNames = {
   plan_ready: "Plan ready",
   agent_started: "Agent started", agent_done: "Agent finished", agent_thought: "Agent activity",
   tool_called: "Tool called", tool_result: "Tool result", memory_written: "Memory written",
-  conflict_detected: "Priority conflict", version_updated: "Version updated",
+  conflict_detected: "Conflict detected", version_updated: "Version updated",
 };
 const statusLabels = {
   idle: "Idle", running: "Running", offline: "Offline", unregistered: "Unregistered", unknown: "Unknown",

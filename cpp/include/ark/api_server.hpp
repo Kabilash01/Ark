@@ -19,6 +19,7 @@ struct ApiServices {
     std::function<void(const Json&)> log_conflict;
     std::function<Json(std::string_view)> version_events;
     std::function<Json(std::string_view, std::string_view)> rollback;
+    std::function<Json(std::string_view)> benchmark_history;
 };
 
 bool serve_api(int port, ApiServices services, std::stop_token stop = {},

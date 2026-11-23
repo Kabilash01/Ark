@@ -144,12 +144,24 @@ dialog textarea { width: 100%; resize: vertical; padding: 9px; border: 1px solid
 .inspector-section { display: grid; gap: 8px; min-width: 0; }
 .inspector-section h3 { font-size: 13px; font-weight: 700; }
 .inspection-code { max-height: 300px; overflow: auto; padding: 11px 13px; margin: 0; border: 1px solid var(--line); border-radius: 8px; background: #f5f7f3; font: 12px/1.5 ui-monospace, Consolas, monospace; }
-.dag { display: grid; gap: 8px; }
+.dag { display: grid; gap: 24px; position: relative; }
 .dag-layer { display: flex; gap: 8px; flex-wrap: wrap; position: relative; }
-.dag-layer + .dag-layer { padding-top: 10px; border-top: 1px dashed #bdcdbf; }
+.dag-connections { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke: #52816b; stroke-width: 1.5; pointer-events: none; }
 .dag-node { min-width: 140px; flex: 1 1 150px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #f6f8f4; overflow-wrap: anywhere; }
 .dag-node strong { margin-right: 5px; color: var(--green-dark); font-family: ui-monospace, monospace; font-size: 12px; }
 .dag-node p { margin-top: 4px; color: var(--muted); font-size: 11px; }
+.dag-node[data-status="running"] { border-color: #347756; background: #e1f2e5; }
+@media (prefers-reduced-motion: no-preference) {
+  .dag-node[data-status="running"] { animation: working-pulse 1.5s ease-in-out infinite; }
+}
+@keyframes working-pulse { 50% { box-shadow: 0 0 0 4px #34775640; } }
+.score-history { padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #f6f8f4; }
+.score-history svg { width: 100%; max-height: 205px; }
+.score-history text { fill: var(--muted); font: 12px system-ui, sans-serif; }
+.chart-grid { stroke: var(--line); stroke-width: 1; }
+.chart-line { fill: none; stroke: #347756; stroke-width: 2; }
+.chart-point { fill: #347756; stroke: white; stroke-width: 1.5; }
+.score-points { display: grid; gap: 4px; padding-left: 20px; font-size: 12px; color: var(--muted); }
 .inspect-events { max-height: 210px; overflow: auto; border-radius: 8px; padding: 4px 12px; background: #14261e; }
 .inspect-events .empty { color: #adccba; }
 .inspect-events .event:last-child { border-bottom: 0; }

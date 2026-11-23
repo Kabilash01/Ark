@@ -945,6 +945,9 @@ int serve(int port) {
             ark::Redis redis(redis_port, redis_db);
             return ark::AgentVersioner(redis).rollback(name, version);
         },
+        [](std::string_view name) {
+            return ark::benchmark_history(env("ARK_BENCHMARK_RESULTS", "benchmarks/arkbench/results"), name);
+        },
     });
     if (!listened) {
         std::cerr << "Could not listen on 127.0.0.1:" << port << '\n';

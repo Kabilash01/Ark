@@ -41,6 +41,16 @@ the submitted solution. The results record completion, elapsed time, and the
 evaluator's ratings alongside the evidence checks. This design supports
 comparisons between recorded configurations using the same dataset.
 
+![A research, coding, and evaluation DAG. The coding node is running.](figures/ark_runtime_dag.png)
+
+The task inspector derives the displayed edges from the validated plan.
+The figure shows a three-stage workflow with a live-state fixture.
+
+![The Research Agent v1.0.0 ARKBench point with a mean score of 0.518.](figures/ark_benchmark_timeline.png)
+
+The version panel groups scored cases by producer and revision for each
+completed benchmark run. This figure shows the first recorded baseline.
+
 ## Methods
 
 ### Local inference architecture

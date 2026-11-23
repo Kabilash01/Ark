@@ -473,6 +473,9 @@ bool serve_api(int port, ApiServices services, std::stop_token stop, const std::
         }
         reply(response, history);
     }));
+    server.Get(R"(/agents/([a-zA-Z0-9_-]+)/benchmark-history)", route([&](const HttpRequest& request, HttpResponse& response) {
+        reply(response, services.benchmark_history ? services.benchmark_history(request.matches[1].str()) : Json::array());
+    }));
     if (services.rollback) {
         server.Post(R"(/agents/([a-zA-Z0-9_-]+)/versions/([0-9]+\.[0-9]+\.[0-9]+)/rollback)",
             route([&](const HttpRequest& request, HttpResponse& response) {

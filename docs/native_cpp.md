@@ -702,3 +702,12 @@ decision in both runs. SQLite changed from a sort to a covering-index scan.
   the active embedding model.
 - A failed local model request names the unavailable Ollama or llama.cpp
   endpoint. The supervisor reports a failed task after bounded retries.
+
+## Day 62 dashboard graphs
+
+The task inspector draws arrows from each prerequisite to its dependent
+task. Running nodes follow worker events and honor reduced-motion settings.
+Each agent's version panel charts measured ARKBench scores by run date and
+producer version. It uses completed reports from `ARK_BENCHMARK_RESULTS`
+(defaults to `benchmarks/arkbench/results`). Tooltips and a text list give
+the dataset version, agent version, score, and number of scored cases.

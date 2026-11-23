@@ -1,10 +1,14 @@
 #include "ark/benchmark.hpp"
+#include "ark/research.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <map>
 #include <regex>
 #include <set>
 #include <stdexcept>
+#include <tuple>
 
 namespace ark {
 namespace {
@@ -220,6 +224,41 @@ Json run_benchmark(const Json& suite, const BenchmarkDispatch& dispatch, const T
     }
     report["finished_at"] = utc_timestamp();
     return report;
+}
+
+Json benchmark_history(const std::filesystem::path& directory, std::string_view agent) {
+    auto history = Json::array();
+    if (!std::filesystem::is_directory(directory)) return history;
+    const auto prefix = std::string(agent) + "@";
+    for (const auto& file : std::filesystem::directory_iterator(directory)) {
+        if (!file.is_regular_file() || file.path().extension() != ".json") continue;
+        try {
+            const auto report = read_json(file.path());
+            if (report.value("benchmark", "") != "ARKBench" || !report.contains("finished_at")) continue;
+            std::map<std::string, std::pair<double, int>> groups;
+            for (const auto& row : report.at("results")) {
+                const auto version = row.value("agent_version", Json(nullptr));
+                const auto score = row.value("score", Json(nullptr));
+                if (!version.is_string() || !version.get_ref<const std::string&>().starts_with(prefix) || !score.is_number()) continue;
+                const auto value = score.get<double>();
+                if (!std::isfinite(value) || value < 0 || value > 1) continue;
+                auto& [sum, n] = groups[version.get_ref<const std::string&>().substr(prefix.size())];
+                sum += value;
+                ++n;
+            }
+            for (const auto& [version, totals] : groups) {
+                history.push_back({{"version", version}, {"score", totals.first / totals.second}, {"samples", totals.second},
+                    {"time", report.at("finished_at")}, {"dataset", report.at("dataset_version")}});
+            }
+        } catch (const std::exception&) {
+            // Another producer may still be writing this report.
+        }
+    }
+    std::sort(history.begin(), history.end(), [](const Json& left, const Json& right) {
+        return std::tie(left.at("time"), left.at("dataset"), left.at("version"))
+             < std::tie(right.at("time"), right.at("dataset"), right.at("version"));
+    });
+    return history;
 }
 
 } // namespace ark
