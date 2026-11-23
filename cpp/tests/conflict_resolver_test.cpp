@@ -1,8 +1,11 @@
 #include "ark/conflict_resolver.hpp"
 
 #include <array>
+#include <chrono>
+#include <future>
 #include <iostream>
 #include <stdexcept>
+#include <thread>
 
 namespace {
 
@@ -42,12 +45,50 @@ void ties_rotate_domains_and_preserve_fifo() {
     }
 }
 
+void resource_capacity_and_fifo() {
+    using namespace std::chrono_literals;
+    for (const auto& [tool, capacity] : std::array{
+            std::pair{ark::Tool::browser, 1}, std::pair{ark::Tool::terminal, 2}, std::pair{ark::Tool::arxiv, 3}}) {
+        auto& semaphore = ark::tool_semaphore(tool);
+        std::vector<ark::ToolSemaphore::Permit> permits;
+        std::vector<std::size_t> order;
+        std::mutex order_mutex;
+        std::vector<std::future<void>> workers;
+        auto enter = [&](std::size_t id) {
+            workers.push_back(std::async(std::launch::async, [&, id] {
+                const auto permit = semaphore.acquire();
+                const std::lock_guard lock(order_mutex);
+                order.push_back(id);
+            }));
+            const auto deadline = std::chrono::steady_clock::now() + 1s;
+            while (semaphore.queued() < id && std::chrono::steady_clock::now() < deadline) std::this_thread::sleep_for(1ms);
+            return semaphore.queued() == id;
+        };
+        for (int i = 0; i < capacity; ++i) permits.push_back(semaphore.acquire());
+        const bool first_waited = enter(1);
+        const bool second_waited = enter(2);
+        permits.pop_back();
+        for (auto& worker : workers) worker.get();
+        check(first_waited && second_waited && order == std::vector<std::size_t>{1, 2},
+              "saturated tool did not resume its users in FIFO order");
+    }
+
+    ark::ToolSemaphore semaphore(1);
+    try {
+        const auto permit = semaphore.acquire();
+        throw std::runtime_error("simulated tool failure");
+    } catch (const std::runtime_error&) {}
+    const auto permit = semaphore.acquire();
+    check(semaphore.queued() == 0, "exception path lost its permit");
+}
+
 } // namespace
 
 int main() {
     try {
         higher_priority_then_earlier_timestamp();
         ties_rotate_domains_and_preserve_fifo();
+        resource_capacity_and_fifo();
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

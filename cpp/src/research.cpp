@@ -1,4 +1,5 @@
 #include "ark/research.hpp"
+#include "ark/conflict_resolver.hpp"
 #include "ark/privacy.hpp"
 #include "ark/kernel.hpp"
 #include "ark/vector_memory.hpp"
@@ -227,6 +228,7 @@ Json ResearchAgent::read_arxiv(const std::string& params) {
     static std::chrono::steady_clock::time_point last;
     Response response{};
     {
+        const auto permit = tool_semaphore(Tool::arxiv).acquire();
         const std::lock_guard lock(mutex);
         if (last != std::chrono::steady_clock::time_point{}) {
             std::this_thread::sleep_until(last + config_.arxiv_interval);

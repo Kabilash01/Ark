@@ -1,4 +1,5 @@
 #include "ark/browser.hpp"
+#include "ark/conflict_resolver.hpp"
 
 #include "ark/privacy.hpp"
 
@@ -151,9 +152,10 @@ std::string browser_url_host(std::string_view url) { return url_host(url); }
 
 struct Browser::Impl {
     explicit Impl(BrowserOptions input)
-        : options(std::move(input)),
+        : permit(tool_semaphore(Tool::browser).acquire()), options(std::move(input)),
           privacy(TaskPrivacy::resolve(options.privacy, {{"privacy", options.private_mode}, {"airgap_mode", options.airgap}})) {}
 
+    ToolSemaphore::Permit permit;
     BrowserOptions options;
     TaskPrivacy privacy;
     std::string profile;

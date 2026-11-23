@@ -1,4 +1,5 @@
 #include "ark/sandbox.hpp"
+#include "ark/conflict_resolver.hpp"
 
 #include <algorithm>
 #include <regex>
@@ -138,6 +139,7 @@ SandboxResult DockerSandbox::run(std::string_view executable, const Json& argume
     if (timeout < std::chrono::seconds(1) || timeout > std::chrono::seconds(180)) {
         throw std::invalid_argument("Sandbox timeout must be between 1 and 180 seconds");
     }
+    const auto permit = tool_semaphore(Tool::terminal).acquire();
     const auto name = "ark-run-" + random_uuid();
     const auto container = "/containers/" + name;
     const Json specification{

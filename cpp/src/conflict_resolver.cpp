@@ -3,8 +3,55 @@
 #include <algorithm>
 #include <map>
 #include <stdexcept>
+#include <utility>
 
 namespace ark {
+
+ToolSemaphore::Permit::Permit(Permit&& other) noexcept : owner_(std::exchange(other.owner_, nullptr)) {}
+
+ToolSemaphore::Permit::~Permit() {
+    if (owner_) owner_->release();
+}
+
+ToolSemaphore::ToolSemaphore(std::size_t capacity) : available_(capacity) {
+    if (capacity == 0) throw std::invalid_argument("Tool capacity must be positive");
+}
+
+ToolSemaphore::Permit ToolSemaphore::acquire() {
+    std::unique_lock lock(mutex_);
+    const auto ticket = next_++;
+    ready_.wait(lock, [&] { return available_ > 0 && ticket == serving_; });
+    --available_;
+    ++serving_;
+    lock.unlock();
+    ready_.notify_all();
+    return Permit(*this);
+}
+
+std::size_t ToolSemaphore::queued() const {
+    const std::lock_guard lock(mutex_);
+    return next_ - serving_;
+}
+
+void ToolSemaphore::release() {
+    {
+        const std::lock_guard lock(mutex_);
+        ++available_;
+    }
+    ready_.notify_all();
+}
+
+ToolSemaphore& tool_semaphore(Tool tool) {
+    static ToolSemaphore browser(1);
+    static ToolSemaphore terminal(2);
+    static ToolSemaphore arxiv(3);
+    switch (tool) {
+    case Tool::browser: return browser;
+    case Tool::terminal: return terminal;
+    case Tool::arxiv: return arxiv;
+    }
+    throw std::invalid_argument("Unknown limited tool");
+}
 
 bool ConflictResolver::detect_priority_conflict(std::span<const PendingTask> pending) {
     return pending.size() > 1;

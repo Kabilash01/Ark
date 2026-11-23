@@ -468,3 +468,11 @@ import and a suggested pip command for review. Command execution and error
 parsing require no model. The CLI exits with 0 on success, 124 on timeout,
 and 1 on other failures. Set `ARK_TEST_DOCKER_SOCKET` to test the Terminal Agent
 against a local Docker Engine.
+
+## Day 46 tool resource limits
+
+Each ARK runtime process shares one Chromium session slot, two Docker job
+slots, and three arXiv API slots. Requests for the same tool wait in arrival
+order when its slots are full. Browser closure, container cleanup, and request
+completion release their slots, including on errors. arXiv requests still
+follow the runtime's paced, serial request policy.
