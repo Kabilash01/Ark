@@ -449,3 +449,22 @@ sets the extraction limit and requires that many results before completion.
 Use `--privacy` or `--airgap` before the instruction to apply the same
 privacy policy as the Browser Tool. The requested host must also be allowed
 by that policy. [arXiv recent submissions](https://arxiv.org/list/cs.CL/recent)
+
+## Day 45 terminal agent
+
+```bash
+build/ark-cpp terminal 'printf "%s\n" "hello from the sandbox"'
+printf '%s\n' '{"command":"sleep 5","timeout_seconds":1}' | build/ark-cpp terminal
+```
+
+The agent runs the supplied Bash command in a fresh container using the
+[Day 24 sandbox](#day-24-sandbox). It uses the same Docker socket and image
+settings. A custom image must provide `/bin/bash`. The timeout defaults to 30
+seconds and accepts whole seconds from 1 through 180 in the JSON request.
+
+The result contains `stdout`, `stderr`, `exit_code`, and `timed_out`. If a
+command fails with `ModuleNotFoundError` on stderr, the result adds the missing
+import and a suggested pip command for review. Command execution and error
+parsing require no model. The CLI exits with 0 on success, 124 on timeout,
+and 1 on other failures. Set `ARK_TEST_DOCKER_SOCKET` to test the Terminal Agent
+against a local Docker Engine.

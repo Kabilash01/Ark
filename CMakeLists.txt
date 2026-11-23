@@ -53,6 +53,7 @@ add_library(ark_native
     cpp/src/runtime_files.cpp
     cpp/src/sandbox.cpp
     cpp/src/storage.cpp
+    cpp/src/terminal.cpp
     cpp/src/vector_memory.cpp
     cpp/src/versions.cpp
     cpp/src/web_search.cpp)

@@ -108,29 +108,41 @@ Response DockerSandbox::request(std::string_view route, std::string_view method,
 
 SandboxResult DockerSandbox::run_python(std::string_view code, const SandboxWorkspace& workspace,
                                         std::chrono::seconds timeout) const {
-    return run({{"code", code}, {"files", workspace.files()}, {"packages", workspace.packages()}, {"tests", false}},
-               timeout);
+    return run_python_bundle({{"code", code}, {"files", workspace.files()}, {"packages", workspace.packages()},
+                              {"tests", false}}, timeout);
 }
 
 SandboxResult DockerSandbox::run_tests(const SandboxWorkspace& workspace, std::chrono::seconds timeout) const {
-    return run({{"code", ""}, {"files", workspace.files()}, {"packages", workspace.packages()}, {"tests", true}},
-               timeout);
+    return run_python_bundle({{"code", ""}, {"files", workspace.files()}, {"packages", workspace.packages()},
+                              {"tests", true}}, timeout);
 }
 
-SandboxResult DockerSandbox::run(const Json& input, std::chrono::seconds timeout) const {
-    if (timeout < std::chrono::seconds(1) || timeout > std::chrono::seconds(180)) {
-        throw std::invalid_argument("Sandbox timeout must be between 1 and 180 seconds");
+SandboxResult DockerSandbox::run_command(std::string_view command, std::chrono::seconds timeout) const {
+    if (command.find_first_not_of(" \t\r\n") == std::string_view::npos || command.size() > max_bundle_bytes
+        || command.find('\0') != std::string_view::npos) {
+        throw std::invalid_argument("Sandbox command must contain non-whitespace text, be at most 64 KiB, and contain no NUL bytes");
     }
+    return run("/bin/bash", {"--noprofile", "--norc", "-c", command}, timeout);
+}
+
+SandboxResult DockerSandbox::run_python_bundle(const Json& input, std::chrono::seconds timeout) const {
     const auto bundle = input.dump();
     if (bundle.size() > max_bundle_bytes) {
         throw std::invalid_argument("Sandbox request exceeds 64 KiB");
+    }
+    return run("/usr/local/bin/python", {"-I", "-B", "-u", "-c", launcher, bundle}, timeout);
+}
+
+SandboxResult DockerSandbox::run(std::string_view executable, const Json& arguments,
+                                std::chrono::seconds timeout) const {
+    if (timeout < std::chrono::seconds(1) || timeout > std::chrono::seconds(180)) {
+        throw std::invalid_argument("Sandbox timeout must be between 1 and 180 seconds");
     }
     const auto name = "ark-run-" + random_uuid();
     const auto container = "/containers/" + name;
     const Json specification{
         {"Image", image_}, {"User", "65534:65534"}, {"WorkingDir", "/work"},
-        {"Entrypoint", Json::array({"/usr/local/bin/python"})},
-        {"Cmd", {"-I", "-B", "-u", "-c", launcher, bundle}},
+        {"Entrypoint", Json::array({executable})}, {"Cmd", arguments},
         {"Tty", false}, {"NetworkDisabled", true},
         {"Env", {"HOME=/tmp", "OPENBLAS_NUM_THREADS=1", "OMP_NUM_THREADS=1"}},
         {"Labels", {{"io.ark.sandbox", "true"}}},

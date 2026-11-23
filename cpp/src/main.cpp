@@ -13,6 +13,7 @@
 #include "ark/runtime_files.hpp"
 #include "ark/sandbox.hpp"
 #include "ark/storage.hpp"
+#include "ark/terminal.hpp"
 #include "ark/vector_memory.hpp"
 #include "ark/versions.hpp"
 #include "ark/web_search.hpp"
@@ -62,6 +63,11 @@ ark::ResearchConfig config(bool chat_required = true) {
 
 std::filesystem::path skills_path() { return env("ARK_PROCEDURAL_DB", "data/procedural_cpp.db"); }
 
+ark::DockerSandbox docker_sandbox(ark::Transport transport) {
+    return ark::DockerSandbox(std::move(transport), env("ARK_DOCKER_SOCKET", "/var/run/docker.sock"),
+                              env("ARK_SANDBOX_IMAGE", "python:3.11-slim"));
+}
+
 int choose_models(const char* override_vram) {
     const auto dir = config_dir();
     double vram = 0;
@@ -95,14 +101,22 @@ int run_sandbox() {
         workspace.install_package(package);
     }
     ark::CurlTransport http;
-    const ark::DockerSandbox sandbox(std::ref(http), env("ARK_DOCKER_SOCKET", "/var/run/docker.sock"),
-                                     env("ARK_SANDBOX_IMAGE", "python:3.11-slim"));
+    const auto sandbox = docker_sandbox(std::ref(http));
     const auto timeout = std::chrono::seconds(input.value("timeout_seconds", 30));
     const auto output = input.value("tests", false)
         ? sandbox.run_tests(workspace, timeout)
         : sandbox.run_python(input.at("code").get<std::string>(), workspace, timeout);
     std::cout << output.json().dump(2, ' ', false, ark::Json::error_handler_t::replace) << '\n';
     return output.exit_code == 0 ? 0 : output.timed_out ? 124 : 1;
+}
+
+int run_terminal(const char* command) {
+    auto payload = command ? ark::Json{{"command", command}} : ark::Json::parse(std::cin);
+    ark::CurlTransport http;
+    const ark::TerminalAgent agent(docker_sandbox(std::ref(http)));
+    const auto result = agent.run(ark::make_message("user", "terminal_agent", "EXECUTE", std::move(payload)));
+    std::cout << result.dump(2, ' ', false, ark::Json::error_handler_t::replace) << '\n';
+    return result.at("status") == "DONE" ? 0 : result.at("output").value("timed_out", false) ? 124 : 1;
 }
 
 int run_browser() {
@@ -214,8 +228,7 @@ ark::Json run_file_operation(ark::Json payload) {
 
 ark::Json run_coding(const ark::Transport& http, const ark::ResearchConfig& settings, ark::Json message,
                      const ark::AgentProfile& profile) {
-    const ark::DockerSandbox sandbox(std::ref(http), env("ARK_DOCKER_SOCKET", "/var/run/docker.sock"),
-                                     env("ARK_SANDBOX_IMAGE", "python:3.11-slim"));
+    const auto sandbox = docker_sandbox(std::ref(http));
     const ark::CodingAgent worker(std::ref(http), settings.ollama_url, profile,
                                   [&](const auto& workspace) { return sandbox.run_tests(workspace); });
     return worker.run(std::move(message));
@@ -647,8 +660,7 @@ int benchmark(const std::filesystem::path& suite_path, const std::filesystem::pa
     const auto suite = ark::read_json(suite_path);
     const auto settings = config();
     ark::CurlTransport http;
-    const ark::DockerSandbox sandbox(std::ref(http), env("ARK_DOCKER_SOCKET", "/var/run/docker.sock"),
-                                     env("ARK_SANDBOX_IMAGE", "python:3.11-slim"));
+    const auto sandbox = docker_sandbox(std::ref(http));
     const auto report = ark::run_benchmark(suite,
         [&](const ark::Json& dag) { return dispatch(dag, settings, "BENCHMARK"); },
         [&](const ark::SandboxWorkspace& workspace) { return sandbox.run_tests(workspace); },
@@ -807,6 +819,8 @@ int main(int argc, char** argv) {
                      "       ark-cpp memory search <query> | show <tier> [task_id]\n"
                      "       ark-cpp skill-add < skill.json\n"
                      "       ark-cpp sandbox < workspace.json\n"
+                     "       ark-cpp terminal 'bash command'\n"
+                     "       ark-cpp terminal < request.json\n"
                      "       ark-cpp benchmark [suite.json] [report.json]\n"
                      "       ark-cpp browser < actions.json\n"
                      "       ark-cpp serve [port]\n"
@@ -834,6 +848,9 @@ int main(int argc, char** argv) {
         }
         if (command == "sandbox" && argc == 2) {
             return run_sandbox();
+        }
+        if (command == "terminal" && argc <= 3) {
+            return run_terminal(argc == 3 ? argv[2] : nullptr);
         }
         if (command == "files" && argc == 2) {
             return print_run(run_file_operation(ark::Json::parse(std::cin)));

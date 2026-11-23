@@ -38,13 +38,16 @@ public:
                              std::chrono::seconds timeout = std::chrono::seconds(30)) const;
     SandboxResult run_tests(const SandboxWorkspace& workspace,
                             std::chrono::seconds timeout = std::chrono::seconds(30)) const;
+    SandboxResult run_command(std::string_view command,
+                              std::chrono::seconds timeout = std::chrono::seconds(30)) const;
 
 private:
     Transport transport_;
     std::filesystem::path socket_;
     std::string image_;
 
-    SandboxResult run(const Json& input, std::chrono::seconds timeout) const;
+    SandboxResult run_python_bundle(const Json& input, std::chrono::seconds timeout) const;
+    SandboxResult run(std::string_view executable, const Json& arguments, std::chrono::seconds timeout) const;
     Response request(std::string_view route, std::string_view method, const std::string& body = {},
                      std::chrono::seconds timeout = std::chrono::seconds(30)) const;
 };
