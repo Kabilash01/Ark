@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
+#include <mutex>
 #include <stdexcept>
 
 namespace ark {
@@ -39,8 +41,14 @@ void validate_limit(int limit) {
 
 } // namespace
 
+struct Embeddings::Cache {
+    std::mutex mutex;
+    std::string text;
+    std::vector<float> vector;
+};
+
 Embeddings::Embeddings(Transport transport, std::string_view local_url, std::string model)
-    : transport_(std::move(transport)), url_(local_base_url(local_url)), model_(std::move(model)) {
+    : transport_(std::move(transport)), url_(local_base_url(local_url)), model_(std::move(model)), cache_(std::make_shared<Cache>()) {
     if (model_.empty()) {
         throw std::invalid_argument("Embedding model must not be empty");
     }
@@ -50,7 +58,14 @@ std::vector<std::vector<float>> Embeddings::encode(const std::vector<std::string
     if (texts.empty()) {
         return {};
     }
-    const auto llama = configured_llama_url();
+    std::unique_lock lock(cache_->mutex, std::defer_lock);
+    const bool single = texts.size() == 1;
+    if (single) {
+        lock.lock();
+        if (!cache_->vector.empty() && cache_->text == texts.front()) return {cache_->vector};
+    }
+    const auto* dedicated = std::getenv("ARK_LLAMA_EMBED_URL");
+    const auto llama = dedicated && *dedicated ? std::string(dedicated) : configured_llama_url();
     const LocalInference backend(transport_, llama.empty() ? url_ : llama,
                                  llama.empty() ? InferenceProvider::ollama : InferenceProvider::llama_cpp);
     const auto vectors = backend.embed(model_, texts);
@@ -63,6 +78,10 @@ std::vector<std::vector<float>> Embeddings::encode(const std::vector<std::string
             || !std::all_of(vector.begin(), vector.end(), [](float value) { return std::isfinite(value); })) {
             throw std::runtime_error("Embedding response contained an invalid vector");
         }
+    }
+    if (single) {
+        cache_->text = texts.front();
+        cache_->vector = vectors.front();
     }
     return vectors;
 }

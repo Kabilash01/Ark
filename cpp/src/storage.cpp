@@ -416,6 +416,9 @@ EpisodicMemory::EpisodicMemory(const std::filesystem::path& db) : impl_(std::mak
             agent_version TEXT NOT NULL, intent TEXT NOT NULL, summary TEXT NOT NULL,
             quality_score REAL, timestamp TEXT NOT NULL, metadata TEXT
         );
+        CREATE INDEX IF NOT EXISTS episodes_recent ON episodes(timestamp DESC, id DESC);
+        CREATE INDEX IF NOT EXISTS episodes_agent_recent ON episodes(agent_name, timestamp DESC, id DESC);
+        CREATE INDEX IF NOT EXISTS archived_recent ON episodes_archive(timestamp DESC, id DESC);
         CREATE TRIGGER IF NOT EXISTS episodes_retention AFTER INSERT ON episodes
         WHEN new.id - (SELECT min(id) FROM episodes) >= 10000 BEGIN
             INSERT INTO episodes_archive SELECT * FROM episodes WHERE id <= (

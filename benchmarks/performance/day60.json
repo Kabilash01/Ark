@@ -1,0 +1,123 @@
+{
+  "before": {
+    "profile": "RTX 5060 Laptop GPU, Qwen3-4B Q4_K_M; local llama.cpp and Qdrant",
+    "research": {
+      "seconds": 24.532484347000718,
+      "exit_code": 0,
+      "status": "DONE",
+      "detail": null,
+      "citations": 5
+    },
+    "coding": {
+      "seconds": 6.294228692000615,
+      "exit_code": 0,
+      "status": "DONE",
+      "detail": null,
+      "docker_passed": true
+    },
+    "evaluation": {
+      "seconds": 2.845056291000219,
+      "exit_code": 1,
+      "status": "RETRY",
+      "detail": null
+    },
+    "memory": {
+      "timings": [
+        {
+          "seconds": 0.6069400380001753,
+          "exit_code": 0
+        },
+        {
+          "seconds": 0.040007681000133744,
+          "exit_code": 0
+        },
+        {
+          "seconds": 0.03761920599936275,
+          "exit_code": 0
+        },
+        {
+          "seconds": 0.03705619899847079,
+          "exit_code": 0
+        },
+        {
+          "seconds": 0.03646794499945827,
+          "exit_code": 0
+        },
+        {
+          "seconds": 0.038066818997322116,
+          "exit_code": 0
+        },
+        {
+          "seconds": 0.0365364219978801,
+          "exit_code": 0
+        }
+      ],
+      "median_seconds": 0.03761920599936275
+    }
+  },
+  "after": {
+    "profile": "RTX 5060 Laptop GPU, Qwen3-4B Q4_K_M; local llama.cpp and Qdrant",
+    "research": {
+      "seconds": 24.330895606999547,
+      "exit_code": 0,
+      "status": "DONE",
+      "detail": null,
+      "citations": 5
+    },
+    "coding": {
+      "seconds": 6.1587452109997685,
+      "exit_code": 0,
+      "status": "DONE",
+      "detail": null,
+      "docker_passed": true
+    },
+    "evaluation": {
+      "seconds": 2.81894450999971,
+      "exit_code": 1,
+      "status": "RETRY",
+      "detail": null
+    },
+    "memory": {
+      "timings": [
+        {
+          "seconds": 0.03577739500178723,
+          "exit_code": 0
+        },
+        {
+          "seconds": 0.03261063400350395,
+          "exit_code": 0
+        },
+        {
+          "seconds": 0.031784926999534946,
+          "exit_code": 0
+        },
+        {
+          "seconds": 0.02993476500341785,
+          "exit_code": 0
+        },
+        {
+          "seconds": 0.033003434000420384,
+          "exit_code": 0
+        },
+        {
+          "seconds": 0.03009711699996842,
+          "exit_code": 0
+        },
+        {
+          "seconds": 0.031711519997770665,
+          "exit_code": 0
+        }
+      ],
+      "median_seconds": 0.031784926999534946
+    }
+  },
+  "sqlite_ordering_plan": {
+    "before": [
+      "SCAN episodes",
+      "USE TEMP B-TREE FOR ORDER BY"
+    ],
+    "after": [
+      "SCAN episodes USING COVERING INDEX episodes_recent"
+    ]
+  }
+}

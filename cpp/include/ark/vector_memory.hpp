@@ -18,9 +18,11 @@ public:
     const std::string& model() const { return model_; }
 
 private:
+    struct Cache;
     Transport transport_;
     std::string url_;
     std::string model_;
+    std::shared_ptr<Cache> cache_;
 };
 
 struct SemanticRecord {

@@ -669,3 +669,19 @@ removes indexed vectors at least 30 days old with zero retrievals and
 procedural skills with observed success below 0.30. Skills linked to a
 conflict retain their review history. Semantic records created before the
 index was added enter retention tracking when re-ingested.
+
+## Day 60 native performance
+
+Set `ARK_LLAMA_EMBED_URL` to a separate loopback llama-server to keep the
+embedding model resident while the generation router switches models.
+One repeated single-text embedding is shared across copied encoders in
+the same operation. SQLite indexes support ordered recent episode reads.
+
+The end-to-end profile used five live arXiv abstracts, Qwen3-4B, a separate
+embedding server for the tuned run, local Qdrant, and Docker. Warm memory
+retrieval fell from 37.6 ms to 31.8 ms median. The first retrieval after a
+generation request fell from 607 ms to 36 ms. The other tuned timings were
+24.3 seconds for five-paper research, 6.2 seconds for the measured coding
+task, and 2.8 seconds for evaluation. The evaluator returned a valid retry
+decision in both runs. SQLite changed from a sort to a covering-index scan.
+[Raw performance profile](../benchmarks/performance/day60.json)
