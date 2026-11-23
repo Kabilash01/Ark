@@ -50,6 +50,7 @@ add_library(ark_native
     cpp/src/file_system.cpp
     cpp/src/github_agent.cpp
     cpp/src/http.cpp
+    cpp/src/inference.cpp
     cpp/src/kernel.cpp
     cpp/src/message.cpp
     cpp/src/privacy.cpp

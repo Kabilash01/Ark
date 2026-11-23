@@ -16,6 +16,7 @@ struct Request {
     std::vector<std::string> headers;
     std::chrono::seconds timeout{30};
     std::string unix_socket;
+    std::function<void(std::string_view)> on_chunk;
 };
 
 class TransientHttpError : public std::runtime_error {

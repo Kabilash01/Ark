@@ -1,0 +1,174 @@
+{
+  "cases": [
+    {
+      "id": "missing-colon",
+      "llama_cpp": {
+        "latency_ms": 162.98725,
+        "structured_output": true,
+        "tokens": 32,
+        "tokens_per_second": 223.54103420177825
+      },
+      "ollama": {
+        "latency_ms": 152.839769,
+        "structured_output": true,
+        "tokens": 33,
+        "tokens_per_second": 245.1271690040409
+      }
+    },
+    {
+      "id": "bad-indentation",
+      "llama_cpp": {
+        "latency_ms": 139.430726,
+        "structured_output": true,
+        "tokens": 36,
+        "tokens_per_second": 292.75473844455223
+      },
+      "ollama": {
+        "latency_ms": 135.287645,
+        "structured_output": true,
+        "tokens": 36,
+        "tokens_per_second": 302.4676317624621
+      }
+    },
+    {
+      "id": "unclosed-list",
+      "llama_cpp": {
+        "latency_ms": 167.229928,
+        "structured_output": true,
+        "tokens": 44,
+        "tokens_per_second": 293.35716576044314
+      },
+      "ollama": {
+        "latency_ms": 165.462043,
+        "structured_output": true,
+        "tokens": 44,
+        "tokens_per_second": 297.11059942063434
+      }
+    },
+    {
+      "id": "wrong-json-import",
+      "llama_cpp": {
+        "latency_ms": 144.790387,
+        "structured_output": true,
+        "tokens": 37,
+        "tokens_per_second": 287.6226390975041
+      },
+      "ollama": {
+        "latency_ms": 138.079729,
+        "structured_output": true,
+        "tokens": 37,
+        "tokens_per_second": 297.0241392320722
+      }
+    },
+    {
+      "id": "wrong-collections-symbol",
+      "llama_cpp": {
+        "latency_ms": 161.870747,
+        "structured_output": true,
+        "tokens": 39,
+        "tokens_per_second": 268.0643636645809
+      },
+      "ollama": {
+        "latency_ms": 137.888527,
+        "structured_output": true,
+        "tokens": 39,
+        "tokens_per_second": 311.8378443209531
+      }
+    },
+    {
+      "id": "reversed-bounds",
+      "llama_cpp": {
+        "latency_ms": 163.855843,
+        "structured_output": true,
+        "tokens": 40,
+        "tokens_per_second": 273.22404371584696
+      },
+      "ollama": {
+        "latency_ms": 702.127639,
+        "structured_output": false,
+        "tokens": 240,
+        "tokens_per_second": 348.74394057403254
+      }
+    },
+    {
+      "id": "off-by-one",
+      "llama_cpp": {
+        "latency_ms": 453.989834,
+        "structured_output": true,
+        "tokens": 144,
+        "tokens_per_second": 330.15263210145616
+      },
+      "ollama": {
+        "latency_ms": 705.811289,
+        "structured_output": false,
+        "tokens": 240,
+        "tokens_per_second": 347.134333755198
+      }
+    },
+    {
+      "id": "count-distinct",
+      "llama_cpp": {
+        "latency_ms": 141.988345,
+        "structured_output": true,
+        "tokens": 35,
+        "tokens_per_second": 281.8980026697399
+      },
+      "ollama": {
+        "latency_ms": 133.500955,
+        "structured_output": true,
+        "tokens": 35,
+        "tokens_per_second": 290.0400255235223
+      }
+    },
+    {
+      "id": "number-format",
+      "llama_cpp": {
+        "latency_ms": 142.685645,
+        "structured_output": true,
+        "tokens": 35,
+        "tokens_per_second": 273.7409927136589
+      },
+      "ollama": {
+        "latency_ms": 131.888254,
+        "structured_output": true,
+        "tokens": 35,
+        "tokens_per_second": 293.5970673847212
+      }
+    },
+    {
+      "id": "join-numbers",
+      "llama_cpp": {
+        "latency_ms": 149.11988,
+        "structured_output": true,
+        "tokens": 37,
+        "tokens_per_second": 278.8860053453151
+      },
+      "ollama": {
+        "latency_ms": 243.827449,
+        "structured_output": true,
+        "tokens": 79,
+        "tokens_per_second": 340.2898925286985
+      }
+    }
+  ],
+  "generation_speed_change_percent": -8.789400346951526,
+  "llama_avg_latency_ms": 182.79485849999998,
+  "llama_avg_tokens_per_second": 280.3241617714876,
+  "llama_model": "ark-code",
+  "ollama_avg_latency_ms": 264.67132989999993,
+  "ollama_avg_tokens_per_second": 307.3372643506335,
+  "ollama_model": "ark-day54-code:chatml",
+  "weights": "Qwen2.5-Coder-0.5B-Instruct Q4_K_M (same GGUF in both services)",
+  "gpu": "NVIDIA GeForce RTX 5060 Laptop GPU",
+  "llama_build": "10635 (fc35562ba), CUDA, --parallel 1 --flash-attn on",
+  "ollama_version": "0.40.7",
+  "baseline_run": {
+    "generation_speed_change_percent": -10.113298097697342,
+    "llama_avg_latency_ms": 197.4716631,
+    "llama_avg_tokens_per_second": 278.1309979872846,
+    "llama_model": "ark-code",
+    "ollama_avg_latency_ms": 223.2278584,
+    "ollama_avg_tokens_per_second": 309.42396606072344,
+    "ollama_model": "ark-day54-code:latest"
+  }
+}

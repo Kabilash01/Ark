@@ -2,6 +2,7 @@
 
 #include <curl/curl.h>
 
+#include <exception>
 #include <memory>
 #include <regex>
 #include <stdexcept>
@@ -11,16 +12,24 @@ namespace {
 
 constexpr std::size_t max_response_size = 8 * 1024 * 1024;
 
+struct BodySink {
+    std::string& body;
+    const std::function<void(std::string_view)>& on_chunk;
+    std::exception_ptr error;
+};
+
 std::size_t receive(char* bytes, std::size_t size, std::size_t count, void* target) noexcept {
-    auto& body = *static_cast<std::string*>(target);
+    auto& sink = *static_cast<BodySink*>(target);
     const auto length = size * count;
-    if (length > max_response_size - body.size()) {
+    if (length > max_response_size - sink.body.size()) {
         return 0;
     }
     try {
-        body.append(bytes, length);
+        sink.body.append(bytes, length);
+        if (sink.on_chunk) sink.on_chunk({bytes, length});
         return length;
     } catch (...) {
+        sink.error = std::current_exception();
         return 0;
     }
 }
@@ -71,7 +80,8 @@ Response CurlTransport::operator()(const Request& request) {
     }
     curl_easy_setopt(handle_, CURLOPT_WRITEFUNCTION, receive);
     Response response{};
-    curl_easy_setopt(handle_, CURLOPT_WRITEDATA, &response.body);
+    BodySink sink{response.body, request.on_chunk, {}};
+    curl_easy_setopt(handle_, CURLOPT_WRITEDATA, &sink);
 
     std::unique_ptr<curl_slist, decltype(&curl_slist_free_all)> headers(nullptr, curl_slist_free_all);
     for (const auto& header : request.headers) {
@@ -90,6 +100,7 @@ Response CurlTransport::operator()(const Request& request) {
     }
 
     const auto result = curl_easy_perform(handle_);
+    if (sink.error) std::rethrow_exception(sink.error);
     if (result == CURLE_OPERATION_TIMEDOUT) {
         throw HttpTimeout("HTTP request timed out");
     }

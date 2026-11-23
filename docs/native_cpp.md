@@ -566,3 +566,42 @@ Conflicting steps create a durable review item for the Reflection Agent.
 Use `build/ark-cpp skill-conflicts` to list pending items and
 `build/ark-cpp skill-conflicts <conflict-id>` to acknowledge an item. Review
 status is stored separately from the skill revisions.
+
+## Day 54 llama.cpp inference
+
+Set `ARK_LLAMA_URL` to a loopback llama-server endpoint to route the native
+agents' chat and embedding requests through llama.cpp. Use `ARK_LLAMA_API_KEY`
+when the local server requires a bearer token. The legacy Ollama endpoint is
+used when `ARK_LLAMA_URL` is unset.
+
+The preset command resolves configured model names through Ollama manifests
+to their GGUF weights and vision projector. Set `ARK_EMBEDDING_MODEL` to
+include an embedding model. Model aliases must match the active model file
+or the `ARK_MODEL`, `ARK_CODE_MODEL`, and `ARK_VISION_MODEL` overrides.
+
+```bash
+build/ark-cpp llama-presets "$OLLAMA_MODELS" > build/ark-models.ini
+llama-server --models-preset build/ark-models.ini --models-max 1 --host 127.0.0.1 --port 8080
+```
+
+With one loaded model, the router loads the requested GGUF and releases the
+previous model when roles change. `build/ark-cpp infer < request.json` takes
+`role`, OpenAI-style `messages`, and optional `max_tokens`, `temperature`,
+`schema`, and `stream`. A `model` field selects an explicit router alias.
+
+```bash
+ARK_LLAMA_URL=http://127.0.0.1:8080 build/ark-cpp inference-benchmark \
+  benchmarks/coding_self_repair/cases.json build/inference-results.json
+```
+
+The comparison warms both services and sends each the same ten coding
+prompts. Use `ARK_BENCH_OLLAMA_MODEL` when the same GGUF weights have a
+different name in Ollama. It records generation tokens per second, latency,
+and structured output for each engine. [llama-server reference](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md)
+
+On an RTX 5060 Laptop GPU, the tuned llama.cpp run averaged 183 ms per
+prompt versus 265 ms for Ollama, about 31% lower latency. Generation throughput
+averaged 280 versus 307 tokens per second, so the guide's throughput improvement
+target remains unmet on this setup. All ten llama.cpp responses matched the
+structured output contract. This measures generation, with the locked Docker
+repair results recorded separately. [Benchmark results](../benchmarks/inference/results.json)

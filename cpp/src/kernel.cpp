@@ -1,4 +1,5 @@
 #include "ark/kernel.hpp"
+#include "ark/inference.hpp"
 
 #include <algorithm>
 #include <array>
@@ -328,22 +329,17 @@ SupervisedRun supervise_plan(const Json& dag, const AttemptHandler& execute,
 
 std::string chat_local(const Transport& transport, std::string_view url, std::string_view model,
                        std::string_view prompt, std::string_view content, const Json& format) {
-    Json payload{
-        {"model", model}, {"stream", false}, {"think", false},
-        {"options", {{"temperature", 0}, {"num_predict", 2400}}},
-        {"messages", {{{"role", "system"}, {"content", prompt}}, {{"role", "user"}, {"content", content}}}},
-    };
-    if (!format.is_null()) {
-        payload["format"] = format;
-    }
-    const auto response = transport({local_base_url(url) + "/api/chat", "POST", payload.dump(),
-                                     {"Content-Type: application/json"}, std::chrono::seconds(120)});
-    response.require_success("Local model");
-    const auto envelope = Json::parse(response.body);
-    if (envelope.value("done_reason", "") == "length") {
+    const auto llama = configured_llama_url();
+    const LocalInference backend(transport, llama.empty() ? url : std::string_view(llama),
+                                 llama.empty() ? InferenceProvider::ollama : InferenceProvider::llama_cpp);
+    const auto result = backend.generate(model, Json::array({{{"role", "system"}, {"content", prompt}},
+                                                             {{"role", "user"}, {"content", content}}}),
+                                         !llama.empty() && format.is_null() ? Json::object() : format);
+    if (result.finish_reason == "length") {
         throw std::runtime_error("Local model exceeded the response token limit");
     }
-    return envelope.at("message").at("content").get<std::string>();
+    if (result.text.empty()) throw std::runtime_error("Local model returned an empty response");
+    return result.text;
 }
 
 Planner::Planner(Transport transport, std::string local_url, std::string model)

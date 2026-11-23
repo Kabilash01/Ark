@@ -1,4 +1,5 @@
 #include "ark/vector_memory.hpp"
+#include "ark/inference.hpp"
 #include "ark/storage.hpp"
 
 #include <algorithm>
@@ -49,11 +50,10 @@ std::vector<std::vector<float>> Embeddings::encode(const std::vector<std::string
     if (texts.empty()) {
         return {};
     }
-    const auto response = send(transport_, url_ + "/api/embed", "POST", {
-        {"model", model_}, {"input", texts},
-    }, std::chrono::seconds(120));
-    response.require_success("Local embedding");
-    const auto vectors = Json::parse(response.body).at("embeddings").get<std::vector<std::vector<float>>>();
+    const auto llama = configured_llama_url();
+    const LocalInference backend(transport_, llama.empty() ? url_ : llama,
+                                 llama.empty() ? InferenceProvider::ollama : InferenceProvider::llama_cpp);
+    const auto vectors = backend.embed(model_, texts);
     if (vectors.size() != texts.size() || vectors.front().empty()) {
         throw std::runtime_error("Embedding response must contain one nonempty vector per input");
     }

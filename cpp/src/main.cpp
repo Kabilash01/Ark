@@ -9,6 +9,7 @@
 #include "ark/evaluation.hpp"
 #include "ark/file_system.hpp"
 #include "ark/github_agent.hpp"
+#include "ark/inference.hpp"
 #include "ark/kernel.hpp"
 #include "ark/privacy.hpp"
 #include "ark/reflection.hpp"
@@ -657,6 +658,85 @@ int print_run(const ark::Json& result) {
     return result.at("status") == "DONE" ? 0 : 1;
 }
 
+int infer() {
+    const auto input = ark::Json::parse(std::cin);
+    const auto llama = ark::configured_llama_url();
+    const auto role = input.value("role", "general");
+    const char* override = role == "general" ? "ARK_MODEL" : role == "code" ? "ARK_CODE_MODEL"
+        : role == "vision" ? "ARK_VISION_MODEL" : nullptr;
+    if (!override) throw std::invalid_argument("Select the general, code, or vision inference role");
+    const auto model = input.contains("model") ? input.at("model").get<std::string>() : configured_model(override, role.c_str());
+    ark::CurlTransport http;
+    const ark::LocalInference backend(std::ref(http), llama.empty() ? config(false).ollama_url : llama,
+        llama.empty() ? ark::InferenceProvider::ollama : ark::InferenceProvider::llama_cpp);
+    ark::TextStream stream;
+    if (input.value("stream", false)) stream = [](std::string_view text) { std::cout << text << std::flush; };
+    const auto tokens = input.value("max_tokens", ark::Json(2048));
+    if (!tokens.is_number_integer() || tokens.get<double>() < 1 || tokens.get<double>() > 8192) {
+        throw std::invalid_argument("Inference max_tokens must be an integer from 1 to 8192");
+    }
+    const auto result = backend.generate(model, input.at("messages"), input.value("schema", ark::Json(nullptr)),
+                                         tokens.get<int>(), input.value("temperature", 0.0), stream);
+    if (stream) std::cout << '\n';
+    else std::cout << ark::Json{{"model", model}, {"text", result.text}, {"finish_reason", result.finish_reason},
+                               {"tokens", result.tokens}, {"tokens_per_second", result.tokens_per_second}}.dump(2) << '\n';
+    return result.text.empty() ? 1 : 0;
+}
+
+int inference_benchmark(const std::filesystem::path& suite, const std::filesystem::path& output) {
+    if (std::filesystem::weakly_canonical(suite) == std::filesystem::weakly_canonical(output)) {
+        throw std::invalid_argument("Inference report path must differ from the suite path");
+    }
+    const auto llama_url = ark::configured_llama_url();
+    const auto cases = ark::read_json(suite);
+    if (llama_url.empty() || !cases.is_array() || cases.empty()) {
+        throw std::invalid_argument("Inference benchmark requires ARK_LLAMA_URL and a nonempty coding suite");
+    }
+    const auto llama_model = configured_model("ARK_CODE_MODEL", "code");
+    const auto ollama_model = env("ARK_BENCH_OLLAMA_MODEL", llama_model);
+    const auto profile = ark::coding_profile(llama_model);
+    ark::CurlTransport http;
+    const ark::LocalInference llama(std::ref(http), llama_url, ark::InferenceProvider::llama_cpp);
+    const ark::LocalInference ollama(std::ref(http), config(false).ollama_url, ark::InferenceProvider::ollama);
+    const auto warm = ark::Json::array({{{"role", "user"}, {"content", "Write one sentence about unit tests."}}});
+    ollama.generate(ollama_model, warm, nullptr, 32);
+    llama.generate(llama_model, warm, nullptr, 32);
+    const ark::Json schema{{"type", "object"}, {"properties", {{"filename", {{"type", "string"}}},
+        {"source", {{"type", "string"}}}}}, {"required", {"filename", "source"}}, {"additionalProperties", false}};
+    auto rows = ark::Json::array();
+    double ollama_speed = 0, llama_speed = 0, ollama_latency = 0, llama_latency = 0;
+    for (const auto& entry : cases) {
+        auto goal = entry.at("payload");
+        goal["previous_files"] = goal.at("repair_files");
+        goal["locked_tests"] = goal.at("test_files");
+        goal.erase("repair_files");
+        goal.erase("test_files");
+        const auto messages = ark::Json::array({{{"role", "system"}, {"content", profile.prompts.at("system")}},
+                                                {{"role", "user"}, {"content", goal.dump()}}});
+        const auto measure = [&](const ark::LocalInference& engine, const std::string& model, double& speed, double& latency) {
+            const auto begin = std::chrono::steady_clock::now();
+            const auto result = engine.generate(model, messages, schema, 240);
+            const auto ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - begin).count();
+            if (result.text.empty() || result.tokens_per_second <= 0) throw std::runtime_error("Inference server returned no timing evidence");
+            speed += result.tokens_per_second;
+            latency += ms;
+            const auto artifact = ark::Json::parse(result.text, nullptr, false);
+            return ark::Json{{"latency_ms", ms}, {"tokens", result.tokens}, {"tokens_per_second", result.tokens_per_second},
+                {"structured_output", artifact.is_object() && artifact.contains("source") && artifact.contains("filename")}};
+        };
+        auto via_ollama = measure(ollama, ollama_model, ollama_speed, ollama_latency);
+        auto via_llama = measure(llama, llama_model, llama_speed, llama_latency);
+        rows.push_back({{"id", entry.at("id")}, {"ollama", std::move(via_ollama)}, {"llama_cpp", std::move(via_llama)}});
+    }
+    const ark::Json result{{"ollama_model", ollama_model}, {"llama_model", llama_model}, {"cases", std::move(rows)},
+        {"ollama_avg_tokens_per_second", ollama_speed / cases.size()}, {"llama_avg_tokens_per_second", llama_speed / cases.size()},
+        {"ollama_avg_latency_ms", ollama_latency / cases.size()}, {"llama_avg_latency_ms", llama_latency / cases.size()},
+        {"generation_speed_change_percent", 100 * (llama_speed / ollama_speed - 1)}};
+    ark::write_json(output, result);
+    std::cout << result.dump(2) << '\n';
+    return 0;
+}
+
 int repair_benchmark(const std::filesystem::path& suite, const std::filesystem::path& report_path) {
     if (std::filesystem::weakly_canonical(suite) == std::filesystem::weakly_canonical(report_path)) {
         throw std::invalid_argument("Repair report path must differ from the suite path");
@@ -874,6 +954,9 @@ int main(int argc, char** argv) {
                      "       ark-cpp citation-graph < request.json\n"
                      "       ark-cpp benchmark [suite.json] [report.json]\n"
                      "       ark-cpp repair-benchmark <suite.json> <report.json>\n"
+                     "       ark-cpp infer < request.json\n"
+                     "       ark-cpp llama-presets <ollama-model-dir>\n"
+                     "       ark-cpp inference-benchmark <suite.json> <report.json>\n"
                      "       ark-cpp browser < actions.json\n"
                      "       ark-cpp serve [port]\n"
                      "Research without an instruction reads an ARKMessage from stdin.\n";
@@ -890,6 +973,15 @@ int main(int argc, char** argv) {
         }
         if (command == "repair-benchmark" && argc == 4) {
             return repair_benchmark(argv[2], argv[3]);
+        }
+        if (command == "infer" && argc == 2) return infer();
+        if (command == "inference-benchmark" && argc == 4) return inference_benchmark(argv[2], argv[3]);
+        if (command == "llama-presets" && argc == 3) {
+            const ark::Json models{{"general", configured_model("ARK_MODEL", "general")},
+                                   {"code", configured_model("ARK_CODE_MODEL", "code")},
+                                   {"vision", configured_model("ARK_VISION_MODEL", "vision")}};
+            std::cout << ark::llama_presets(argv[2], models, env("ARK_EMBEDDING_MODEL"));
+            return 0;
         }
         if ((command == "versions" && argc == 3) || (command == "version-rollback" && argc == 4)
             || ((command == "version-bump" || command == "version-compare") && argc == 5)) {
