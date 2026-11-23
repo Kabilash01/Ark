@@ -40,3 +40,23 @@ the required citations. Coding cases execute a separate acceptance suite on
 the submitted solution. The results record completion, elapsed time, and the
 evaluator's ratings alongside the evidence checks. This design supports
 comparisons between recorded configurations using the same dataset.
+
+## Methods
+
+### Local inference architecture
+
+A shared C++ adapter routes structured chat and embeddings to the selected
+loopback inference service. With llama.cpp selected, the adapter sends chat
+completions and embedding requests to a local llama-server. The model router
+loads the GGUF named by the agent profile and can cap the number of resident
+models at one. This supports alternating general, coding, and vision models
+on a device with limited memory. Vision inference loads the model's matching
+projector and accepts image data with the user message. Ollama manifests can
+resolve downloaded GGUF and projector paths for the server presets.
+
+The inference experiment used ten coding prompts and one GGUF quantization
+for both engines on an RTX 5060 Laptop GPU. Each engine received a warmup
+request before measurement. The runtime recorded request latency, reported
+generation throughput, and structured output validity for each prompt.
+The coding repair benchmark separately uses locked unittests in Docker to
+measure correctness of the generated patch. [Month 3 results](../month3_results.md)

@@ -94,7 +94,8 @@ Generation LocalInference::generate(std::string_view model, const Json& messages
         payload.update({{"temperature", temperature}, {"max_tokens", max_tokens},
                         {"chat_template_kwargs", {{"enable_thinking", false}}}});
         if (!schema.is_null()) {
-            payload["response_format"] = {{"type", "json_object"}, {"schema", schema}};
+            payload["response_format"] = {{"type", "json_object"}};
+            if (schema != "json") payload["response_format"]["schema"] = schema;
         }
     } else {
         payload.update({{"think", false}, {"options", {{"temperature", temperature}, {"num_predict", max_tokens}}}});
