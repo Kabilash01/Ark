@@ -1,0 +1,59 @@
+{
+  "source_revision": "c3ed45a733377bc7313b93f57ff518254d81380f",
+  "mode": "offline static review of selected Java files",
+  "cases": [
+    {
+      "file": "cryptography/HashingAssignment.java",
+      "rule": "java-weak-message-digest",
+      "detected": true
+    },
+    {
+      "file": "deserialization/SerializationHelper.java",
+      "rule": "java-object-deserialization",
+      "detected": true
+    },
+    {
+      "file": "deserialization/InsecureDeserializationTask.java",
+      "rule": "java-object-deserialization",
+      "detected": true
+    },
+    {
+      "file": "pathtraversal/ProfileZipSlip.java",
+      "rule": "java-upload-path",
+      "detected": true
+    },
+    {
+      "file": "sqlinjection/advanced/SqlInjectionLesson6a.java",
+      "rule": "java-dynamic-sql",
+      "detected": false
+    },
+    {
+      "file": "sqlinjection/advanced/SqlInjectionLesson6b.java",
+      "rule": "java-dynamic-sql",
+      "detected": false
+    },
+    {
+      "file": "sqlinjection/introduction/SqlInjectionLesson8.java",
+      "rule": "java-dynamic-sql",
+      "detected": true
+    },
+    {
+      "file": "sqlinjection/introduction/SqlInjectionLesson9.java",
+      "rule": "java-dynamic-sql",
+      "detected": true
+    }
+  ],
+  "matched": 6,
+  "reference_count": 8,
+  "negative_controls": [
+    {
+      "file": "sqlinjection/mitigation/SqlInjectionLesson13.java",
+      "findings": 0
+    },
+    {
+      "file": "sqlinjection/mitigation/Servers.java",
+      "findings": 0
+    }
+  ],
+  "recall": 0.75
+}

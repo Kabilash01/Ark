@@ -642,3 +642,17 @@ decisions under `output_conflicts`.
 `research` and `code` outputs. Five controlled comparisons used real Docker
 observations. All five were detected after calibrating the review prompt on
 those cases. [Controlled comparisons](../benchmarks/conflicts/output_conflicts.json)
+
+## Day 58 WebGoat source audit
+
+`ark-cpp security` accepts `language: "java"` with `run_semgrep` or `audit`.
+The bundled rules flag dynamically built SQL, Java object deserialization,
+weak message digests, and upload paths derived from client filenames.
+They run offline and report source locations for defensive review.
+
+On a pinned WebGoat v2025.3 checkout, the scanner matched **6 of 8** expected
+file/rule pairs and reported zero findings for two prepared-statement controls.
+Both misses were advanced SQL examples. The 75% recall applies to these
+selected source files. The workflow inspects source without launching the
+application. [WebGoat release](https://github.com/WebGoat/WebGoat/releases/tag/v2025.3)
+[Per-file results](../benchmarks/security/webgoat_source_results.json)

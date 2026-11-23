@@ -20,19 +20,62 @@ constexpr auto semgrep_rules = R"yaml(rules:
       - pattern: $CUR.execute($QUERY.format(...))
 )yaml";
 
-SandboxWorkspace workspace_for(const Json& request) {
+constexpr auto java_rules = R"yaml(rules:
+  - id: java-dynamic-sql
+    message: Review assembled SQL and bind request values through a prepared statement.
+    languages: [java]
+    severity: ERROR
+    mode: taint
+    pattern-sources:
+      - pattern: $A + $B
+      - pattern: String.format(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $ST.executeQuery($QUERY)
+              - pattern: $ST.execute($QUERY)
+              - pattern: $ST.executeUpdate($QUERY)
+          - focus-metavariable: $QUERY
+  - id: java-object-deserialization
+    message: Check object deserialization boundaries and adopt a restricted data format for untrusted input.
+    languages: [java]
+    severity: WARNING
+    pattern: $INPUT.readObject()
+  - id: java-weak-message-digest
+    message: Review MD5 or SHA-1 usage and use the algorithm appropriate to the security purpose.
+    languages: [java]
+    severity: WARNING
+    pattern-either:
+      - pattern: MessageDigest.getInstance("MD5")
+      - pattern: MessageDigest.getInstance("SHA-1")
+  - id: java-upload-path
+    message: Constrain uploaded file destinations to a fixed directory and use server-generated names.
+    languages: [java]
+    severity: ERROR
+    mode: taint
+    pattern-sources:
+      - pattern: $FILE.getOriginalFilename()
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $ROOT.resolve($NAME)
+              - pattern: new File($ROOT, $NAME)
+          - focus-metavariable: $NAME
+)yaml";
+
+SandboxWorkspace workspace_for(const Json& request, bool java) {
     const auto& files = request.at("files");
     if (!files.is_object() || files.empty() || files.size() > 100) {
-        throw std::invalid_argument("Supply 1 to 100 Python source files");
+        throw std::invalid_argument("Supply 1 to 100 source files for the selected scanner language");
     }
     SandboxWorkspace workspace;
     for (const auto& [name, source] : files.items()) {
-        if (std::filesystem::path(name).is_absolute() || !name.ends_with(".py")) {
-            throw std::invalid_argument("Scanner file paths must be project-relative Python files");
+        if (std::filesystem::path(name).is_absolute() || !name.ends_with(java ? ".java" : ".py")) {
+            throw std::invalid_argument("Scanner file paths must be relative and match the selected language");
         }
         workspace.write_file("source/" + name, source.get_ref<const std::string&>());
     }
-    workspace.write_file("rules.yml", semgrep_rules);
+    workspace.write_file("rules.yml", java ? java_rules : semgrep_rules);
     return workspace;
 }
 
@@ -68,7 +111,10 @@ Json scan(const DockerSandbox& sandbox, const SandboxWorkspace& workspace, bool 
         findings.push_back({{"tool", tool}, {"rule", id}, {"severity", details.at(bandit ? "issue_severity" : "severity")},
             {"file", scanner_path(row.at(bandit ? "filename" : "path").get<std::string>())},
             {"line", bandit ? row.at("line_number") : row.at("start").at("line")}, {"summary", detail},
-            {"owasp", credential ? Json("A07:2021") : sql ? Json("A03:2021") : Json(nullptr)}});
+            {"owasp", credential ? Json("A07:2021") : sql ? Json("A03:2021")
+                : id == "java-weak-message-digest" ? Json("A02:2021")
+                : id == "java-object-deserialization" ? Json("A08:2021")
+                : id == "java-upload-path" ? Json("A01:2021") : Json(nullptr)}});
     }
     return findings;
 }
@@ -147,15 +193,21 @@ Json execute(const DockerSandbox& sandbox, const Json& request) {
     if (action != "audit" && action != "run_bandit" && action != "run_semgrep") {
         throw std::invalid_argument("Unknown security action");
     }
-    const auto workspace = workspace_for(request);
+    const auto language = request.value("language", "python");
+    const bool java = language == "java";
+    if ((!java && language != "python") || (java && action == "run_bandit")) {
+        throw std::invalid_argument("Select Python or Java for Semgrep, or Python for Bandit");
+    }
+    const auto workspace = workspace_for(request, java);
     auto findings = Json::array();
     if (action != "run_bandit") findings = scan(sandbox, workspace, false);
-    if (action != "run_semgrep") {
+    if (action != "run_semgrep" && !java) {
         for (auto& finding : scan(sandbox, workspace, true)) findings.push_back(std::move(finding));
     }
     Json output{{"findings", std::move(findings)}, {"dependencies", check_dependencies(request)},
         {"owasp_coverage", {{"standard", "OWASP Top 10 (2021)"},
-            {"mapped_categories", {"A03:2021", "A06:2021", "A07:2021"}}}}};
+            {"mapped_categories", java ? Json::array({"A01:2021", "A02:2021", "A03:2021", "A06:2021", "A08:2021"})
+                                       : Json::array({"A03:2021", "A06:2021", "A07:2021"})}}}};
     if (request.contains("report_path")) {
         const auto& path = request.at("report_path").get_ref<const std::string&>();
         if (path.empty() || path.find('\0') != std::string::npos) throw std::invalid_argument("Invalid report path");
