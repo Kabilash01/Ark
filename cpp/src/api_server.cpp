@@ -259,7 +259,8 @@ public:
             task["priority"] = priority;
             tasks_.emplace(id, task);
             order_.push_back(id);
-            queue_.push_back({id, priority.get<int>(), task.at("timestamp").get<std::string>(), domain});
+            queue_.push_back({id, priority.get<int>(), task.at("timestamp").get<std::string>(), domain,
+                              std::chrono::steady_clock::now()});
             // Publish creation before the worker can announce a start.
             events_.send("task_created", id);
         }

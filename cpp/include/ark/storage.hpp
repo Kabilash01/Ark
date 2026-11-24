@@ -10,6 +10,18 @@
 
 namespace ark {
 
+class ConflictJournal {
+public:
+    explicit ConflictJournal(const std::filesystem::path& database);
+    ~ConflictJournal();
+    void record(std::string_view id, const Json& event);
+    Json recent();
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
+};
+
 class RedisUnavailable : public std::runtime_error {
 public:
     using std::runtime_error::runtime_error;

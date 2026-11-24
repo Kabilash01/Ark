@@ -105,6 +105,25 @@ hardware workers are running. The native test dispatches two independent
 research workers concurrently and checks assignment balance, score-based
 selection, and slot release after exceptions.
 
+## Day 67 conflict telemetry
+
+`ark-cpp conflict-report [report.json]` summarizes sanitized conflict records
+from the last 30 days. The SQLite journal stores only a pseudonymous case ID,
+type, outcome, observation timestamp, and optional elapsed time. It omits task
+prompts, outputs, source code, and conflict explanations. Resource records
+measure time waiting on a saturated browser, terminal, or arXiv semaphore;
+priority records measure queue time to selection; output records measure
+reconciliation through resolution or escalation; procedural memory records
+measure review time where an existing timestamp is available. Repeated updates
+to one case count as one case with its latest outcome.
+
+The committed `research/conflict_data/conflict_log.json` is an honest initial
+capture with zero production observations. Earlier runs did not retain a
+complete month of categorized conflict telemetry, so this report cannot
+backfill or claim month-long empirical frequencies. Native tests exercise the
+journal, deduplication, privacy filtering, and resource-wait observer with
+controlled fixtures; those fixtures are not reported as production outcomes.
+
 ## Day 24 sandbox
 
 `ark-cpp sandbox` uses the local Docker Engine Unix socket. Pull

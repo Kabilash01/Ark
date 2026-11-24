@@ -4,6 +4,7 @@
 #include "ark/browser_agent.hpp"
 #include "ark/citation_graph.hpp"
 #include "ark/coding.hpp"
+#include "ark/conflict_resolver.hpp"
 #include "ark/document_agent.hpp"
 #include "ark/done_condition.hpp"
 #include "ark/evaluation.hpp"
@@ -72,6 +73,32 @@ ark::ResearchConfig config(bool chat_required = true) {
 }
 
 std::filesystem::path skills_path() { return env("ARK_PROCEDURAL_DB", "data/procedural_cpp.db"); }
+
+std::filesystem::path conflict_path() { return env("ARK_CONFLICT_DB", "data/conflicts.db"); }
+
+void record_conflict(std::string_view id, const ark::Json& event) {
+    try {
+        ark::ConflictJournal(conflict_path()).record(id, event);
+    } catch (const std::exception& error) {
+        std::cerr << "Could not record conflict telemetry: " << error.what() << '\n';
+    }
+}
+
+ark::Json conflict_report() {
+    auto events = ark::ConflictJournal(conflict_path()).recent();
+    if (std::filesystem::exists(skills_path())) {
+        ark::CurlTransport http;
+        const auto settings = config(false);
+        ark::ProceduralMemory skills(skills_path(), ark::Embeddings(std::ref(http), settings.ollama_url,
+                                                                    settings.embedding_model));
+        for (auto& event : skills.conflict_history()) events.push_back(std::move(event));
+    }
+    auto report = ark::summarize_conflicts(std::move(events));
+    report["coverage"] = {{"window_days", 30}, {"historical_backfill", false},
+        {"source", "native runtime conflict telemetry and procedural-memory review history"},
+        {"note", "The runtime journal records events going forward; prior incidents without stored telemetry cannot be reconstructed."}};
+    return report;
+}
 
 ark::DockerSandbox docker_sandbox(ark::Transport transport) {
     return ark::DockerSandbox(std::move(transport), env("ARK_DOCKER_SOCKET", "/var/run/docker.sock"),
@@ -547,6 +574,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     });
     for (auto report : conflicts) {
         report["task_id"] = parent_id;
+        if (report.contains("case_id")) record_conflict(report.at("case_id").get<std::string>(), report);
         emit(events, "conflict_detected", report);
         audit_event(redis.get(), {{"event", "conflict_detected"}, {"task_id", parent_id}, {"report", report}});
     }
@@ -969,6 +997,7 @@ int serve(int port) {
         memory_tier,
         [=](const ark::Json& report) {
             const auto redis = runtime_redis(redis_port, redis_db);
+            record_conflict("priority:" + report.at("task_id").get<std::string>(), report);
             audit_event(redis.get(), {{"event", "conflict_detected"}, {"task_id", report.at("task_id")},
                                       {"report", report}});
         },
@@ -1015,6 +1044,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp --privacy|--airgap <goal> [tests.json]\n"
                      "       ark-cpp dispatch < dag.json\n"
                      "       ark-cpp conflict-check < evidence.json\n"
+                     "       ark-cpp conflict-report [report.json]\n"
                      "       ark-cpp audit|episodes\n"
                      "       ark-cpp episodes-archive | memory-prune\n"
                      "       ark-cpp reflection-queue\n"
@@ -1045,7 +1075,18 @@ int main(int argc, char** argv) {
         return argc < 2 ? 2 : 0;
     }
     try {
+        ark::set_resource_conflict_observer([](std::string_view resource, std::chrono::milliseconds waited) {
+            const auto id = ark::random_uuid();
+            record_conflict(id, {{"conflict_type", "resource"}, {"status", "ACQUIRED"},
+                                 {"elapsed_ms", waited.count()}, {"resource", resource}});
+        });
         const std::string_view command = argv[1];
+        if ((command == "conflict-report" && argc <= 3)) {
+            const auto report = conflict_report();
+            if (argc == 3) ark::write_json(argv[2], report);
+            else std::cout << report.dump(2) << '\n';
+            return 0;
+        }
         if (command == "browser" && argc == 2) {
             return run_browser();
         }

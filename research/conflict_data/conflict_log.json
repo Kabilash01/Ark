@@ -1,0 +1,38 @@
+{
+  "by_type": {
+    "memory": {
+      "cases": 0,
+      "mean_elapsed_ms": null,
+      "outcomes": {},
+      "timed_cases": 0
+    },
+    "output": {
+      "cases": 0,
+      "mean_elapsed_ms": null,
+      "outcomes": {},
+      "timed_cases": 0
+    },
+    "priority": {
+      "cases": 0,
+      "mean_elapsed_ms": null,
+      "outcomes": {},
+      "timed_cases": 0
+    },
+    "resource": {
+      "cases": 0,
+      "mean_elapsed_ms": null,
+      "outcomes": {},
+      "timed_cases": 0
+    }
+  },
+  "coverage": {
+    "historical_backfill": false,
+    "note": "The runtime journal records events going forward; prior incidents without stored telemetry cannot be reconstructed.",
+    "source": "native runtime conflict telemetry and procedural-memory review history",
+    "window_days": 30
+  },
+  "distinct_cases": 0,
+  "events": [],
+  "generated_at": "2026-11-24T05:01:48+00:00",
+  "window_days": 30
+}

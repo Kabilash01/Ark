@@ -254,7 +254,9 @@ SupervisedRun supervise_plan(const Json& dag, const AttemptHandler& execute,
     auto feedback = Json::object();
     auto results = Json::object();
     auto conflicts = Json::array();
-    std::map<std::pair<std::string, std::string>, int> conflict_rounds;
+    using Clock = std::chrono::steady_clock;
+    struct Reconciliation { int rounds = 0; std::string id; Clock::time_point started; };
+    std::map<std::pair<std::string, std::string>, Reconciliation> reconciliations;
     std::set<std::string> disputed;
     for (int round = 1; round <= supervisor_attempt_limit; ++round) {
         results = dispatch_layers(layers, [&](const Task& task, const Json& dependencies) {
@@ -308,16 +310,29 @@ SupervisedRun supervise_plan(const Json& dag, const AttemptHandler& execute,
                                 {"status", "REVIEW_UNAVAILABLE"}, {"detail", error.what()}});
                             continue;
                         }
-                        auto& revisions = conflict_rounds[{peer, task.id}];
+                        auto& state = reconciliations[{peer, task.id}];
+                        auto& revisions = state.rounds;
+                        const auto elapsed = [&] {
+                            return std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - state.started).count();
+                        };
                         if (!verdict.at("conflict").get<bool>()) {
-                            if (revisions > 0) conflicts.push_back({{"conflict_type", "output"}, {"research_task", peer},
-                                {"code_task", task.id}, {"status", "RESOLVED"}, {"reconciliation_round", revisions}});
+                            if (revisions > 0 && !state.id.empty()) {
+                                conflicts.push_back({{"conflict_type", "output"}, {"case_id", state.id}, {"research_task", peer},
+                                    {"code_task", task.id}, {"status", "RESOLVED"}, {"reconciliation_round", revisions},
+                                    {"elapsed_ms", elapsed()}});
+                                state.id.clear();
+                            }
                             continue;
+                        }
+                        if (state.id.empty()) {
+                            state.id = random_uuid();
+                            state.started = Clock::now();
                         }
                         const bool escalate = revisions == 2 || round == supervisor_attempt_limit;
                         const auto detail = verdict.at("reason").get<std::string>();
-                        conflicts.push_back({{"conflict_type", "output"}, {"research_task", peer}, {"code_task", task.id},
+                        conflicts.push_back({{"conflict_type", "output"}, {"case_id", state.id}, {"research_task", peer}, {"code_task", task.id},
                             {"status", escalate ? "HUMAN_REVIEW" : "RECONCILE"},
+                            {"elapsed_ms", escalate ? Json(elapsed()) : Json(nullptr)},
                             {"reconciliation_round", escalate ? revisions : revisions + 1}, {"detail", detail}});
                         if (escalate) {
                             disputed.insert(task.id);

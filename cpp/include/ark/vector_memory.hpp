@@ -87,6 +87,7 @@ public:
     Json get(std::string_view id);
     Json all(int limit = -1);
     Json pending_conflicts(int limit = 20);
+    Json conflict_history();
     bool review_conflict(std::int64_t id);
     std::size_t evict_low_success();
 

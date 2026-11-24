@@ -150,6 +150,61 @@ Database open_database(const std::filesystem::path& db) {
 
 } // namespace
 
+struct ConflictJournal::Impl {
+    explicit Impl(const std::filesystem::path& file) : db(open_database(file)) {}
+    Database db;
+    std::mutex mutex;
+};
+
+ConflictJournal::ConflictJournal(const std::filesystem::path& database) : impl_(std::make_unique<Impl>(database)) {
+    auto* db = impl_->db.get();
+    sqlite_check(sqlite3_exec(db, R"sql(
+        CREATE TABLE IF NOT EXISTS conflict_events (
+            id INTEGER PRIMARY KEY, case_id TEXT NOT NULL,
+            type TEXT NOT NULL, status TEXT NOT NULL, observed_at TEXT NOT NULL, elapsed_ms REAL
+        );
+        CREATE INDEX IF NOT EXISTS recent_conflicts ON conflict_events(observed_at);
+    )sql", nullptr, nullptr, nullptr), db);
+}
+
+ConflictJournal::~ConflictJournal() = default;
+
+void ConflictJournal::record(std::string_view id, const Json& event) {
+    const auto type = event.at("conflict_type").get<std::string>();
+    if (type != "resource" && type != "output" && type != "priority" && type != "memory") {
+        throw std::invalid_argument("Unknown conflict type");
+    }
+    const std::lock_guard lock(impl_->mutex);
+    auto* db = impl_->db.get();
+    const auto sql = prepare(db, "INSERT INTO conflict_events(case_id,type,status,observed_at,elapsed_ms) VALUES(?,?,?,?,?)");
+    bind_text(db, sql.get(), 1, point_id(id));
+    bind_text(db, sql.get(), 2, type);
+    bind_text(db, sql.get(), 3, event.at("status").get<std::string>());
+    bind_text(db, sql.get(), 4, utc_timestamp());
+    const auto elapsed = event.value("elapsed_ms", Json(nullptr));
+    if (elapsed.is_number() && elapsed.get<double>() >= 0) {
+        sqlite_check(sqlite3_bind_double(sql.get(), 5, elapsed.get<double>()), db);
+    }
+    sqlite_check(sqlite3_step(sql.get()), db);
+}
+
+Json ConflictJournal::recent() {
+    const std::lock_guard lock(impl_->mutex);
+    auto* db = impl_->db.get();
+    const auto sql = prepare(db, R"sql(
+        SELECT case_id,type,status,observed_at,elapsed_ms FROM conflict_events
+        WHERE observed_at >= strftime('%Y-%m-%dT%H:%M:%S','now','-30 days') ORDER BY id
+    )sql");
+    auto rows = Json::array();
+    for (int step; (step = sqlite3_step(sql.get())) != SQLITE_DONE;) {
+        sqlite_check(step, db);
+        rows.push_back({{"case_id", sqlite_text(sql.get(), 0)}, {"conflict_type", sqlite_text(sql.get(), 1)},
+            {"status", sqlite_text(sql.get(), 2)}, {"observed_at", sqlite_text(sql.get(), 3)},
+            {"elapsed_ms", sqlite3_column_type(sql.get(), 4) == SQLITE_NULL ? Json(nullptr) : Json(sqlite3_column_double(sql.get(), 4))}});
+    }
+    return rows;
+}
+
 struct Redis::Impl {
     std::unique_ptr<redisContext, decltype(&redisFree)> context{nullptr, redisFree};
 };
@@ -908,6 +963,25 @@ bool ProceduralMemory::review_conflict(std::int64_t id) {
     bind_text(db, statement.get(), 3, encoder_.model());
     sqlite_check(sqlite3_step(statement.get()), db);
     return sqlite3_changes(db) == 1;
+}
+
+Json ProceduralMemory::conflict_history() {
+    const std::lock_guard lock(impl_->mutex);
+    auto* db = impl_->db.get();
+    const auto sql = prepare(db, R"sql(
+        SELECT id, created_at, reviewed_at, (unixepoch(reviewed_at)-unixepoch(created_at))*1000 FROM skill_conflicts
+        WHERE julianday(created_at) >= julianday('now','-30 days') ORDER BY id
+    )sql");
+    auto rows = Json::array();
+    for (int step; (step = sqlite3_step(sql.get())) != SQLITE_DONE;) {
+        sqlite_check(step, db);
+        const bool reviewed = sqlite3_column_type(sql.get(), 2) != SQLITE_NULL;
+        rows.push_back({{"case_id", point_id("skill-conflict-" + std::to_string(sqlite3_column_int64(sql.get(), 0)))},
+            {"conflict_type", "memory"}, {"status", reviewed ? "REVIEWED" : "HUMAN_REVIEW"},
+            {"observed_at", sqlite_text(sql.get(), reviewed ? 2 : 1)},
+            {"elapsed_ms", reviewed ? Json(sqlite3_column_int64(sql.get(), 3)) : Json(nullptr)}});
+    }
+    return rows;
 }
 
 std::size_t ProceduralMemory::evict_low_success() {
