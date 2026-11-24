@@ -24,6 +24,7 @@
 #include "ark/runtime_files.hpp"
 #include "ark/sandbox.hpp"
 #include "ark/security_agent.hpp"
+#include "ark/scientific_report.hpp"
 #include "ark/storage.hpp"
 #include "ark/terminal.hpp"
 #include "ark/tool_benchmark.hpp"
@@ -1098,6 +1099,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp analyze-csv < request.json\n"
                      "       ark-cpp hypothesize < request.json\n"
                      "       ark-cpp design-experiment < request.json\n"
+                     "       ark-cpp scientific-report < request.json\n"
                      "Research without an instruction reads an ARKMessage from stdin.\n";
         return argc < 2 ? 2 : 0;
     }
@@ -1163,6 +1165,14 @@ int main(int argc, char** argv) {
             ark::ExperimentDesigner designer(std::ref(http), llama.empty() ? settings.ollama_url : llama,
                 ark::experiment_designer_profile(configured_model("ARK_MODEL", "general")), provider);
             return print_run(designer.run(ark::make_message("user", "experiment_designer", "DESIGN_EXPERIMENT", ark::Json::parse(std::cin))));
+        }
+        if (command == "scientific-report" && argc == 2) {
+            ark::CurlTransport http;
+            const auto password = env("ARK_NEO4J_PASSWORD");
+            ark::CitationGraph graph(std::ref(http), env("ARK_NEO4J_URL", "http://127.0.0.1:7474"),
+                env("ARK_NEO4J_DATABASE", "neo4j"), env("ARK_NEO4J_USER", password.empty() ? "" : "neo4j"), password);
+            return print_run(ark::ScientificReportGenerator(graph).run(
+                ark::make_message("user", "scientific_report_generator", "GENERATE_REPORT", ark::Json::parse(std::cin))));
         }
         if (command == "benchmark" && argc <= 4) {
             return benchmark(argc >= 3 ? argv[2] : "benchmarks/arkbench/benchmark_v0.1.json",

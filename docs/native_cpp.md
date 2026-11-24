@@ -783,6 +783,18 @@ Python sandbox, so routing this C++20 specification through that agent would
 contradict the project's C++ direction. A native C++ code generation and
 compiler sandbox remains a follow-up requirement.
 
+## Day 80 native Scientific Report Generator
+
+`build/ark-cpp scientific-report` accepts a hypothesis, experiment `spec`,
+measured `results`, optional figure path/caption pairs, and optional Neo4j
+`paper_ids`. It writes a bounded `.tex` draft with Abstract, Introduction,
+Related Work, Method, Results, Figures, and bibliography sections. Linked works
+are queried from Neo4j and cited by generated keys; titles and graph IDs are
+included in the bibliography. User-supplied prose is escaped for LaTeX, figure
+paths must be relative and traversal-free, and the output is marked unverified.
+This creates a `.tex` artifact, not a PDF, and citations may need richer
+bibliographic metadata before publication.
+
 ```bash
 printf '%s\n' '{"experiment":"smoke","ranges":[{"name":"learning_rate","minimum":0,"maximum":1}],"target":{"learning_rate":0.5},"trial_count":10}' \
   | build/ark-cpp ml-optimize
