@@ -879,7 +879,8 @@ with `topic` and at least two `material_ids`. Its first five checkpointed
 stages run arXiv literature, hypotheses, C++ experiment design, Materials
 Project summary screening plus CSV analysis, and a LaTeX report. The request
 and workflow version are bound to the loop ID so resuming with different inputs
-or incompatible checkpoint schemas fails clearly. Each stage must return `DONE` before its output is checkpointed. The
+or incompatible checkpoint schemas fails clearly. Each stage must return `DONE`
+before its output is checkpointed. The
 Materials Project analysis is database screening, not an executed physical
 experiment; generated results are therefore not represented as measurements.
 The command checks for `MP_API_KEY` before starting research, so a missing key
@@ -898,10 +899,21 @@ native hyperparameter smoke workflow; they are not VLM training loss curves.
 The native SAGE command automatically processes the top two ranked hypotheses.
 It designs a separate C++ experiment for each, reuses the identical Materials
 Project screening artifact, and writes a separate cited LaTeX report per
-hypothesis. All eight workflow stages checkpoint independently, so a failure
+hypothesis. All nine workflow stages checkpoint independently, so a failure
 in the second report resumes there without repeating literature retrieval or
 the first report. The second screening intentionally reuses the same material
 records rather than issuing an identical API request again.
+
+## Day 90 Vision Agent captions in SAGE reports
+
+Pass optional relative `figure_paths` in the `sage-materials` input. SAGE runs
+each image through the native Vision Agent, stores its caption, chart type,
+observations, and uncertainty notes in the `vision_figures` checkpoint, and
+places the generated caption and relative image path in both LaTeX reports.
+The workflow rejects absolute and traversal paths before reading image files.
+When no paths are supplied, report generation continues with no figures. The
+existing Vision Agent fixture test verifies confusion-matrix labels, cell
+values, and a misclassification caption; a live VLM remains unavailable here.
 
 ## Day 85 hypothesis evidence and specificity
 

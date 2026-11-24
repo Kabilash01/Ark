@@ -1233,8 +1233,15 @@ int main(int argc, char** argv) {
             const auto input = ark::Json::parse(std::cin);
             const auto topic = input.at("topic").get<std::string>();
             const auto material_ids = input.at("material_ids").get<std::vector<std::string>>();
+            const auto figure_paths = input.value("figure_paths", std::vector<std::string>{});
             if (topic.empty() || topic.size() > 1000 || material_ids.size() < 2 || material_ids.size() > 100)
                 throw std::invalid_argument("SAGE requires a topic and 2–100 Materials Project IDs");
+            if (figure_paths.size() > 12) throw std::invalid_argument("SAGE accepts at most 12 figure paths");
+            for (const auto& path : figure_paths) {
+                if (path.empty() || path.size() > 1024 || path.starts_with('/')
+                    || path.find("..") != std::string::npos || path.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_./-") != std::string::npos)
+                    throw std::invalid_argument("SAGE figure paths must be safe relative image paths");
+            }
 
             const auto settings = config();
             ark::CurlTransport http;
@@ -1247,10 +1254,11 @@ int main(int argc, char** argv) {
                 }
                 return message.at("output");
             };
-            const std::vector<std::string> steps{"literature", "hypothesis", "experiment", "analysis", "report",
+            const std::vector<std::string> steps{"literature", "hypothesis", "experiment", "analysis", "vision_figures", "report",
                 "experiment_second", "analysis_second", "report_second"};
             ark::CheckpointManager checkpoints(env("ARK_SAGE_CHECKPOINT_DIR", "data/sage/checkpoints"));
-            const ark::Json request_signature{{"workflow_version", 2}, {"topic", topic}, {"material_ids", material_ids}};
+            const ark::Json request_signature{{"workflow_version", 3}, {"topic", topic},
+                {"material_ids", material_ids}, {"figure_paths", figure_paths}};
             if (const auto saved = checkpoints.load(argv[2], "request")) {
                 if (*saved != request_signature) throw std::invalid_argument("SAGE loop ID already belongs to a different topic or material ID list");
             } else {
@@ -1304,6 +1312,21 @@ int main(int argc, char** argv) {
                     return {{"materials", data}, {"analysis", require_done(ark::analyze_csv(
                         ark::make_message("user", "data_analysis_agent", "ANALYZE_DATA", {{"csv", csv}})), stage)}};
                 }
+                if (stage == "vision_figures") {
+                    auto figures = ark::Json::array();
+                    if (figure_paths.empty()) return {{"figures", figures}};
+                    const auto profile = ark::vision_profile(configured_model("ARK_VISION_MODEL", "vision"));
+                    for (const auto& path : figure_paths) {
+                        const auto output = require_done(run_vision_agent(transport, settings,
+                            ark::make_message("user", "vision_agent", "VISION", {
+                                {"instruction", "Describe this experiment figure with a factual caption. Preserve visible confusion-matrix labels and cell values; do not infer unstated metrics."},
+                                {"image_path", path}}), profile), stage);
+                        figures.push_back({{"path", path}, {"caption", output.at("caption")},
+                            {"chart_type", output.at("chart_type")}, {"summary", output.at("summary")},
+                            {"observations", output.at("observations")}, {"uncertainties", output.at("uncertainties")}});
+                    }
+                    return {{"figures", std::move(figures)}};
+                }
                 if (stage == "report" || stage == "report_second") {
                     const bool second = stage == "report_second";
                     const auto candidate_index = second ? 1 : 0;
@@ -1319,6 +1342,9 @@ int main(int argc, char** argv) {
                             }
                         }
                     }
+                    auto report_results = prior.at(second ? "analysis_second" : "analysis");
+                    const auto& analyzed_figures = prior.at("vision_figures").at("figures");
+                    report_results["vision_figure_analyses"] = analyzed_figures;
                     const auto password = env("ARK_NEO4J_PASSWORD");
                     ark::CitationGraph graph(transport, env("ARK_NEO4J_URL", "http://127.0.0.1:7474"),
                         env("ARK_NEO4J_DATABASE", "neo4j"), env("ARK_NEO4J_USER", password.empty() ? "" : "neo4j"), password);
@@ -1327,7 +1353,7 @@ int main(int argc, char** argv) {
                         {"title", "Materials screening: hypothesis " + std::to_string(candidate_index + 1) + " — " + topic},
                         {"hypothesis", candidate.at("hypothesis")},
                         {"spec", prior.at(second ? "experiment_second" : "experiment")},
-                        {"results", prior.at(second ? "analysis_second" : "analysis")},
+                        {"results", std::move(report_results)}, {"figures", analyzed_figures},
                         {"references", std::move(references)}})), stage);
                 }
                 throw std::invalid_argument("Unknown SAGE workflow stage");
