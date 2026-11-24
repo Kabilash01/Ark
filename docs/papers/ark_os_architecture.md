@@ -63,6 +63,34 @@ The final v1.0 evaluation includes 50 cases. On the ten unchanged research and
 coding task IDs, the measured score rose from 0.4035 in the recorded Month 2
 baseline to 0.438, an 8.55% relative improvement. The overall 50-case mean is
 reported separately because it includes new deterministic tool workflows.
+This aggregate does not show a uniform gain: research moved from 0.518 to
+0.736, while coding moved from 0.289 to 0.140. Both reports label the agents
+version `1.0.0`, so this comparison is not evidence that prompt self-improvement
+caused the increase. The Month 4 report also lacks the per-agent model
+fingerprints recorded in the Month 2 provenance. These results support a
+matched-cohort observation, not a causal claim about the source of the change.
+
+### Integration limits
+
+The shared planner path is narrower than the collection of native worker
+modules. A normal `ark-cpp run` offers a limited research/coding/evaluation
+set plus selected browse and vision paths, and dispatches only selected agent
+types through dedicated branches. Document, terminal, and security workflows
+can be composed through the validated native-tool DAG path used by ARKBench,
+while DevOps, ML Engineer, Data Analysis, GitHub, and SAGE specialists remain
+direct CLI workflows. The flagship goal that activates all 20 agents in one
+run has not been demonstrated. The unit and workflow tests establish component
+behavior but do not establish that full-system integration criterion.
+
+The prompt-improvement gate and capability evidence map are implemented in
+native C++, with fixture tests. Neither has been run against live reflection,
+registry, inference, or benchmark services in the current environment. The
+multimodal training stage also remains unstarted: the installed llama.cpp
+trainer does not implement the guide's projection-plus-LoRA workflow. See the
+[Month 5 evidence review](../month5_results.md),
+[matched self-improvement analysis](../self_improvement_evidence.md), and
+[all-agent integration audit](../day96_agent_integration.md) for the exact
+verification scope.
 
 ![A research, coding, and evaluation DAG. The coding node is running.](figures/ark_runtime_dag.png)
 
