@@ -795,6 +795,21 @@ paths must be relative and traversal-free, and the output is marked unverified.
 This creates a `.tex` artifact, not a PDF, and citations may need richer
 bibliographic metadata before publication.
 
+## Day 81 native SAGE checkpoints
+
+`CheckpointManager` stores one atomic JSON file per completed step under
+`data/sage/checkpoints/<loop-id>/`, plus `status.json`. Loop IDs and step names
+are restricted to safe path components, and each checkpoint is limited to
+16 MiB. `run_workflow` loads saved steps, executes only missing steps, and
+writes each result before continuing, so a thrown step leaves earlier work
+available for restart.
+
+The CLI supports `sage-checkpoint list`, `resume <loop>`, `load <loop> <step>`,
+`save <loop> <step>`, and `clear <loop>`. Set `ARK_SAGE_CHECKPOINT_DIR` to use a
+different local directory. `resume` reports the last saved step and first
+missing step in the standard SAGE workflow. Unit tests simulate an interruption
+at the experiment step, restart, and verify the first two steps are skipped.
+
 ```bash
 printf '%s\n' '{"experiment":"smoke","ranges":[{"name":"learning_rate","minimum":0,"maximum":1}],"target":{"learning_rate":0.5},"trial_count":10}' \
   | build/ark-cpp ml-optimize

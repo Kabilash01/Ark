@@ -42,6 +42,7 @@ add_library(ark_native
     cpp/src/browser.cpp
     cpp/src/browser_agent.cpp
     cpp/src/citation_graph.cpp
+    cpp/src/checkpoint_manager.cpp
     cpp/src/coding.cpp
     cpp/src/conflict_resolver.cpp
     cpp/src/document_agent.cpp
@@ -122,6 +123,9 @@ if(BUILD_TESTING)
     add_executable(ark_scientific_report_tests cpp/tests/scientific_report_test.cpp)
     target_link_libraries(ark_scientific_report_tests PRIVATE ark_native)
     add_test(NAME ark_scientific_report_tests COMMAND ark_scientific_report_tests)
+    add_executable(ark_checkpoint_manager_tests cpp/tests/checkpoint_manager_test.cpp)
+    target_link_libraries(ark_checkpoint_manager_tests PRIVATE ark_native)
+    add_test(NAME ark_checkpoint_manager_tests COMMAND ark_checkpoint_manager_tests)
     set_tests_properties(ark_vision_agent_tests PROPERTIES TIMEOUT 120)
     add_executable(ark_browser_tests cpp/tests/browser_test.cpp)
     target_link_libraries(ark_browser_tests PRIVATE ark_native httplib::httplib)

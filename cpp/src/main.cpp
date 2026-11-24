@@ -3,6 +3,7 @@
 #include "ark/browser.hpp"
 #include "ark/browser_agent.hpp"
 #include "ark/citation_graph.hpp"
+#include "ark/checkpoint_manager.hpp"
 #include "ark/coding.hpp"
 #include "ark/conflict_resolver.hpp"
 #include "ark/document_agent.hpp"
@@ -1100,6 +1101,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp hypothesize < request.json\n"
                      "       ark-cpp design-experiment < request.json\n"
                      "       ark-cpp scientific-report < request.json\n"
+                     "       ark-cpp sage-checkpoint {list|resume LOOP|load LOOP STEP|save LOOP STEP|clear LOOP}\n"
                      "Research without an instruction reads an ARKMessage from stdin.\n";
         return argc < 2 ? 2 : 0;
     }
@@ -1110,6 +1112,28 @@ int main(int argc, char** argv) {
                                  {"elapsed_ms", waited.count()}, {"resource", resource}});
         });
         const std::string_view command = argv[1];
+        if (command == "sage-checkpoint" && argc >= 3) {
+            const ark::CheckpointManager manager(env("ARK_SAGE_CHECKPOINT_DIR", "data/sage/checkpoints"));
+            const std::string_view action = argv[2];
+            if (action == "list" && argc == 3) { std::cout << manager.list_loops().dump(2) << '\n'; return 0; }
+            if (action == "resume" && argc == 4) {
+                const std::vector<std::string> workflow{"literature", "hypothesis", "experiment", "analysis", "report"};
+                const std::string loop = argv[3];
+                std::cout << ark::Json{{"loop_id", loop}, {"last_completed_step", manager.get_resume_point(loop)},
+                    {"resume_step", manager.next_step(loop, workflow)}}.dump(2) << '\n'; return 0;
+            }
+            if (action == "load" && argc == 5) {
+                const auto result = manager.load(argv[3], argv[4]);
+                if (!result) { std::cout << "null\n"; return 1; }
+                std::cout << result->dump(2) << '\n'; return 0;
+            }
+            if (action == "save" && argc == 5) {
+                manager.save(argv[3], argv[4], ark::Json::parse(std::cin));
+                std::cout << "saved\n"; return 0;
+            }
+            if (action == "clear" && argc == 4) { manager.clear(argv[3]); std::cout << "cleared\n"; return 0; }
+            throw std::invalid_argument("Invalid sage-checkpoint command arguments");
+        }
         if ((command == "conflict-report" && argc <= 3)) {
             const auto report = conflict_report();
             if (argc == 3) ark::write_json(argv[2], report);
