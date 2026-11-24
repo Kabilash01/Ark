@@ -20,6 +20,7 @@
 #include "ark/kernel.hpp"
 #include "ark/ml_engineer.hpp"
 #include "ark/materials_project.hpp"
+#include "ark/mcp_server.hpp"
 #include "ark/privacy.hpp"
 #include "ark/reflection.hpp"
 #include "ark/reflection_study.hpp"
@@ -41,8 +42,10 @@
 #include "ark/web_search.hpp"
 
 #include <algorithm>
+#include <cerrno>
 #include <cctype>
 #include <cstdlib>
+#include <fcntl.h>
 #include <filesystem>
 #include <iostream>
 #include <map>
@@ -50,6 +53,12 @@
 #include <mutex>
 #include <optional>
 #include <thread>
+#include <signal.h>
+#include <spawn.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+extern char** environ;
 
 namespace {
 
@@ -63,6 +72,65 @@ std::filesystem::path config_dir() { return env("ARK_CONFIG_DIR", "config"); }
 ark::ResearchPool research_pool;
 std::optional<std::pair<std::string, std::string>> active_prompt_override;
 std::mutex active_prompt_override_mutex;
+
+std::string run_child_json(const std::filesystem::path& executable, const std::vector<std::string>& arguments,
+                           const ark::Json& input) {
+    int to_child[2]{-1, -1}, from_child[2]{-1, -1};
+    const auto close_fd = [](int& fd) { if (fd >= 0) { close(fd); fd = -1; } };
+    if (pipe(to_child) != 0) throw std::runtime_error("Could not create MCP child input pipe");
+    if (pipe(from_child) != 0) {
+        close_fd(to_child[0]); close_fd(to_child[1]);
+        throw std::runtime_error("Could not create MCP child output pipe");
+    }
+    posix_spawn_file_actions_t actions;
+    if (posix_spawn_file_actions_init(&actions) != 0) {
+        close_fd(to_child[0]); close_fd(to_child[1]); close_fd(from_child[0]); close_fd(from_child[1]);
+        throw std::runtime_error("Could not initialize MCP child process");
+    }
+    int action_error = posix_spawn_file_actions_adddup2(&actions, to_child[0], STDIN_FILENO);
+    if (!action_error) action_error = posix_spawn_file_actions_adddup2(&actions, from_child[1], STDOUT_FILENO);
+    if (!action_error) action_error = posix_spawn_file_actions_addclose(&actions, to_child[1]);
+    if (!action_error) action_error = posix_spawn_file_actions_addclose(&actions, from_child[0]);
+    if (!action_error) action_error = posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, "/dev/null", O_WRONLY, 0);
+    if (action_error) {
+        posix_spawn_file_actions_destroy(&actions);
+        close_fd(to_child[0]); close_fd(to_child[1]); close_fd(from_child[0]); close_fd(from_child[1]);
+        throw std::runtime_error("Could not configure MCP child process pipes");
+    }
+    std::vector<std::string> command{executable.string()};
+    command.insert(command.end(), arguments.begin(), arguments.end());
+    std::vector<char*> argv;
+    for (auto& part : command) argv.push_back(part.data());
+    argv.push_back(nullptr);
+    pid_t child = -1;
+    const int error = posix_spawn(&child, executable.c_str(), &actions, nullptr, argv.data(), environ);
+    posix_spawn_file_actions_destroy(&actions);
+    close_fd(to_child[0]); close_fd(from_child[1]);
+    if (error != 0) { close_fd(to_child[1]); close_fd(from_child[0]); throw std::runtime_error("Could not start native SAGE workflow subprocess"); }
+    const auto text = input.dump() + "\n";
+    std::size_t written = 0;
+    while (written < text.size()) {
+        const auto count = write(to_child[1], text.data() + written, text.size() - written);
+        if (count < 0) { if (errno == EINTR) continue; close_fd(to_child[1]); close_fd(from_child[0]); kill(child, SIGKILL); waitpid(child, nullptr, 0); throw std::runtime_error("Could not send SAGE input"); }
+        if (count == 0) { close_fd(to_child[1]); close_fd(from_child[0]); kill(child, SIGKILL); waitpid(child, nullptr, 0); throw std::runtime_error("Could not send SAGE input"); }
+        written += static_cast<std::size_t>(count);
+    }
+    close_fd(to_child[1]);
+    std::string output;
+    char buffer[8192];
+    for (;;) {
+        const auto count = read(from_child[0], buffer, sizeof(buffer));
+        if (count == 0) break;
+        if (count < 0) { if (errno == EINTR) continue; close_fd(from_child[0]); kill(child, SIGKILL); waitpid(child, nullptr, 0); throw std::runtime_error("Could not read SAGE result"); }
+        if (output.size() + static_cast<std::size_t>(count) > 16 * 1024 * 1024) { close_fd(from_child[0]); kill(child, SIGKILL); waitpid(child, nullptr, 0); throw std::runtime_error("SAGE result exceeded 16 MiB"); }
+        output.append(buffer, static_cast<std::size_t>(count));
+    }
+    close_fd(from_child[0]);
+    int status = 0;
+    while (waitpid(child, &status, 0) < 0) if (errno != EINTR) throw std::runtime_error("Could not wait for SAGE subprocess");
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) throw std::runtime_error("Native SAGE workflow failed: " + output.substr(0, 1000));
+    return output;
+}
 
 class PromptOverrideGuard {
 public:
@@ -1019,6 +1087,44 @@ int self_improve_agent(std::string_view target, const std::filesystem::path& sui
     return 0;
 }
 
+int mcp_stdio(const std::filesystem::path& executable) {
+    ark::serve_mcp_stdio(std::cin, std::cout, [&](std::string_view name, const ark::Json& args) -> ark::Json {
+        if (name == "ark_task" || name == "ark_research" || name == "ark_code") {
+            const bool privacy = args.value("privacy", false);
+            std::string goal;
+            if (name == "ark_task") goal = args.at("goal").get<std::string>();
+            else if (name == "ark_research") goal = "Research " + args.at("topic").get<std::string>();
+            else {
+                const auto language = args.value("language", "python");
+                if (language != "python") throw std::invalid_argument("ARK Coding Agent currently accepts Python tasks only");
+                goal = "Write and test " + language + " code: " + args.at("instruction").get<std::string>();
+            }
+            if (goal.empty() || goal.size() > 8192) throw std::invalid_argument("ARK task text must be 1–8192 bytes");
+            return run_task(goal, config(), ark::Json::object(), privacy, false, std::nullopt, 10);
+        }
+        if (name == "ark_security") {
+            ark::CurlTransport http;
+            const ark::SecurityAgent agent(ark::DockerSandbox(std::ref(http), env("ARK_DOCKER_SOCKET", "/var/run/docker.sock"),
+                env("ARK_SECURITY_IMAGE", "ark-security:local")));
+            auto message = agent.run(ark::make_message("mcp", "security_agent", "SECURITY", args));
+            if (message.value("status", "FAILED") != "DONE")
+                throw std::runtime_error(message.value("output", ark::Json::object()).value("error_message", "Security scan failed"));
+            return message;
+        }
+        if (name == "ark_sage") {
+            const auto loop_id = args.at("loop_id").get<std::string>();
+            if (loop_id.empty() || loop_id.size() > 64) throw std::invalid_argument("SAGE loop_id must be 1–64 characters");
+            const auto serialized = run_child_json(executable, {"sage-materials", loop_id}, args);
+            const auto result = ark::Json::parse(serialized, nullptr, false);
+            if (!result.is_object() || result.value("status", "") != "DONE")
+                throw std::runtime_error("SAGE subprocess did not return a completed result");
+            return result;
+        }
+        throw std::invalid_argument("Unknown ARK MCP tool");
+    });
+    return 0;
+}
+
 void api_command(std::string_view path, std::string_view method = "GET") {
     ark::CurlTransport http;
     const auto port = std::stoi(env("ARK_API_PORT", "8000"));
@@ -1161,6 +1267,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp models [vram-gib]\n"
                      "       ark-cpp capability-discovery <question> [map.json]\n"
                      "       ark-cpp voice [--file recording.wav] [--seconds 1..60]\n"
+                     "       ark-cpp mcp  # MCP stdio server for Claude Code, Cursor, and other MCP clients\n"
                      "       ark-cpp classify|plan <goal>\n"
                      "       ark-cpp run [--privacy] [--airgap] [--until <condition>] [--max-iter <n>] <goal> [tests.json]\n"
                      "       ark-cpp --privacy|--airgap <goal> [tests.json]\n"
@@ -1680,6 +1787,9 @@ int main(int argc, char** argv) {
             auto result = run_task(transcript, config(), ark::Json::object(), false, false, std::nullopt, 10);
             result["voice_transcript"] = transcript;
             return print_run(result);
+        }
+        if (command == "mcp" && argc == 2) {
+            return mcp_stdio(std::filesystem::canonical("/proc/self/exe"));
         }
         if (command == "memory" && (argc == 3 || (argc == 4 && std::string_view(argv[2]) == "search"))) {
             std::cout << recall(config(false), argv[argc - 1]).dump(2) << '\n';

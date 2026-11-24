@@ -1098,3 +1098,43 @@ an existing recording. Configure `ARK_AUDIO_RECORDER`, `ARK_WHISPER_CLI`, and
 machine has `arecord`, but no installed `whisper-cli` or Whisper model, so live
 speech submission has not been verified here; offline tests cover argument
 construction, transcript handling, capture cleanup, and invalid input.
+
+## Day 109 native MCP server
+
+Run `build/ark-cpp mcp` as a stdio subprocess from an MCP client configuration.
+The native server speaks JSON-RPC over newline-delimited UTF-8, negotiates MCP
+`2025-11-25`, and exposes `ark_task`, `ark_research`, `ark_code`, `ark_security`,
+and `ark_sage`. Results include both text content and structured JSON. Tool
+execution failures use MCP's `isError` result field; malformed requests and
+unknown tools use JSON-RPC errors. Standard output is reserved for protocol
+messages; the server writes no informational text to that stream.
+
+Example stdio server entry (use the absolute path to this checkout):
+
+```json
+{
+  "mcpServers": {
+    "ark-os": {
+      "command": "/absolute/path/to/Ark/build/ark-cpp",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+`ark_security` accepts source text in a `files` object rather than reading an
+arbitrary host path. It runs the native scanner inside the configured Docker
+sandbox. `ark_sage` accepts a topic, material IDs, stable loop ID, and optional
+relative figure paths; it starts the existing C++ checkpointed workflow in a
+child `ark-cpp` process. It still requires the same local services and
+Materials Project key as the CLI. Long `ark_task` and SAGE calls are
+synchronous over stdio; clients that enforce short tool-call timeouts may need
+their timeout extended. `ark_code` currently accepts Python because that is
+the language supported by its locked Coding Agent test workspace. The MCP
+protocol fixture test and a real stdio
+initialize/list smoke check verify the server surface, but registration inside
+Claude Code, Cursor, or VS Code has not been verified in this environment.
+The wire implementation follows MCP's documented
+[stdio transport](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports),
+[initialization lifecycle](https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle),
+and [tool result/error format](https://modelcontextprotocol.io/specification/2025-11-25/server/tools).
