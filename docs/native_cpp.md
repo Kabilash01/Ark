@@ -915,6 +915,9 @@ When no paths are supplied, report generation continues with no figures. The
 existing Vision Agent fixture test verifies confusion-matrix labels, cell
 values, and a misclassification caption; a live VLM remains unavailable here.
 
+The Week 13 status and live verification requirements are recorded in
+[the review](week13_review.md).
+
 ## Day 85 hypothesis evidence and specificity
 
 Hypothesis proposals now cite one to three exact paper IDs from the retrieved
