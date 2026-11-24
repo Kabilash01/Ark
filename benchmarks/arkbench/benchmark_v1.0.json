@@ -1,0 +1,1769 @@
+{
+  "version": "1.0",
+  "description": "ARKBench v1.0 retains all 30 v0.5 tasks and adds 10 native DAG coordination and 10 cross-domain workflow cases. Workflow data bindings are restricted to known tool string outputs and document paragraph text.",
+  "tasks": [
+    {
+      "task_id": "research-01-transformer",
+      "kind": "research",
+      "goal": "Explain which components the Transformer replaces with attention, why the architecture changes training parallelism, and one translation result reported in the abstract. Distinguish the reported result from a general performance claim.",
+      "required_arxiv_ids": [
+        "1706.03762"
+      ]
+    },
+    {
+      "task_id": "research-02-residual-learning",
+      "kind": "research",
+      "goal": "Explain the training difficulty addressed by residual learning and what a residual block learns relative to its input. Describe one result from the image recognition experiments, identifying the dataset and whether the result concerns a single network or an ensemble when the abstract says so.",
+      "required_arxiv_ids": [
+        "1512.03385"
+      ]
+    },
+    {
+      "task_id": "research-03-language-pretraining",
+      "kind": "research",
+      "goal": "Compare the central contribution of BERT with the pretraining study in RoBERTa. Explain what the later study changes about the interpretation of benchmark gains and identify what the two abstracts leave unresolved. Cite each paper for its own contribution.",
+      "required_arxiv_ids": [
+        "1810.04805",
+        "1907.11692"
+      ]
+    },
+    {
+      "task_id": "research-04-adam-weight-decay",
+      "kind": "research",
+      "goal": "Explain the purpose of Adam and how decoupled weight decay changes the treatment of regularization for adaptive optimization. Distinguish the algorithmic change from the empirical claims and support the comparison with both abstracts.",
+      "required_arxiv_ids": [
+        "1412.6980",
+        "1711.05101"
+      ]
+    },
+    {
+      "task_id": "research-05-model-distillation",
+      "kind": "research",
+      "goal": "Explain the goal of DistilBERT and which trade-offs the authors report for model size, speed, and retained performance. Identify the comparison baseline and keep any reported numbers tied to what the abstract measures.",
+      "required_arxiv_ids": [
+        "1910.01108"
+      ]
+    },
+    {
+      "task_id": "coding-01-merge-intervals",
+      "kind": "coding",
+      "goal": "Write solution.py with merge_intervals(intervals). The input is a list of [start, end] integer pairs with start <= end. Return sorted merged [start, end] lists. Merge closed intervals that overlap or share an endpoint. Do not change the input list or its nested lists. Return [] for empty input.",
+      "test_files": {
+        "test_smoke.py": "import unittest\n\nfrom solution import merge_intervals\n\n\nclass SmokeTests(unittest.TestCase):\n    def test_touching(self):\n        self.assertEqual(merge_intervals([[1, 3], [3, 4]]), [[1, 4]])\n"
+      },
+      "acceptance_tests": {
+        "test_acceptance.py": "import unittest\n\nfrom solution import merge_intervals\n\n\nclass AcceptanceTests(unittest.TestCase):\n    def test_mixed_intervals_without_mutation(self):\n        intervals = [[8, 10], [-4, -2], [1, 4], [2, 3], [-2, 1], [9, 12]]\n        original = [interval[:] for interval in intervals]\n        self.assertEqual(merge_intervals(intervals), [[-4, 4], [8, 12]])\n        self.assertEqual(intervals, original)\n\n    def test_disjoint_and_empty(self):\n        self.assertEqual(merge_intervals([[3, 4], [1, 2]]), [[1, 2], [3, 4]])\n        self.assertEqual(merge_intervals([]), [])\n"
+      }
+    },
+    {
+      "task_id": "coding-02-rolling-mean",
+      "kind": "coding",
+      "goal": "Write solution.py with rolling_mean(values, window). For a list of finite numeric values and a positive integer window, return the mean of every complete contiguous window in input order. Return [] when the window is larger than the input. Raise ValueError for a zero or negative window. Preserve the input.",
+      "test_files": {
+        "test_smoke.py": "import unittest\n\nfrom solution import rolling_mean\n\n\nclass SmokeTests(unittest.TestCase):\n    def test_rolling(self):\n        self.assertEqual(rolling_mean([1, 3, 5], 2), [2.0, 4.0])\n"
+      },
+      "acceptance_tests": {
+        "test_acceptance.py": "import unittest\n\nfrom solution import rolling_mean\n\n\nclass AcceptanceTests(unittest.TestCase):\n    def test_fractional_negative_input(self):\n        values = [2.5, -1.0, 4.5, 0.0]\n        result = rolling_mean(values, 3)\n        self.assertEqual(len(result), 2)\n        self.assertAlmostEqual(result[0], 2.0)\n        self.assertAlmostEqual(result[1], 3.5 / 3.0)\n        self.assertEqual(values, [2.5, -1.0, 4.5, 0.0])\n\n    def test_boundaries(self):\n        self.assertEqual(rolling_mean([2, -4], 1), [2.0, -4.0])\n        self.assertEqual(rolling_mean([], 1), [])\n        self.assertEqual(rolling_mean([20], 2), [])\n        for window in (0, -1):\n            with self.assertRaises(ValueError):\n                rolling_mean([1], window)\n"
+      }
+    },
+    {
+      "task_id": "coding-03-topological-order",
+      "kind": "coding",
+      "goal": "Write solution.py with topological_order(nodes, edges). Nodes is a list of distinct strings. Each (before, after) edge requires before to precede after. At each step, choose the lexicographically smallest available node. Include isolated nodes and count duplicate edges once. Raise ValueError for a cycle or for an edge that mentions an undeclared node.",
+      "test_files": {
+        "test_smoke.py": "import unittest\n\nfrom solution import topological_order\n\n\nclass SmokeTests(unittest.TestCase):\n    def test_precedence(self):\n        self.assertEqual(topological_order(['c', 'b', 'a'], [('b', 'c')]), ['a', 'b', 'c'])\n"
+      },
+      "acceptance_tests": {
+        "test_acceptance.py": "import unittest\n\nfrom solution import topological_order\n\n\nclass AcceptanceTests(unittest.TestCase):\n    def test_available_order_with_parallel_dependencies(self):\n        nodes = ['z', 'd', 'c', 'a', 'b']\n        edges = [('a', 'd'), ('b', 'c'), ('b', 'c'), ('d', 'c')]\n        self.assertEqual(topological_order(nodes, edges), ['a', 'b', 'd', 'c', 'z'])\n        self.assertEqual(topological_order([], []), [])\n\n    def test_invalid_edges(self):\n        with self.assertRaises(ValueError):\n            topological_order(['a', 'b'], [('a', 'b'), ('b', 'a')])\n        with self.assertRaises(ValueError):\n            topological_order(['a'], [('a', 'missing')])\n"
+      }
+    },
+    {
+      "task_id": "coding-04-csv-aggregation",
+      "kind": "coding",
+      "goal": "Write solution.py with aggregate_sales(csv_text). Read CSV with columns city and amount. Trim surrounding whitespace from both fields, preserve case in city names, and sum signed integer amounts by city. Handle quoted CSV fields and skip empty lines. Return an empty dict for a header-only input. Raise ValueError for a blank city or a missing or invalid amount.",
+      "test_files": {
+        "test_smoke.py": "import unittest\n\nfrom solution import aggregate_sales\n\n\nclass SmokeTests(unittest.TestCase):\n    def test_totals(self):\n        self.assertEqual(aggregate_sales('city,amount\\nA,2\\nA,3\\nB,1\\n'), {'A': 5, 'B': 1})\n"
+      },
+      "acceptance_tests": {
+        "test_acceptance.py": "import unittest\n\nfrom solution import aggregate_sales\n\n\nclass AcceptanceTests(unittest.TestCase):\n    def test_quoted_fields_and_negative_sales(self):\n        data = 'city,amount\\r\\n\" Paris, TX \", 4\\r\\n\\r\\n\"Paris, TX\",-2\\r\\nparis,3\\r\\n'\n        self.assertEqual(aggregate_sales(data), {'Paris, TX': 2, 'paris': 3})\n        self.assertEqual(aggregate_sales('city,amount\\n'), {})\n\n    def test_invalid_rows(self):\n        for row in ('A,nope', 'A,1.5', ' ,2', 'B'):\n            with self.subTest(row=row), self.assertRaises(ValueError):\n                aggregate_sales('city,amount\\n' + row + '\\n')\n"
+      }
+    },
+    {
+      "task_id": "coding-05-run-length-encoding",
+      "kind": "coding",
+      "goal": "Write solution.py with encode_runs(text) and decode_runs(runs). Encode adjacent equal Unicode characters as a list of (one_character_string, positive_integer_count) tuples. Decode these pairs back to a string. Empty inputs produce an empty list or string. Raise ValueError for a run with a multi-character or empty string, a non-integer count, or a count less than one.",
+      "test_files": {
+        "test_smoke.py": "import unittest\n\nfrom solution import decode_runs, encode_runs\n\n\nclass SmokeTests(unittest.TestCase):\n    def test_basic_round_trip(self):\n        runs = [('a', 2), ('b', 1)]\n        self.assertEqual(encode_runs('aab'), runs)\n        self.assertEqual(decode_runs(runs), 'aab')\n"
+      },
+      "acceptance_tests": {
+        "test_acceptance.py": "import unittest\n\nfrom solution import decode_runs, encode_runs\n\n\nclass AcceptanceTests(unittest.TestCase):\n    def test_unicode_and_adjacent_groups(self):\n        text = 'éé🐙é  \\n'\n        expected = [('é', 2), ('🐙', 1), ('é', 1), (' ', 2), ('\\n', 1)]\n        self.assertEqual(encode_runs(text), expected)\n        self.assertEqual(decode_runs(expected), text)\n        self.assertEqual(encode_runs(''), [])\n        self.assertEqual(decode_runs([]), '')\n\n    def test_invalid_runs(self):\n        for runs in ([('xy', 1)], [('', 2)], [('x', 0)], [('x', -4)], [('x', 1.5)]):\n            with self.subTest(runs=runs), self.assertRaises(ValueError):\n                decode_runs(runs)\n"
+      }
+    },
+    {
+      "task_id": "AB-S01",
+      "kind": "security",
+      "goal": "Check pinned werkzeug 3.0.2 against the local CVE-2024-34069 advisory.",
+      "fixture": {
+        "dependencies": {
+          "werkzeug": "3.0.2"
+        },
+        "advisories": [
+          {
+            "id": "CVE-2024-34069",
+            "package": "werkzeug",
+            "affected_versions": [
+              "3.0.2"
+            ],
+            "source": "https://github.com/advisories/GHSA-2g68-c3qc-8985"
+          }
+        ]
+      },
+      "expected": {
+        "/matched_advisories": [
+          "CVE-2024-34069"
+        ]
+      }
+    },
+    {
+      "task_id": "AB-S02",
+      "kind": "security",
+      "goal": "Check pinned werkzeug 3.0.3 against the local CVE-2024-34069 advisory.",
+      "fixture": {
+        "dependencies": {
+          "werkzeug": "3.0.3"
+        },
+        "advisories": [
+          {
+            "id": "CVE-2024-34069",
+            "package": "werkzeug",
+            "affected_versions": [
+              "3.0.2"
+            ],
+            "source": "https://github.com/advisories/GHSA-2g68-c3qc-8985"
+          }
+        ]
+      },
+      "expected": {
+        "/matched_advisories": []
+      }
+    },
+    {
+      "task_id": "AB-S03",
+      "kind": "security",
+      "goal": "Check pinned flask 2.3.1 against the local CVE-2023-30861 advisory.",
+      "fixture": {
+        "dependencies": {
+          "flask": "2.3.1"
+        },
+        "advisories": [
+          {
+            "id": "CVE-2023-30861",
+            "package": "flask",
+            "affected_versions": [
+              "2.3.1"
+            ],
+            "source": "https://github.com/advisories/GHSA-m2qf-hxjv-5gpq"
+          }
+        ]
+      },
+      "expected": {
+        "/matched_advisories": [
+          "CVE-2023-30861"
+        ]
+      }
+    },
+    {
+      "task_id": "AB-S04",
+      "kind": "security",
+      "goal": "Check pinned flask 2.3.2 against the local CVE-2023-30861 advisory.",
+      "fixture": {
+        "dependencies": {
+          "flask": "2.3.2"
+        },
+        "advisories": [
+          {
+            "id": "CVE-2023-30861",
+            "package": "flask",
+            "affected_versions": [
+              "2.3.1"
+            ],
+            "source": "https://github.com/advisories/GHSA-m2qf-hxjv-5gpq"
+          }
+        ]
+      },
+      "expected": {
+        "/matched_advisories": []
+      }
+    },
+    {
+      "task_id": "AB-S05",
+      "kind": "security",
+      "goal": "Check pinned requests 2.31.0 against the local CVE-2024-35195 advisory.",
+      "fixture": {
+        "dependencies": {
+          "requests": "2.31.0"
+        },
+        "advisories": [
+          {
+            "id": "CVE-2024-35195",
+            "package": "requests",
+            "affected_versions": [
+              "2.31.0"
+            ],
+            "source": "https://github.com/advisories/GHSA-9wx4-h78v-vm56"
+          }
+        ]
+      },
+      "expected": {
+        "/matched_advisories": [
+          "CVE-2024-35195"
+        ]
+      }
+    },
+    {
+      "task_id": "AB-S06",
+      "kind": "security",
+      "goal": "Check pinned requests 2.32.0 against the local CVE-2024-35195 advisory.",
+      "fixture": {
+        "dependencies": {
+          "requests": "2.32.0"
+        },
+        "advisories": [
+          {
+            "id": "CVE-2024-35195",
+            "package": "requests",
+            "affected_versions": [
+              "2.31.0"
+            ],
+            "source": "https://github.com/advisories/GHSA-9wx4-h78v-vm56"
+          }
+        ]
+      },
+      "expected": {
+        "/matched_advisories": []
+      }
+    },
+    {
+      "task_id": "AB-S07",
+      "kind": "security",
+      "goal": "Check pinned urllib3 1.26.18 against the local CVE-2024-37891 advisory.",
+      "fixture": {
+        "dependencies": {
+          "urllib3": "1.26.18"
+        },
+        "advisories": [
+          {
+            "id": "CVE-2024-37891",
+            "package": "urllib3",
+            "affected_versions": [
+              "1.26.18"
+            ],
+            "source": "https://github.com/advisories/GHSA-34jh-p97f-mpxf"
+          }
+        ]
+      },
+      "expected": {
+        "/matched_advisories": [
+          "CVE-2024-37891"
+        ]
+      }
+    },
+    {
+      "task_id": "AB-S08",
+      "kind": "security",
+      "goal": "Check pinned urllib3 1.26.19 against the local CVE-2024-37891 advisory.",
+      "fixture": {
+        "dependencies": {
+          "urllib3": "1.26.19"
+        },
+        "advisories": [
+          {
+            "id": "CVE-2024-37891",
+            "package": "urllib3",
+            "affected_versions": [
+              "1.26.18"
+            ],
+            "source": "https://github.com/advisories/GHSA-34jh-p97f-mpxf"
+          }
+        ]
+      },
+      "expected": {
+        "/matched_advisories": []
+      }
+    },
+    {
+      "task_id": "AB-S09",
+      "kind": "security",
+      "goal": "Check pinned pillow 10.1.0 against the local CVE-2023-50447 advisory.",
+      "fixture": {
+        "dependencies": {
+          "pillow": "10.1.0"
+        },
+        "advisories": [
+          {
+            "id": "CVE-2023-50447",
+            "package": "pillow",
+            "affected_versions": [
+              "10.1.0"
+            ],
+            "source": "https://github.com/advisories/GHSA-3f63-hfp8-52jq"
+          }
+        ]
+      },
+      "expected": {
+        "/matched_advisories": [
+          "CVE-2023-50447"
+        ]
+      }
+    },
+    {
+      "task_id": "AB-S10",
+      "kind": "security",
+      "goal": "Check pinned pillow 10.2.0 against the local CVE-2023-50447 advisory.",
+      "fixture": {
+        "dependencies": {
+          "pillow": "10.2.0"
+        },
+        "advisories": [
+          {
+            "id": "CVE-2023-50447",
+            "package": "pillow",
+            "affected_versions": [
+              "10.1.0"
+            ],
+            "source": "https://github.com/advisories/GHSA-3f63-hfp8-52jq"
+          }
+        ]
+      },
+      "expected": {
+        "/matched_advisories": []
+      }
+    },
+    {
+      "task_id": "AB-B01",
+      "kind": "browser",
+      "goal": "Extract the first two fixture paper titles.",
+      "fixture": {
+        "html": "<title>Library papers</title><h1>Papers</h1><p class=\"paper-title\">Vector report</p><p class=\"paper-title\">Search methods</p><p class=\"paper-title\">Reference index</p>",
+        "instruction": "extract the first two paper titles."
+      },
+      "expected": {
+        "/extractions/0/items": [
+          "Vector report",
+          "Search methods"
+        ]
+      }
+    },
+    {
+      "task_id": "AB-B02",
+      "kind": "browser",
+      "goal": "Capture a screenshot of a fixture review page.",
+      "fixture": {
+        "html": "<title>Review</title><main><h1>Review complete</h1><p>Two cases verified.</p></main>",
+        "instruction": "capture one screenshot of the current page."
+      },
+      "expected": {
+        "/screenshot_count": 1
+      }
+    },
+    {
+      "task_id": "AB-B03",
+      "kind": "browser",
+      "goal": "Extract the displayed status from a fixture page.",
+      "fixture": {
+        "html": "<title>Task status</title><h1>Task status</h1><p id=\"status-value\" class=\"state\">Ready for review</p>",
+        "instruction": "extract the displayed task status from the element with ID status-value."
+      },
+      "expected": {
+        "/extractions/0/items": [
+          "Ready for review"
+        ]
+      }
+    },
+    {
+      "task_id": "AB-D01",
+      "kind": "document",
+      "goal": "Write and read a formatted DOCX report.",
+      "fixture": {
+        "format": "docx",
+        "content": {
+          "title": "Audit summary",
+          "paragraphs": [
+            "Reviewed & approved.",
+            "Source < archive >."
+          ]
+        }
+      },
+      "expected": {
+        "/paragraphs": [
+          "Audit summary",
+          "Reviewed & approved.",
+          "Source < archive >."
+        ]
+      }
+    },
+    {
+      "task_id": "AB-D02",
+      "kind": "document",
+      "goal": "Write and read a PDF containing a stable sentence.",
+      "fixture": {
+        "format": "pdf",
+        "content": {
+          "paragraphs": [
+            "Stable sentence for PDF extraction."
+          ]
+        }
+      },
+      "expected": {
+        "/pages": [
+          "Stable sentence for PDF extraction."
+        ]
+      }
+    },
+    {
+      "task_id": "AB-D03",
+      "kind": "document",
+      "goal": "Round-trip the values from a typed spreadsheet.",
+      "fixture": {
+        "format": "xlsx",
+        "content": {
+          "rows": [
+            [
+              "Project",
+              "Count",
+              "Ready",
+              "Comment"
+            ],
+            [
+              "Index",
+              7,
+              true,
+              null
+            ]
+          ]
+        }
+      },
+      "expected": {
+        "/sheets/0/rows": [
+          [
+            "Project",
+            "Count",
+            "Ready",
+            "Comment"
+          ],
+          [
+            "Index",
+            7,
+            true,
+            null
+          ]
+        ]
+      }
+    },
+    {
+      "task_id": "AB-T01",
+      "kind": "terminal",
+      "goal": "Read Bash array output and distinguish standard error.",
+      "fixture": {
+        "command": "items=(alpha beta); printf \"%s\\n\" \"${items[1]}\"; printf \"%s\\n\" \"diagnostic\" >&2"
+      },
+      "expected": {
+        "/stdout": "beta\n",
+        "/stderr": "diagnostic\n",
+        "/exit_code": 0
+      }
+    },
+    {
+      "task_id": "AB-T02",
+      "kind": "terminal",
+      "goal": "Preserve output and exit status when a Bash command fails.",
+      "fixture": {
+        "command": "printf \"%s\\n\" \"report\"; exit 7"
+      },
+      "expected": {
+        "/stdout": "report\n",
+        "/exit_code": 7,
+        "/timed_out": false
+      },
+      "expected_status": "FAILED"
+    },
+    {
+      "task_id": "AB-T03",
+      "kind": "terminal",
+      "goal": "Recognize a missing fixture Python import.",
+      "fixture": {
+        "command": "python -c 'import ark_benchmark_missing'"
+      },
+      "expected": {
+        "/missing_module": "ark_benchmark_missing",
+        "/suggestion": "python -m pip install ark_benchmark_missing"
+      },
+      "expected_status": "FAILED"
+    },
+    {
+      "task_id": "AB-T04",
+      "kind": "terminal",
+      "goal": "Enforce the job timeout after preserving the initial output.",
+      "fixture": {
+        "command": "printf \"%s\\n\" \"started\"; sleep 12",
+        "timeout_seconds": 1
+      },
+      "expected": {
+        "/stdout": "started\n",
+        "/exit_code": 124,
+        "/timed_out": true
+      },
+      "expected_status": "FAILED"
+    },
+    {
+      "task_id": "coordination-01-fan-in",
+      "kind": "coordination",
+      "goal": "Coordinate a pinned advisory check, a local preparation command, and a final report for case 01.",
+      "fixture": {
+        "max_workers": 2,
+        "stages": [
+          {
+            "task_id": "prepare-01",
+            "kind": "terminal",
+            "depends_on": [],
+            "fixture": {
+              "command": "printf '%s' 'coordination-01'"
+            }
+          },
+          {
+            "task_id": "audit-01",
+            "kind": "security",
+            "depends_on": [],
+            "fixture": {
+              "dependencies": {
+                "werkzeug": "3.0.2"
+              },
+              "advisories": [
+                {
+                  "id": "CVE-2024-34069",
+                  "package": "werkzeug",
+                  "affected_versions": [
+                    "3.0.2"
+                  ],
+                  "source": "https://github.com/advisories/GHSA-2g68-c3qc-8985"
+                }
+              ]
+            }
+          },
+          {
+            "task_id": "report-01",
+            "kind": "document",
+            "depends_on": [
+              "prepare-01",
+              "audit-01"
+            ],
+            "fixture": {
+              "format": "docx",
+              "content": {
+                "paragraphs": [
+                  "Workflow 01"
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "from": "prepare-01",
+                "source": "/output/stdout",
+                "target": "/content/paragraphs/0"
+              },
+              {
+                "from": "audit-01",
+                "source": "/output/matched_advisories/0",
+                "target": "/content/paragraphs/0"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "/stage_status/prepare-01": "DONE",
+        "/stage_status/audit-01": "DONE",
+        "/stage_status/report-01": "DONE",
+        "/stage_outputs/report-01/paragraphs/0": "Workflow 01 | coordination-01 | CVE-2024-34069",
+        "/parallel_layers": 2
+      }
+    },
+    {
+      "task_id": "coordination-02-fan-in",
+      "kind": "coordination",
+      "goal": "Coordinate a pinned advisory check, a local preparation command, and a final report for case 02.",
+      "fixture": {
+        "max_workers": 2,
+        "stages": [
+          {
+            "task_id": "prepare-02",
+            "kind": "terminal",
+            "depends_on": [],
+            "fixture": {
+              "command": "printf '%s' 'coordination-02'"
+            }
+          },
+          {
+            "task_id": "audit-02",
+            "kind": "security",
+            "depends_on": [],
+            "fixture": {
+              "dependencies": {
+                "werkzeug": "3.0.2"
+              },
+              "advisories": [
+                {
+                  "id": "CVE-2024-34069",
+                  "package": "werkzeug",
+                  "affected_versions": [
+                    "3.0.2"
+                  ],
+                  "source": "https://github.com/advisories/GHSA-2g68-c3qc-8985"
+                }
+              ]
+            }
+          },
+          {
+            "task_id": "report-02",
+            "kind": "document",
+            "depends_on": [
+              "prepare-02",
+              "audit-02"
+            ],
+            "fixture": {
+              "format": "docx",
+              "content": {
+                "paragraphs": [
+                  "Workflow 02"
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "from": "prepare-02",
+                "source": "/output/stdout",
+                "target": "/content/paragraphs/0"
+              },
+              {
+                "from": "audit-02",
+                "source": "/output/matched_advisories/0",
+                "target": "/content/paragraphs/0"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "/stage_status/prepare-02": "DONE",
+        "/stage_status/audit-02": "DONE",
+        "/stage_status/report-02": "DONE",
+        "/stage_outputs/report-02/paragraphs/0": "Workflow 02 | coordination-02 | CVE-2024-34069",
+        "/parallel_layers": 2
+      }
+    },
+    {
+      "task_id": "coordination-03-fan-in",
+      "kind": "coordination",
+      "goal": "Coordinate a pinned advisory check, a local preparation command, and a final report for case 03.",
+      "fixture": {
+        "max_workers": 2,
+        "stages": [
+          {
+            "task_id": "prepare-03",
+            "kind": "terminal",
+            "depends_on": [],
+            "fixture": {
+              "command": "printf '%s' 'coordination-03'"
+            }
+          },
+          {
+            "task_id": "audit-03",
+            "kind": "security",
+            "depends_on": [],
+            "fixture": {
+              "dependencies": {
+                "werkzeug": "3.0.2"
+              },
+              "advisories": [
+                {
+                  "id": "CVE-2024-34069",
+                  "package": "werkzeug",
+                  "affected_versions": [
+                    "3.0.2"
+                  ],
+                  "source": "https://github.com/advisories/GHSA-2g68-c3qc-8985"
+                }
+              ]
+            }
+          },
+          {
+            "task_id": "report-03",
+            "kind": "document",
+            "depends_on": [
+              "prepare-03",
+              "audit-03"
+            ],
+            "fixture": {
+              "format": "docx",
+              "content": {
+                "paragraphs": [
+                  "Workflow 03"
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "from": "prepare-03",
+                "source": "/output/stdout",
+                "target": "/content/paragraphs/0"
+              },
+              {
+                "from": "audit-03",
+                "source": "/output/matched_advisories/0",
+                "target": "/content/paragraphs/0"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "/stage_status/prepare-03": "DONE",
+        "/stage_status/audit-03": "DONE",
+        "/stage_status/report-03": "DONE",
+        "/stage_outputs/report-03/paragraphs/0": "Workflow 03 | coordination-03 | CVE-2024-34069",
+        "/parallel_layers": 2
+      }
+    },
+    {
+      "task_id": "coordination-04-fan-in",
+      "kind": "coordination",
+      "goal": "Coordinate a pinned advisory check, a local preparation command, and a final report for case 04.",
+      "fixture": {
+        "max_workers": 2,
+        "stages": [
+          {
+            "task_id": "prepare-04",
+            "kind": "terminal",
+            "depends_on": [],
+            "fixture": {
+              "command": "printf '%s' 'coordination-04'"
+            }
+          },
+          {
+            "task_id": "audit-04",
+            "kind": "security",
+            "depends_on": [],
+            "fixture": {
+              "dependencies": {
+                "werkzeug": "3.0.2"
+              },
+              "advisories": [
+                {
+                  "id": "CVE-2024-34069",
+                  "package": "werkzeug",
+                  "affected_versions": [
+                    "3.0.2"
+                  ],
+                  "source": "https://github.com/advisories/GHSA-2g68-c3qc-8985"
+                }
+              ]
+            }
+          },
+          {
+            "task_id": "report-04",
+            "kind": "document",
+            "depends_on": [
+              "prepare-04",
+              "audit-04"
+            ],
+            "fixture": {
+              "format": "docx",
+              "content": {
+                "paragraphs": [
+                  "Workflow 04"
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "from": "prepare-04",
+                "source": "/output/stdout",
+                "target": "/content/paragraphs/0"
+              },
+              {
+                "from": "audit-04",
+                "source": "/output/matched_advisories/0",
+                "target": "/content/paragraphs/0"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "/stage_status/prepare-04": "DONE",
+        "/stage_status/audit-04": "DONE",
+        "/stage_status/report-04": "DONE",
+        "/stage_outputs/report-04/paragraphs/0": "Workflow 04 | coordination-04 | CVE-2024-34069",
+        "/parallel_layers": 2
+      }
+    },
+    {
+      "task_id": "coordination-05-fan-in",
+      "kind": "coordination",
+      "goal": "Coordinate a pinned advisory check, a local preparation command, and a final report for case 05.",
+      "fixture": {
+        "max_workers": 2,
+        "stages": [
+          {
+            "task_id": "prepare-05",
+            "kind": "terminal",
+            "depends_on": [],
+            "fixture": {
+              "command": "printf '%s' 'coordination-05'"
+            }
+          },
+          {
+            "task_id": "audit-05",
+            "kind": "security",
+            "depends_on": [],
+            "fixture": {
+              "dependencies": {
+                "werkzeug": "3.0.2"
+              },
+              "advisories": [
+                {
+                  "id": "CVE-2024-34069",
+                  "package": "werkzeug",
+                  "affected_versions": [
+                    "3.0.2"
+                  ],
+                  "source": "https://github.com/advisories/GHSA-2g68-c3qc-8985"
+                }
+              ]
+            }
+          },
+          {
+            "task_id": "report-05",
+            "kind": "document",
+            "depends_on": [
+              "prepare-05",
+              "audit-05"
+            ],
+            "fixture": {
+              "format": "docx",
+              "content": {
+                "paragraphs": [
+                  "Workflow 05"
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "from": "prepare-05",
+                "source": "/output/stdout",
+                "target": "/content/paragraphs/0"
+              },
+              {
+                "from": "audit-05",
+                "source": "/output/matched_advisories/0",
+                "target": "/content/paragraphs/0"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "/stage_status/prepare-05": "DONE",
+        "/stage_status/audit-05": "DONE",
+        "/stage_status/report-05": "DONE",
+        "/stage_outputs/report-05/paragraphs/0": "Workflow 05 | coordination-05 | CVE-2024-34069",
+        "/parallel_layers": 2
+      }
+    },
+    {
+      "task_id": "coordination-06-fan-in",
+      "kind": "coordination",
+      "goal": "Coordinate a pinned advisory check, a local preparation command, and a final report for case 06.",
+      "fixture": {
+        "max_workers": 2,
+        "stages": [
+          {
+            "task_id": "prepare-06",
+            "kind": "terminal",
+            "depends_on": [],
+            "fixture": {
+              "command": "printf '%s' 'coordination-06'"
+            }
+          },
+          {
+            "task_id": "audit-06",
+            "kind": "security",
+            "depends_on": [],
+            "fixture": {
+              "dependencies": {
+                "werkzeug": "3.0.2"
+              },
+              "advisories": [
+                {
+                  "id": "CVE-2024-34069",
+                  "package": "werkzeug",
+                  "affected_versions": [
+                    "3.0.2"
+                  ],
+                  "source": "https://github.com/advisories/GHSA-2g68-c3qc-8985"
+                }
+              ]
+            }
+          },
+          {
+            "task_id": "report-06",
+            "kind": "document",
+            "depends_on": [
+              "prepare-06",
+              "audit-06"
+            ],
+            "fixture": {
+              "format": "docx",
+              "content": {
+                "paragraphs": [
+                  "Workflow 06"
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "from": "prepare-06",
+                "source": "/output/stdout",
+                "target": "/content/paragraphs/0"
+              },
+              {
+                "from": "audit-06",
+                "source": "/output/matched_advisories/0",
+                "target": "/content/paragraphs/0"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "/stage_status/prepare-06": "DONE",
+        "/stage_status/audit-06": "DONE",
+        "/stage_status/report-06": "DONE",
+        "/stage_outputs/report-06/paragraphs/0": "Workflow 06 | coordination-06 | CVE-2024-34069",
+        "/parallel_layers": 2
+      }
+    },
+    {
+      "task_id": "coordination-07-fan-in",
+      "kind": "coordination",
+      "goal": "Coordinate a pinned advisory check, a local preparation command, and a final report for case 07.",
+      "fixture": {
+        "max_workers": 2,
+        "stages": [
+          {
+            "task_id": "prepare-07",
+            "kind": "terminal",
+            "depends_on": [],
+            "fixture": {
+              "command": "printf '%s' 'coordination-07'"
+            }
+          },
+          {
+            "task_id": "audit-07",
+            "kind": "security",
+            "depends_on": [],
+            "fixture": {
+              "dependencies": {
+                "werkzeug": "3.0.2"
+              },
+              "advisories": [
+                {
+                  "id": "CVE-2024-34069",
+                  "package": "werkzeug",
+                  "affected_versions": [
+                    "3.0.2"
+                  ],
+                  "source": "https://github.com/advisories/GHSA-2g68-c3qc-8985"
+                }
+              ]
+            }
+          },
+          {
+            "task_id": "report-07",
+            "kind": "document",
+            "depends_on": [
+              "prepare-07",
+              "audit-07"
+            ],
+            "fixture": {
+              "format": "docx",
+              "content": {
+                "paragraphs": [
+                  "Workflow 07"
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "from": "prepare-07",
+                "source": "/output/stdout",
+                "target": "/content/paragraphs/0"
+              },
+              {
+                "from": "audit-07",
+                "source": "/output/matched_advisories/0",
+                "target": "/content/paragraphs/0"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "/stage_status/prepare-07": "DONE",
+        "/stage_status/audit-07": "DONE",
+        "/stage_status/report-07": "DONE",
+        "/stage_outputs/report-07/paragraphs/0": "Workflow 07 | coordination-07 | CVE-2024-34069",
+        "/parallel_layers": 2
+      }
+    },
+    {
+      "task_id": "coordination-08-fan-in",
+      "kind": "coordination",
+      "goal": "Coordinate a pinned advisory check, a local preparation command, and a final report for case 08.",
+      "fixture": {
+        "max_workers": 2,
+        "stages": [
+          {
+            "task_id": "prepare-08",
+            "kind": "terminal",
+            "depends_on": [],
+            "fixture": {
+              "command": "printf '%s' 'coordination-08'"
+            }
+          },
+          {
+            "task_id": "audit-08",
+            "kind": "security",
+            "depends_on": [],
+            "fixture": {
+              "dependencies": {
+                "werkzeug": "3.0.2"
+              },
+              "advisories": [
+                {
+                  "id": "CVE-2024-34069",
+                  "package": "werkzeug",
+                  "affected_versions": [
+                    "3.0.2"
+                  ],
+                  "source": "https://github.com/advisories/GHSA-2g68-c3qc-8985"
+                }
+              ]
+            }
+          },
+          {
+            "task_id": "report-08",
+            "kind": "document",
+            "depends_on": [
+              "prepare-08",
+              "audit-08"
+            ],
+            "fixture": {
+              "format": "docx",
+              "content": {
+                "paragraphs": [
+                  "Workflow 08"
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "from": "prepare-08",
+                "source": "/output/stdout",
+                "target": "/content/paragraphs/0"
+              },
+              {
+                "from": "audit-08",
+                "source": "/output/matched_advisories/0",
+                "target": "/content/paragraphs/0"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "/stage_status/prepare-08": "DONE",
+        "/stage_status/audit-08": "DONE",
+        "/stage_status/report-08": "DONE",
+        "/stage_outputs/report-08/paragraphs/0": "Workflow 08 | coordination-08 | CVE-2024-34069",
+        "/parallel_layers": 2
+      }
+    },
+    {
+      "task_id": "coordination-09-fan-in",
+      "kind": "coordination",
+      "goal": "Coordinate a pinned advisory check, a local preparation command, and a final report for case 09.",
+      "fixture": {
+        "max_workers": 2,
+        "stages": [
+          {
+            "task_id": "prepare-09",
+            "kind": "terminal",
+            "depends_on": [],
+            "fixture": {
+              "command": "printf '%s' 'coordination-09'"
+            }
+          },
+          {
+            "task_id": "audit-09",
+            "kind": "security",
+            "depends_on": [],
+            "fixture": {
+              "dependencies": {
+                "werkzeug": "3.0.2"
+              },
+              "advisories": [
+                {
+                  "id": "CVE-2024-34069",
+                  "package": "werkzeug",
+                  "affected_versions": [
+                    "3.0.2"
+                  ],
+                  "source": "https://github.com/advisories/GHSA-2g68-c3qc-8985"
+                }
+              ]
+            }
+          },
+          {
+            "task_id": "report-09",
+            "kind": "document",
+            "depends_on": [
+              "prepare-09",
+              "audit-09"
+            ],
+            "fixture": {
+              "format": "docx",
+              "content": {
+                "paragraphs": [
+                  "Workflow 09"
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "from": "prepare-09",
+                "source": "/output/stdout",
+                "target": "/content/paragraphs/0"
+              },
+              {
+                "from": "audit-09",
+                "source": "/output/matched_advisories/0",
+                "target": "/content/paragraphs/0"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "/stage_status/prepare-09": "DONE",
+        "/stage_status/audit-09": "DONE",
+        "/stage_status/report-09": "DONE",
+        "/stage_outputs/report-09/paragraphs/0": "Workflow 09 | coordination-09 | CVE-2024-34069",
+        "/parallel_layers": 2
+      }
+    },
+    {
+      "task_id": "coordination-10-fan-in",
+      "kind": "coordination",
+      "goal": "Coordinate a pinned advisory check, a local preparation command, and a final report for case 10.",
+      "fixture": {
+        "max_workers": 2,
+        "stages": [
+          {
+            "task_id": "prepare-10",
+            "kind": "terminal",
+            "depends_on": [],
+            "fixture": {
+              "command": "printf '%s' 'coordination-10'"
+            }
+          },
+          {
+            "task_id": "audit-10",
+            "kind": "security",
+            "depends_on": [],
+            "fixture": {
+              "dependencies": {
+                "werkzeug": "3.0.2"
+              },
+              "advisories": [
+                {
+                  "id": "CVE-2024-34069",
+                  "package": "werkzeug",
+                  "affected_versions": [
+                    "3.0.2"
+                  ],
+                  "source": "https://github.com/advisories/GHSA-2g68-c3qc-8985"
+                }
+              ]
+            }
+          },
+          {
+            "task_id": "report-10",
+            "kind": "document",
+            "depends_on": [
+              "prepare-10",
+              "audit-10"
+            ],
+            "fixture": {
+              "format": "docx",
+              "content": {
+                "paragraphs": [
+                  "Workflow 10"
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "from": "prepare-10",
+                "source": "/output/stdout",
+                "target": "/content/paragraphs/0"
+              },
+              {
+                "from": "audit-10",
+                "source": "/output/matched_advisories/0",
+                "target": "/content/paragraphs/0"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "/stage_status/prepare-10": "DONE",
+        "/stage_status/audit-10": "DONE",
+        "/stage_status/report-10": "DONE",
+        "/stage_outputs/report-10/paragraphs/0": "Workflow 10 | coordination-10 | CVE-2024-34069",
+        "/parallel_layers": 2
+      }
+    },
+    {
+      "task_id": "mixed-01-terminal-document",
+      "kind": "mixed",
+      "goal": "Run a terminal operation and preserve its result in a document for case 01.",
+      "fixture": {
+        "max_workers": 2,
+        "stages": [
+          {
+            "task_id": "source",
+            "kind": "terminal",
+            "depends_on": [],
+            "fixture": {
+              "command": "printf '%s' 'mixed-terminal-01'"
+            }
+          },
+          {
+            "task_id": "document",
+            "kind": "document",
+            "depends_on": [
+              "source"
+            ],
+            "fixture": {
+              "format": "docx",
+              "content": {
+                "paragraphs": [
+                  "Mixed workflow 01"
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "from": "source",
+                "source": "/output/stdout",
+                "target": "/content/paragraphs/0"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "/stage_status/document": "DONE",
+        "/stage_outputs/document/paragraphs/0": "Mixed workflow 01 | mixed-terminal-01",
+        "/parallel_layers": 2,
+        "/stage_status/source": "DONE"
+      }
+    },
+    {
+      "task_id": "mixed-02-security-document",
+      "kind": "mixed",
+      "goal": "Run a security operation and preserve its result in a document for case 02.",
+      "fixture": {
+        "max_workers": 2,
+        "stages": [
+          {
+            "task_id": "source",
+            "kind": "security",
+            "depends_on": [],
+            "fixture": {
+              "dependencies": {
+                "werkzeug": "3.0.2"
+              },
+              "advisories": [
+                {
+                  "id": "CVE-2024-34069",
+                  "package": "werkzeug",
+                  "affected_versions": [
+                    "3.0.2"
+                  ],
+                  "source": "https://github.com/advisories/GHSA-2g68-c3qc-8985"
+                }
+              ]
+            }
+          },
+          {
+            "task_id": "document",
+            "kind": "document",
+            "depends_on": [
+              "source"
+            ],
+            "fixture": {
+              "format": "docx",
+              "content": {
+                "paragraphs": [
+                  "Mixed workflow 02"
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "from": "source",
+                "source": "/output/matched_advisories/0",
+                "target": "/content/paragraphs/0"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "/stage_status/document": "DONE",
+        "/stage_outputs/document/paragraphs/0": "Mixed workflow 02 | CVE-2024-34069",
+        "/parallel_layers": 2,
+        "/stage_status/source": "DONE"
+      }
+    },
+    {
+      "task_id": "mixed-03-terminal-document",
+      "kind": "mixed",
+      "goal": "Run a terminal operation and preserve its result in a document for case 03.",
+      "fixture": {
+        "max_workers": 2,
+        "stages": [
+          {
+            "task_id": "source",
+            "kind": "terminal",
+            "depends_on": [],
+            "fixture": {
+              "command": "printf '%s' 'mixed-terminal-03'"
+            }
+          },
+          {
+            "task_id": "document",
+            "kind": "document",
+            "depends_on": [
+              "source"
+            ],
+            "fixture": {
+              "format": "docx",
+              "content": {
+                "paragraphs": [
+                  "Mixed workflow 03"
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "from": "source",
+                "source": "/output/stdout",
+                "target": "/content/paragraphs/0"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "/stage_status/document": "DONE",
+        "/stage_outputs/document/paragraphs/0": "Mixed workflow 03 | mixed-terminal-03",
+        "/parallel_layers": 2,
+        "/stage_status/source": "DONE"
+      }
+    },
+    {
+      "task_id": "mixed-04-security-document",
+      "kind": "mixed",
+      "goal": "Run a security operation and preserve its result in a document for case 04.",
+      "fixture": {
+        "max_workers": 2,
+        "stages": [
+          {
+            "task_id": "source",
+            "kind": "security",
+            "depends_on": [],
+            "fixture": {
+              "dependencies": {
+                "werkzeug": "3.0.2"
+              },
+              "advisories": [
+                {
+                  "id": "CVE-2024-34069",
+                  "package": "werkzeug",
+                  "affected_versions": [
+                    "3.0.2"
+                  ],
+                  "source": "https://github.com/advisories/GHSA-2g68-c3qc-8985"
+                }
+              ]
+            }
+          },
+          {
+            "task_id": "document",
+            "kind": "document",
+            "depends_on": [
+              "source"
+            ],
+            "fixture": {
+              "format": "docx",
+              "content": {
+                "paragraphs": [
+                  "Mixed workflow 04"
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "from": "source",
+                "source": "/output/matched_advisories/0",
+                "target": "/content/paragraphs/0"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "/stage_status/document": "DONE",
+        "/stage_outputs/document/paragraphs/0": "Mixed workflow 04 | CVE-2024-34069",
+        "/parallel_layers": 2,
+        "/stage_status/source": "DONE"
+      }
+    },
+    {
+      "task_id": "mixed-05-terminal-document",
+      "kind": "mixed",
+      "goal": "Run a terminal operation and preserve its result in a document for case 05.",
+      "fixture": {
+        "max_workers": 2,
+        "stages": [
+          {
+            "task_id": "source",
+            "kind": "terminal",
+            "depends_on": [],
+            "fixture": {
+              "command": "printf '%s' 'mixed-terminal-05'"
+            }
+          },
+          {
+            "task_id": "document",
+            "kind": "document",
+            "depends_on": [
+              "source"
+            ],
+            "fixture": {
+              "format": "docx",
+              "content": {
+                "paragraphs": [
+                  "Mixed workflow 05"
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "from": "source",
+                "source": "/output/stdout",
+                "target": "/content/paragraphs/0"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "/stage_status/document": "DONE",
+        "/stage_outputs/document/paragraphs/0": "Mixed workflow 05 | mixed-terminal-05",
+        "/parallel_layers": 2,
+        "/stage_status/source": "DONE"
+      }
+    },
+    {
+      "task_id": "mixed-06-security-document",
+      "kind": "mixed",
+      "goal": "Run a security operation and preserve its result in a document for case 06.",
+      "fixture": {
+        "max_workers": 2,
+        "stages": [
+          {
+            "task_id": "source",
+            "kind": "security",
+            "depends_on": [],
+            "fixture": {
+              "dependencies": {
+                "werkzeug": "3.0.2"
+              },
+              "advisories": [
+                {
+                  "id": "CVE-2024-34069",
+                  "package": "werkzeug",
+                  "affected_versions": [
+                    "3.0.2"
+                  ],
+                  "source": "https://github.com/advisories/GHSA-2g68-c3qc-8985"
+                }
+              ]
+            }
+          },
+          {
+            "task_id": "document",
+            "kind": "document",
+            "depends_on": [
+              "source"
+            ],
+            "fixture": {
+              "format": "docx",
+              "content": {
+                "paragraphs": [
+                  "Mixed workflow 06"
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "from": "source",
+                "source": "/output/matched_advisories/0",
+                "target": "/content/paragraphs/0"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "/stage_status/document": "DONE",
+        "/stage_outputs/document/paragraphs/0": "Mixed workflow 06 | CVE-2024-34069",
+        "/parallel_layers": 2,
+        "/stage_status/source": "DONE"
+      }
+    },
+    {
+      "task_id": "mixed-07-terminal-document",
+      "kind": "mixed",
+      "goal": "Run a terminal operation and preserve its result in a document for case 07.",
+      "fixture": {
+        "max_workers": 2,
+        "stages": [
+          {
+            "task_id": "source",
+            "kind": "terminal",
+            "depends_on": [],
+            "fixture": {
+              "command": "printf '%s' 'mixed-terminal-07'"
+            }
+          },
+          {
+            "task_id": "document",
+            "kind": "document",
+            "depends_on": [
+              "source"
+            ],
+            "fixture": {
+              "format": "docx",
+              "content": {
+                "paragraphs": [
+                  "Mixed workflow 07"
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "from": "source",
+                "source": "/output/stdout",
+                "target": "/content/paragraphs/0"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "/stage_status/document": "DONE",
+        "/stage_outputs/document/paragraphs/0": "Mixed workflow 07 | mixed-terminal-07",
+        "/parallel_layers": 2,
+        "/stage_status/source": "DONE"
+      }
+    },
+    {
+      "task_id": "mixed-08-security-document",
+      "kind": "mixed",
+      "goal": "Run a security operation and preserve its result in a document for case 08.",
+      "fixture": {
+        "max_workers": 2,
+        "stages": [
+          {
+            "task_id": "source",
+            "kind": "security",
+            "depends_on": [],
+            "fixture": {
+              "dependencies": {
+                "werkzeug": "3.0.2"
+              },
+              "advisories": [
+                {
+                  "id": "CVE-2024-34069",
+                  "package": "werkzeug",
+                  "affected_versions": [
+                    "3.0.2"
+                  ],
+                  "source": "https://github.com/advisories/GHSA-2g68-c3qc-8985"
+                }
+              ]
+            }
+          },
+          {
+            "task_id": "document",
+            "kind": "document",
+            "depends_on": [
+              "source"
+            ],
+            "fixture": {
+              "format": "docx",
+              "content": {
+                "paragraphs": [
+                  "Mixed workflow 08"
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "from": "source",
+                "source": "/output/matched_advisories/0",
+                "target": "/content/paragraphs/0"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "/stage_status/document": "DONE",
+        "/stage_outputs/document/paragraphs/0": "Mixed workflow 08 | CVE-2024-34069",
+        "/parallel_layers": 2,
+        "/stage_status/source": "DONE"
+      }
+    },
+    {
+      "task_id": "mixed-09-terminal-document",
+      "kind": "mixed",
+      "goal": "Run a terminal operation and preserve its result in a document for case 09.",
+      "fixture": {
+        "max_workers": 2,
+        "stages": [
+          {
+            "task_id": "source",
+            "kind": "terminal",
+            "depends_on": [],
+            "fixture": {
+              "command": "printf '%s' 'mixed-terminal-09'"
+            }
+          },
+          {
+            "task_id": "document",
+            "kind": "document",
+            "depends_on": [
+              "source"
+            ],
+            "fixture": {
+              "format": "docx",
+              "content": {
+                "paragraphs": [
+                  "Mixed workflow 09"
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "from": "source",
+                "source": "/output/stdout",
+                "target": "/content/paragraphs/0"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "/stage_status/document": "DONE",
+        "/stage_outputs/document/paragraphs/0": "Mixed workflow 09 | mixed-terminal-09",
+        "/parallel_layers": 2,
+        "/stage_status/source": "DONE"
+      }
+    },
+    {
+      "task_id": "mixed-10-security-document",
+      "kind": "mixed",
+      "goal": "Run a security operation and preserve its result in a document for case 10.",
+      "fixture": {
+        "max_workers": 2,
+        "stages": [
+          {
+            "task_id": "source",
+            "kind": "security",
+            "depends_on": [],
+            "fixture": {
+              "dependencies": {
+                "werkzeug": "3.0.2"
+              },
+              "advisories": [
+                {
+                  "id": "CVE-2024-34069",
+                  "package": "werkzeug",
+                  "affected_versions": [
+                    "3.0.2"
+                  ],
+                  "source": "https://github.com/advisories/GHSA-2g68-c3qc-8985"
+                }
+              ]
+            }
+          },
+          {
+            "task_id": "document",
+            "kind": "document",
+            "depends_on": [
+              "source"
+            ],
+            "fixture": {
+              "format": "docx",
+              "content": {
+                "paragraphs": [
+                  "Mixed workflow 10"
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "from": "source",
+                "source": "/output/matched_advisories/0",
+                "target": "/content/paragraphs/0"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "/stage_status/document": "DONE",
+        "/stage_outputs/document/paragraphs/0": "Mixed workflow 10 | CVE-2024-34069",
+        "/parallel_layers": 2,
+        "/stage_status/source": "DONE"
+      }
+    }
+  ]
+}

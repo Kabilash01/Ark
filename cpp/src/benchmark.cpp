@@ -17,7 +17,8 @@ constexpr auto producer_id = "produce";
 constexpr auto judge_id = "evaluate";
 
 bool tool_case(std::string_view kind) {
-    return kind == "security" || kind == "browser" || kind == "terminal" || kind == "document";
+    return kind == "security" || kind == "browser" || kind == "terminal" || kind == "document"
+        || kind == "coordination" || kind == "mixed";
 }
 
 void validate_tests(const Json& files, std::string_view id, std::string_view field) {
@@ -200,7 +201,7 @@ void score_tool(const Json& task, const BenchmarkTool& execute, Json& row) {
     if (separator == std::string::npos || separator == 0 || separator + 1 == version.size()) {
         throw std::runtime_error("Tool result is missing its agent version");
     }
-    row["agent_versions"] = {{version.substr(0, separator), version.substr(separator + 1)}};
+    row["agent_versions"] = result.value("agent_versions", Json{{version.substr(0, separator), version.substr(separator + 1)}});
     auto evidence = Json::object();
     const auto& output = result.at("output");
     bool passed = result.at("status") == task.value("expected_status", "DONE");

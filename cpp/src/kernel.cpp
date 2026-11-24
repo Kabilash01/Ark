@@ -17,9 +17,9 @@ constexpr std::array<std::string_view, 13> intents{
     "RESEARCH", "CODE", "SEARCH", "EXECUTE", "STORE", "EVALUATE", "REFLECT",
     "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION",
 };
-constexpr std::array<std::string_view, 6> workers{
+constexpr std::array<std::string_view, 9> workers{
     "research_agent", "coding_agent", "evaluation_agent", "memory_agent", "web_search_agent",
-    "browser_agent",
+    "browser_agent", "document_agent", "terminal_agent", "security_agent",
 };
 
 bool contains(const auto& values, std::string_view value) {
@@ -122,7 +122,7 @@ Json plan_format(const std::vector<std::string>& agents) {
 
 } // namespace
 
-std::vector<TaskLayer> order_tasks(const Json& dag) {
+std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
     if (!dag.is_object() || !dag.contains("tasks") || !dag["tasks"].is_array() || dag["tasks"].empty()) {
         throw std::invalid_argument("Plan requires a non-empty tasks array");
     }
@@ -138,7 +138,9 @@ std::vector<TaskLayer> order_tasks(const Json& dag) {
         if (!indices.emplace(task.id, tasks.size()).second) {
             throw std::invalid_argument("Duplicate task ID " + task.id);
         }
-        if (!contains(workers, task.agent) || !contains(intents, task.intent)) {
+        const bool tool_worker = task.agent == "document_agent" || task.agent == "terminal_agent"
+            || task.agent == "security_agent";
+        if ((!contains(workers, task.agent) || (tool_worker && !include_native_tools)) || !contains(intents, task.intent)) {
             throw std::invalid_argument("Unknown worker or intent for task " + task.id + ": "
                                         + task.agent + " / " + task.intent);
         }
@@ -231,8 +233,8 @@ static Json dispatch_layers(const std::vector<TaskLayer>& layers, const TaskHand
 }
 
 Json dispatch_plan(const Json& dag, const TaskHandler& execute,
-                   const AgentAvailable& available, std::size_t max_workers) {
-    return dispatch_layers(order_tasks(dag), execute, available, max_workers, Json::object());
+                   const AgentAvailable& available, std::size_t max_workers, bool include_native_tools) {
+    return dispatch_layers(order_tasks(dag, include_native_tools), execute, available, max_workers, Json::object());
 }
 
 SupervisedRun supervise_plan(const Json& dag, const AttemptHandler& execute,

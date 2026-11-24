@@ -1,0 +1,1343 @@
+{
+  "benchmark": "ARKBench",
+  "dataset_version": "1.0",
+  "duration_unit": "seconds",
+  "started_at": "2026-11-24T05:04:45+00:00",
+  "finished_at": "2026-11-24T05:18:56+00:00",
+  "results": [
+    {
+      "agent_version": "research_agent@1.0.0",
+      "agent_versions": {
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0",
+        "research_agent": "1.0.0"
+      },
+      "duration": 44.108738666,
+      "evidence": {
+        "citations": [
+          "1706.03762v7"
+        ],
+        "missing_arxiv_ids": []
+      },
+      "kind": "research",
+      "notes": "The artifact provides accurate information about the Transformer architecture, including the components it replaces with attention and the reason for changes in training parallelism. It also reports a specific translation result (28.4 BLEU on the WMT 2014 English-to-German task) and distinguishes it from general performance claims. The citation is accurate and properly cited. The artifact meets all the criteria.",
+      "run_task_id": "ark_20261124_050445_1c4e8a",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "research-01-transformer"
+    },
+    {
+      "agent_version": "research_agent@1.0.0",
+      "agent_versions": {
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0",
+        "research_agent": "1.0.0"
+      },
+      "duration": 32.065147427,
+      "evidence": {
+        "citations": [
+          "1512.03385v1"
+        ],
+        "missing_arxiv_ids": []
+      },
+      "kind": "research",
+      "notes": "The artifact provides a detailed summary of the paper 'Deep Residual Learning for Image Recognition' and correctly identifies the training difficulty addressed by residual learning as the challenge of training deeper neural networks. It also correctly explains that a residual block learns the difference between the input and the output, focusing on the residual information. The artifact also correctly describes one result from the image recognition experiments, identifying the ImageNet dataset and noting that the result concerns an ensemble of residual networks. The artifact meets all the criteria and provides a clear and accurate explanation of the training difficulty and residual block functionality, as well as the result from the experiments. The citation is accurate and the coverage is comprehensive. The clarity of the explanation is high.",
+      "run_task_id": "ark_20261124_050530_e88454",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "research-02-residual-learning"
+    },
+    {
+      "agent_version": "research_agent@1.0.0",
+      "agent_versions": {
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0",
+        "research_agent": "1.0.0"
+      },
+      "duration": 49.876478149,
+      "evidence": {
+        "citations": [
+          "1810.04805v2",
+          "1907.11692v1"
+        ],
+        "missing_arxiv_ids": []
+      },
+      "kind": "research",
+      "notes": "The artifact provides accurate citations for both BERT and RoBERTa papers. The findings section correctly identifies the central contribution of BERT and the changes in interpretation of benchmark gains in RoBERTa. It also correctly identifies what the two abstracts leave unresolved. The artifact meets all the criteria with high accuracy.",
+      "run_task_id": "ark_20261124_050602_37f3ea",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "research-03-language-pretraining"
+    },
+    {
+      "agent_version": "research_agent@1.0.0",
+      "agent_versions": {
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0",
+        "research_agent": "1.0.0"
+      },
+      "duration": 65.174574625,
+      "evidence": {
+        "citations": [
+          "1711.05101v3",
+          "1412.6980v9"
+        ],
+        "missing_arxiv_ids": []
+      },
+      "kind": "research",
+      "notes": "The artifact provides a clear explanation of the purpose of Adam and how decoupled weight decay changes the treatment of regularization for adaptive optimization. It distinguishes the algorithmic change from the empirical claims and supports the comparison with both abstracts. The citations are accurate and relevant to the task. The summary is well-structured and addresses all aspects of the query. The artifact meets all the criteria effectively.",
+      "run_task_id": "ark_20261124_050651_b4e257",
+      "score": 0.34,
+      "status": "FAILED",
+      "task_id": "research-04-adam-weight-decay"
+    },
+    {
+      "agent_version": "research_agent@1.0.0",
+      "agent_versions": {
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0",
+        "research_agent": "1.0.0"
+      },
+      "duration": 48.202605878,
+      "evidence": {
+        "citations": [
+          "1910.01108v4"
+        ],
+        "missing_arxiv_ids": []
+      },
+      "kind": "research",
+      "notes": "The artifact provides accurate information about DistilBERT, including its goal to create a smaller, faster, and cheaper alternative to BERT. It correctly identifies the trade-offs for model size, speed, and retained performance, and specifies the comparison baseline as BERT. The artifact also correctly cites the arXiv paper and ties the reported numbers to the abstract measures. The information is clear and well-structured, making it suitable for the task.",
+      "run_task_id": "ark_20261124_050757_ce187d",
+      "score": 0.34,
+      "status": "FAILED",
+      "task_id": "research-05-model-distillation"
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "agent_versions": {
+        "coding_agent": "1.0.0",
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0"
+      },
+      "duration": 16.652883757,
+      "evidence": {
+        "acceptance_tests": {
+          "exit_code": 1,
+          "timed_out": false
+        },
+        "smoke_tests_passed": true
+      },
+      "kind": "coding",
+      "notes": "Solution failed the separate Docker acceptance tests",
+      "run_task_id": "ark_20261124_050845_14841d",
+      "score": 0.0,
+      "status": "FAILED",
+      "task_id": "coding-01-merge-intervals"
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "agent_versions": {
+        "coding_agent": "1.0.0",
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0"
+      },
+      "duration": 17.980647376,
+      "evidence": {
+        "acceptance_tests": {
+          "exit_code": 1,
+          "timed_out": false
+        },
+        "smoke_tests_passed": true
+      },
+      "kind": "coding",
+      "notes": "Solution failed the separate Docker acceptance tests",
+      "run_task_id": "ark_20261124_050902_c2c8a4",
+      "score": 0.0,
+      "status": "FAILED",
+      "task_id": "coding-02-rolling-mean"
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "agent_versions": {
+        "coding_agent": "1.0.0",
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0"
+      },
+      "duration": 22.754971726,
+      "evidence": {
+        "acceptance_tests": {
+          "exit_code": 0,
+          "timed_out": false
+        },
+        "smoke_tests_passed": true
+      },
+      "kind": "coding",
+      "notes": "The artifact passes the sandbox tests and includes a solution for the topological_order function that meets the specified criteria. The code correctly validates nodes, builds a graph, and implements Kahn's algorithm with lexicographical selection. However, the artifact does not provide explicit feedback on the style or security criteria as required by the rubric. The code is functional but lacks explicit evaluation on the style and security aspects.",
+      "run_task_id": "ark_20261124_050919_15982d",
+      "score": 0.7,
+      "status": "DONE",
+      "task_id": "coding-03-topological-order"
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "agent_versions": {
+        "coding_agent": "1.0.0",
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0"
+      },
+      "duration": 48.87606292,
+      "evidence": {
+        "smoke_tests_passed": false
+      },
+      "kind": "coding",
+      "notes": "Solution failed the Docker smoke tests",
+      "run_task_id": "ark_20261124_050942_157a0a",
+      "score": 0.0,
+      "status": "FAILED",
+      "task_id": "coding-04-csv-aggregation"
+    },
+    {
+      "agent_version": "coding_agent@1.0.0",
+      "agent_versions": {
+        "coding_agent": "1.0.0",
+        "evaluation_agent": "1.0.0",
+        "reflection_agent": "1.0.0"
+      },
+      "duration": 30.234607572,
+      "evidence": {
+        "acceptance_tests": {
+          "exit_code": 1,
+          "timed_out": false
+        },
+        "smoke_tests_passed": true
+      },
+      "kind": "coding",
+      "notes": "Solution failed the separate Docker acceptance tests",
+      "run_task_id": "ark_20261124_051031_4baf85",
+      "score": 0.0,
+      "status": "FAILED",
+      "task_id": "coding-05-run-length-encoding"
+    },
+    {
+      "agent_version": "security_agent@1.0.0",
+      "agent_versions": {
+        "security_agent": "1.0.0"
+      },
+      "duration": 8.5338e-05,
+      "evidence": {
+        "/matched_advisories": {
+          "matched": true,
+          "observed": [
+            "CVE-2024-34069"
+          ]
+        }
+      },
+      "kind": "security",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-S01"
+    },
+    {
+      "agent_version": "security_agent@1.0.0",
+      "agent_versions": {
+        "security_agent": "1.0.0"
+      },
+      "duration": 3.9163e-05,
+      "evidence": {
+        "/matched_advisories": {
+          "matched": true,
+          "observed": []
+        }
+      },
+      "kind": "security",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-S02"
+    },
+    {
+      "agent_version": "security_agent@1.0.0",
+      "agent_versions": {
+        "security_agent": "1.0.0"
+      },
+      "duration": 3.8662e-05,
+      "evidence": {
+        "/matched_advisories": {
+          "matched": true,
+          "observed": [
+            "CVE-2023-30861"
+          ]
+        }
+      },
+      "kind": "security",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-S03"
+    },
+    {
+      "agent_version": "security_agent@1.0.0",
+      "agent_versions": {
+        "security_agent": "1.0.0"
+      },
+      "duration": 3.8632e-05,
+      "evidence": {
+        "/matched_advisories": {
+          "matched": true,
+          "observed": []
+        }
+      },
+      "kind": "security",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-S04"
+    },
+    {
+      "agent_version": "security_agent@1.0.0",
+      "agent_versions": {
+        "security_agent": "1.0.0"
+      },
+      "duration": 3.797e-05,
+      "evidence": {
+        "/matched_advisories": {
+          "matched": true,
+          "observed": [
+            "CVE-2024-35195"
+          ]
+        }
+      },
+      "kind": "security",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-S05"
+    },
+    {
+      "agent_version": "security_agent@1.0.0",
+      "agent_versions": {
+        "security_agent": "1.0.0"
+      },
+      "duration": 3.4955e-05,
+      "evidence": {
+        "/matched_advisories": {
+          "matched": true,
+          "observed": []
+        }
+      },
+      "kind": "security",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-S06"
+    },
+    {
+      "agent_version": "security_agent@1.0.0",
+      "agent_versions": {
+        "security_agent": "1.0.0"
+      },
+      "duration": 3.7319e-05,
+      "evidence": {
+        "/matched_advisories": {
+          "matched": true,
+          "observed": [
+            "CVE-2024-37891"
+          ]
+        }
+      },
+      "kind": "security",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-S07"
+    },
+    {
+      "agent_version": "security_agent@1.0.0",
+      "agent_versions": {
+        "security_agent": "1.0.0"
+      },
+      "duration": 3.6277e-05,
+      "evidence": {
+        "/matched_advisories": {
+          "matched": true,
+          "observed": []
+        }
+      },
+      "kind": "security",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-S08"
+    },
+    {
+      "agent_version": "security_agent@1.0.0",
+      "agent_versions": {
+        "security_agent": "1.0.0"
+      },
+      "duration": 3.6217e-05,
+      "evidence": {
+        "/matched_advisories": {
+          "matched": true,
+          "observed": [
+            "CVE-2023-50447"
+          ]
+        }
+      },
+      "kind": "security",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-S09"
+    },
+    {
+      "agent_version": "security_agent@1.0.0",
+      "agent_versions": {
+        "security_agent": "1.0.0"
+      },
+      "duration": 3.3132e-05,
+      "evidence": {
+        "/matched_advisories": {
+          "matched": true,
+          "observed": []
+        }
+      },
+      "kind": "security",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-S10"
+    },
+    {
+      "agent_version": "browser_agent@1.0.0",
+      "agent_versions": {
+        "browser_agent": "1.0.0"
+      },
+      "duration": 3.983230781,
+      "evidence": {
+        "/extractions/0/items": {
+          "matched": true,
+          "observed": [
+            "Vector report",
+            "Search methods"
+          ]
+        }
+      },
+      "kind": "browser",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-B01"
+    },
+    {
+      "agent_version": "browser_agent@1.0.0",
+      "agent_versions": {
+        "browser_agent": "1.0.0"
+      },
+      "duration": 2.321971465,
+      "evidence": {
+        "/screenshot_count": {
+          "matched": true,
+          "observed": 1
+        }
+      },
+      "kind": "browser",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-B02"
+    },
+    {
+      "agent_version": "browser_agent@1.0.0",
+      "agent_versions": {
+        "browser_agent": "1.0.0"
+      },
+      "duration": 5.264765875,
+      "evidence": {
+        "/extractions/0/items": {
+          "matched": true,
+          "observed": [
+            "Ready for review"
+          ]
+        }
+      },
+      "kind": "browser",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-B03"
+    },
+    {
+      "agent_version": "document_agent@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0"
+      },
+      "duration": 0.000628666,
+      "evidence": {
+        "/paragraphs": {
+          "matched": true,
+          "observed": [
+            "Audit summary",
+            "Reviewed & approved.",
+            "Source < archive >."
+          ]
+        }
+      },
+      "kind": "document",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-D01"
+    },
+    {
+      "agent_version": "document_agent@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0"
+      },
+      "duration": 0.019020667,
+      "evidence": {
+        "/pages": {
+          "matched": true,
+          "observed": [
+            "Stable sentence for PDF extraction."
+          ]
+        }
+      },
+      "kind": "document",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-D02"
+    },
+    {
+      "agent_version": "document_agent@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0"
+      },
+      "duration": 0.000559548,
+      "evidence": {
+        "/sheets/0/rows": {
+          "matched": true,
+          "observed": [
+            [
+              "Project",
+              "Count",
+              "Ready",
+              "Comment"
+            ],
+            [
+              "Index",
+              7,
+              true,
+              null
+            ]
+          ]
+        }
+      },
+      "kind": "document",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-D03"
+    },
+    {
+      "agent_version": "terminal_agent@1.0.0",
+      "agent_versions": {
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 0.222136223,
+      "evidence": {
+        "/exit_code": {
+          "matched": true,
+          "observed": 0
+        },
+        "/stderr": {
+          "matched": true,
+          "observed": "diagnostic\n"
+        },
+        "/stdout": {
+          "matched": true,
+          "observed": "beta\n"
+        }
+      },
+      "kind": "terminal",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-T01"
+    },
+    {
+      "agent_version": "terminal_agent@1.0.0",
+      "agent_versions": {
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 0.197882273,
+      "evidence": {
+        "/exit_code": {
+          "matched": true,
+          "observed": 7
+        },
+        "/stdout": {
+          "matched": true,
+          "observed": "report\n"
+        },
+        "/timed_out": {
+          "matched": true,
+          "observed": false
+        }
+      },
+      "kind": "terminal",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-T02"
+    },
+    {
+      "agent_version": "terminal_agent@1.0.0",
+      "agent_versions": {
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 0.221760891,
+      "evidence": {
+        "/missing_module": {
+          "matched": true,
+          "observed": "ark_benchmark_missing"
+        },
+        "/suggestion": {
+          "matched": true,
+          "observed": "python -m pip install ark_benchmark_missing"
+        }
+      },
+      "kind": "terminal",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-T03"
+    },
+    {
+      "agent_version": "terminal_agent@1.0.0",
+      "agent_versions": {
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 1.216218874,
+      "evidence": {
+        "/exit_code": {
+          "matched": true,
+          "observed": 124
+        },
+        "/stdout": {
+          "matched": true,
+          "observed": "started\n"
+        },
+        "/timed_out": {
+          "matched": true,
+          "observed": true
+        }
+      },
+      "kind": "terminal",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "AB-T04"
+    },
+    {
+      "agent_version": "coordination_agent@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0",
+        "security_agent": "1.0.0",
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 0.483585263,
+      "evidence": {
+        "/parallel_layers": {
+          "matched": true,
+          "observed": 2
+        },
+        "/stage_outputs/report-01/paragraphs/0": {
+          "matched": true,
+          "observed": "Workflow 01 | coordination-01 | CVE-2024-34069"
+        },
+        "/stage_status/audit-01": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/prepare-01": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/report-01": {
+          "matched": true,
+          "observed": "DONE"
+        }
+      },
+      "kind": "coordination",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "coordination-01-fan-in"
+    },
+    {
+      "agent_version": "coordination_agent@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0",
+        "security_agent": "1.0.0",
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 0.199024784,
+      "evidence": {
+        "/parallel_layers": {
+          "matched": true,
+          "observed": 2
+        },
+        "/stage_outputs/report-02/paragraphs/0": {
+          "matched": true,
+          "observed": "Workflow 02 | coordination-02 | CVE-2024-34069"
+        },
+        "/stage_status/audit-02": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/prepare-02": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/report-02": {
+          "matched": true,
+          "observed": "DONE"
+        }
+      },
+      "kind": "coordination",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "coordination-02-fan-in"
+    },
+    {
+      "agent_version": "coordination_agent@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0",
+        "security_agent": "1.0.0",
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 0.209987186,
+      "evidence": {
+        "/parallel_layers": {
+          "matched": true,
+          "observed": 2
+        },
+        "/stage_outputs/report-03/paragraphs/0": {
+          "matched": true,
+          "observed": "Workflow 03 | coordination-03 | CVE-2024-34069"
+        },
+        "/stage_status/audit-03": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/prepare-03": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/report-03": {
+          "matched": true,
+          "observed": "DONE"
+        }
+      },
+      "kind": "coordination",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "coordination-03-fan-in"
+    },
+    {
+      "agent_version": "coordination_agent@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0",
+        "security_agent": "1.0.0",
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 0.191494429,
+      "evidence": {
+        "/parallel_layers": {
+          "matched": true,
+          "observed": 2
+        },
+        "/stage_outputs/report-04/paragraphs/0": {
+          "matched": true,
+          "observed": "Workflow 04 | coordination-04 | CVE-2024-34069"
+        },
+        "/stage_status/audit-04": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/prepare-04": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/report-04": {
+          "matched": true,
+          "observed": "DONE"
+        }
+      },
+      "kind": "coordination",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "coordination-04-fan-in"
+    },
+    {
+      "agent_version": "coordination_agent@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0",
+        "security_agent": "1.0.0",
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 0.19943619,
+      "evidence": {
+        "/parallel_layers": {
+          "matched": true,
+          "observed": 2
+        },
+        "/stage_outputs/report-05/paragraphs/0": {
+          "matched": true,
+          "observed": "Workflow 05 | coordination-05 | CVE-2024-34069"
+        },
+        "/stage_status/audit-05": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/prepare-05": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/report-05": {
+          "matched": true,
+          "observed": "DONE"
+        }
+      },
+      "kind": "coordination",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "coordination-05-fan-in"
+    },
+    {
+      "agent_version": "coordination_agent@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0",
+        "security_agent": "1.0.0",
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 0.184884439,
+      "evidence": {
+        "/parallel_layers": {
+          "matched": true,
+          "observed": 2
+        },
+        "/stage_outputs/report-06/paragraphs/0": {
+          "matched": true,
+          "observed": "Workflow 06 | coordination-06 | CVE-2024-34069"
+        },
+        "/stage_status/audit-06": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/prepare-06": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/report-06": {
+          "matched": true,
+          "observed": "DONE"
+        }
+      },
+      "kind": "coordination",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "coordination-06-fan-in"
+    },
+    {
+      "agent_version": "coordination_agent@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0",
+        "security_agent": "1.0.0",
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 0.199941179,
+      "evidence": {
+        "/parallel_layers": {
+          "matched": true,
+          "observed": 2
+        },
+        "/stage_outputs/report-07/paragraphs/0": {
+          "matched": true,
+          "observed": "Workflow 07 | coordination-07 | CVE-2024-34069"
+        },
+        "/stage_status/audit-07": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/prepare-07": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/report-07": {
+          "matched": true,
+          "observed": "DONE"
+        }
+      },
+      "kind": "coordination",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "coordination-07-fan-in"
+    },
+    {
+      "agent_version": "coordination_agent@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0",
+        "security_agent": "1.0.0",
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 0.215489554,
+      "evidence": {
+        "/parallel_layers": {
+          "matched": true,
+          "observed": 2
+        },
+        "/stage_outputs/report-08/paragraphs/0": {
+          "matched": true,
+          "observed": "Workflow 08 | coordination-08 | CVE-2024-34069"
+        },
+        "/stage_status/audit-08": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/prepare-08": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/report-08": {
+          "matched": true,
+          "observed": "DONE"
+        }
+      },
+      "kind": "coordination",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "coordination-08-fan-in"
+    },
+    {
+      "agent_version": "coordination_agent@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0",
+        "security_agent": "1.0.0",
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 0.211925791,
+      "evidence": {
+        "/parallel_layers": {
+          "matched": true,
+          "observed": 2
+        },
+        "/stage_outputs/report-09/paragraphs/0": {
+          "matched": true,
+          "observed": "Workflow 09 | coordination-09 | CVE-2024-34069"
+        },
+        "/stage_status/audit-09": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/prepare-09": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/report-09": {
+          "matched": true,
+          "observed": "DONE"
+        }
+      },
+      "kind": "coordination",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "coordination-09-fan-in"
+    },
+    {
+      "agent_version": "coordination_agent@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0",
+        "security_agent": "1.0.0",
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 0.2422612,
+      "evidence": {
+        "/parallel_layers": {
+          "matched": true,
+          "observed": 2
+        },
+        "/stage_outputs/report-10/paragraphs/0": {
+          "matched": true,
+          "observed": "Workflow 10 | coordination-10 | CVE-2024-34069"
+        },
+        "/stage_status/audit-10": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/prepare-10": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/report-10": {
+          "matched": true,
+          "observed": "DONE"
+        }
+      },
+      "kind": "coordination",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "coordination-10-fan-in"
+    },
+    {
+      "agent_version": "mixed_workflow@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0",
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 0.192132251,
+      "evidence": {
+        "/parallel_layers": {
+          "matched": true,
+          "observed": 2
+        },
+        "/stage_outputs/document/paragraphs/0": {
+          "matched": true,
+          "observed": "Mixed workflow 01 | mixed-terminal-01"
+        },
+        "/stage_status/document": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/source": {
+          "matched": true,
+          "observed": "DONE"
+        }
+      },
+      "kind": "mixed",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "mixed-01-terminal-document"
+    },
+    {
+      "agent_version": "mixed_workflow@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0",
+        "security_agent": "1.0.0"
+      },
+      "duration": 0.000829257,
+      "evidence": {
+        "/parallel_layers": {
+          "matched": true,
+          "observed": 2
+        },
+        "/stage_outputs/document/paragraphs/0": {
+          "matched": true,
+          "observed": "Mixed workflow 02 | CVE-2024-34069"
+        },
+        "/stage_status/document": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/source": {
+          "matched": true,
+          "observed": "DONE"
+        }
+      },
+      "kind": "mixed",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "mixed-02-security-document"
+    },
+    {
+      "agent_version": "mixed_workflow@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0",
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 0.190327689,
+      "evidence": {
+        "/parallel_layers": {
+          "matched": true,
+          "observed": 2
+        },
+        "/stage_outputs/document/paragraphs/0": {
+          "matched": true,
+          "observed": "Mixed workflow 03 | mixed-terminal-03"
+        },
+        "/stage_status/document": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/source": {
+          "matched": true,
+          "observed": "DONE"
+        }
+      },
+      "kind": "mixed",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "mixed-03-terminal-document"
+    },
+    {
+      "agent_version": "mixed_workflow@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0",
+        "security_agent": "1.0.0"
+      },
+      "duration": 0.000910146,
+      "evidence": {
+        "/parallel_layers": {
+          "matched": true,
+          "observed": 2
+        },
+        "/stage_outputs/document/paragraphs/0": {
+          "matched": true,
+          "observed": "Mixed workflow 04 | CVE-2024-34069"
+        },
+        "/stage_status/document": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/source": {
+          "matched": true,
+          "observed": "DONE"
+        }
+      },
+      "kind": "mixed",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "mixed-04-security-document"
+    },
+    {
+      "agent_version": "mixed_workflow@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0",
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 0.192113225,
+      "evidence": {
+        "/parallel_layers": {
+          "matched": true,
+          "observed": 2
+        },
+        "/stage_outputs/document/paragraphs/0": {
+          "matched": true,
+          "observed": "Mixed workflow 05 | mixed-terminal-05"
+        },
+        "/stage_status/document": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/source": {
+          "matched": true,
+          "observed": "DONE"
+        }
+      },
+      "kind": "mixed",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "mixed-05-terminal-document"
+    },
+    {
+      "agent_version": "mixed_workflow@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0",
+        "security_agent": "1.0.0"
+      },
+      "duration": 0.000922919,
+      "evidence": {
+        "/parallel_layers": {
+          "matched": true,
+          "observed": 2
+        },
+        "/stage_outputs/document/paragraphs/0": {
+          "matched": true,
+          "observed": "Mixed workflow 06 | CVE-2024-34069"
+        },
+        "/stage_status/document": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/source": {
+          "matched": true,
+          "observed": "DONE"
+        }
+      },
+      "kind": "mixed",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "mixed-06-security-document"
+    },
+    {
+      "agent_version": "mixed_workflow@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0",
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 0.198174062,
+      "evidence": {
+        "/parallel_layers": {
+          "matched": true,
+          "observed": 2
+        },
+        "/stage_outputs/document/paragraphs/0": {
+          "matched": true,
+          "observed": "Mixed workflow 07 | mixed-terminal-07"
+        },
+        "/stage_status/document": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/source": {
+          "matched": true,
+          "observed": "DONE"
+        }
+      },
+      "kind": "mixed",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "mixed-07-terminal-document"
+    },
+    {
+      "agent_version": "mixed_workflow@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0",
+        "security_agent": "1.0.0"
+      },
+      "duration": 0.000836069,
+      "evidence": {
+        "/parallel_layers": {
+          "matched": true,
+          "observed": 2
+        },
+        "/stage_outputs/document/paragraphs/0": {
+          "matched": true,
+          "observed": "Mixed workflow 08 | CVE-2024-34069"
+        },
+        "/stage_status/document": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/source": {
+          "matched": true,
+          "observed": "DONE"
+        }
+      },
+      "kind": "mixed",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "mixed-08-security-document"
+    },
+    {
+      "agent_version": "mixed_workflow@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0",
+        "terminal_agent": "1.0.0"
+      },
+      "duration": 0.192288496,
+      "evidence": {
+        "/parallel_layers": {
+          "matched": true,
+          "observed": 2
+        },
+        "/stage_outputs/document/paragraphs/0": {
+          "matched": true,
+          "observed": "Mixed workflow 09 | mixed-terminal-09"
+        },
+        "/stage_status/document": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/source": {
+          "matched": true,
+          "observed": "DONE"
+        }
+      },
+      "kind": "mixed",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "mixed-09-terminal-document"
+    },
+    {
+      "agent_version": "mixed_workflow@1.0.0",
+      "agent_versions": {
+        "document_agent": "1.0.0",
+        "security_agent": "1.0.0"
+      },
+      "duration": 0.00089049,
+      "evidence": {
+        "/parallel_layers": {
+          "matched": true,
+          "observed": 2
+        },
+        "/stage_outputs/document/paragraphs/0": {
+          "matched": true,
+          "observed": "Mixed workflow 10 | CVE-2024-34069"
+        },
+        "/stage_status/document": {
+          "matched": true,
+          "observed": "DONE"
+        },
+        "/stage_status/source": {
+          "matched": true,
+          "observed": "DONE"
+        }
+      },
+      "kind": "mixed",
+      "notes": "Matched the locked tool evidence",
+      "score": 1.0,
+      "status": "DONE",
+      "task_id": "mixed-10-security-document"
+    }
+  ],
+  "summary": {
+    "total": 50,
+    "scored": 50,
+    "completed": 44,
+    "mean_score": 0.8876000000000001
+  },
+  "provenance": {
+    "base_30": {
+      "dataset": "benchmark_v0.5.json",
+      "executed_report": "Month 4 final run"
+    },
+    "added_20": {
+      "dataset": "benchmark_v1.0.json",
+      "execution_batch": "native coordination and mixed-domain tasks"
+    },
+    "original_cohort_comparison": {
+      "task_count": 10,
+      "baseline_dataset_version": "0.1",
+      "baseline_mean_score": 0.4035,
+      "current_mean_score": 0.438,
+      "relative_improvement_percent": 8.550185873605942,
+      "target_percent_range": [
+        5,
+        10
+      ],
+      "target_met": true
+    },
+    "aggregate_note": "The 50-task mean includes new deterministic tool workflow cases and should not be compared directly with the Month 2 10-task mean. The original 10 matched IDs are compared separately."
+  }
+}
