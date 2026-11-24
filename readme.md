@@ -73,5 +73,7 @@ audit](docs/day96_agent_integration.md), [benchmark methods and results](docs/pa
 and [current project status](docs/project_status.md) for measured outcomes and
 open work.
 
+For unattended operation, see the [native deployment guide](docs/deployment_guide.md).
+
 ARK OS is provided under the [MIT License](LICENSE). Contributions are covered
 by [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md).
