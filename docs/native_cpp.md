@@ -732,6 +732,22 @@ validation history. It accepts up to 5,000 rows, 32 features, 100 trials, and
 300 epochs. This first native pipeline supports linear regression; other model
 families and CSV ingestion remain future extensions.
 
+## Day 75 native DevOps Agent
+
+`build/ark-cpp devops` accepts a JSON object with a `files` map (including a
+Dockerfile) and a `command` string array. It sends the bounded tar build
+context directly to the local Docker Engine API, disables networking for the
+build and container, starts the image with no shell interpolation, drops Linux
+capabilities, uses a read-only root filesystem and resource limits, then
+removes the temporary container and image. Set `ARK_DOCKER_SOCKET` to select a
+non-default local socket. This path is intended for generated project output;
+it requires a preloaded base image because image builds have no network.
+
+The Docker API fixture checks tar encoding, source path traversal rejection,
+the restricted runtime command, logs, and cleanup. A live Docker run built from
+the local `python:3.11-slim` image printed `ARK DevOps integration passed` and
+returned exit code 0; the agent removed the temporary image and container.
+
 ```bash
 printf '%s\n' '{"experiment":"smoke","ranges":[{"name":"learning_rate","minimum":0,"maximum":1}],"target":{"learning_rate":0.5},"trial_count":10}' \
   | build/ark-cpp ml-optimize

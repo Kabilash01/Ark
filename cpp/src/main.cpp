@@ -6,6 +6,7 @@
 #include "ark/coding.hpp"
 #include "ark/conflict_resolver.hpp"
 #include "ark/document_agent.hpp"
+#include "ark/devops_agent.hpp"
 #include "ark/done_condition.hpp"
 #include "ark/evaluation.hpp"
 #include "ark/file_system.hpp"
@@ -1090,6 +1091,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp browser < actions.json\n"
                      "       ark-cpp serve [port]\n"
                      "       ark-cpp ml-optimize < request.json\n"
+                     "       ark-cpp devops < request.json\n"
                      "Research without an instruction reads an ARKMessage from stdin.\n";
         return argc < 2 ? 2 : 0;
     }
@@ -1123,6 +1125,12 @@ int main(int argc, char** argv) {
             const auto payload = ark::Json::parse(std::cin);
             const auto result = ark::run_ml_engineer(std::ref(http), env("MLFLOW_TRACKING_URI"),
                 ark::make_message("user", "ml_engineer_agent", "ML_OPTIMIZE", payload));
+            return print_run(result);
+        }
+        if (command == "devops" && argc == 2) {
+            ark::CurlTransport http;
+            const auto result = ark::DevOpsAgent(std::ref(http), env("ARK_DOCKER_SOCKET", "/var/run/docker.sock"))
+                .run(ark::make_message("user", "devops_agent", "DEVOPS", ark::Json::parse(std::cin)));
             return print_run(result);
         }
         if (command == "benchmark" && argc <= 4) {
