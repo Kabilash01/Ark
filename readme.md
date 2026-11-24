@@ -6,6 +6,9 @@ workflow components. The C++ runtime is the active implementation; the Python
 tree remains in the repository as a migration reference and is not required to
 build `ark-cpp`.
 
+See the [day-tagged development history](CHANGELOG.md) for completed slices
+and roadmap days without a standalone commit.
+
 ## Build
 
 On Linux, install CMake 3.24+, a C++20 compiler, pkg-config, and development

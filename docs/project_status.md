@@ -126,3 +126,6 @@ and local model/data services are not available for a complete live task.
   clean-machine, boot-time, cloud, or Pi deployment was run.
 - Day 119: architecture map added. Full live integration of all 20 agents
   remains open.
+- Day 120: day-tagged Git history and release blockers indexed in
+  [`CHANGELOG.md`](../CHANGELOG.md). The tag, GitHub Release, research
+  submissions, and demo publication remain incomplete.
