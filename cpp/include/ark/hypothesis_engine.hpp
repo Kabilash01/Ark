@@ -4,10 +4,13 @@
 #include "ark/vector_memory.hpp"
 #include "ark/versions.hpp"
 
+#include <set>
+
 namespace ark {
 
 AgentProfile hypothesis_profile(std::string model);
-Json rank_hypotheses(const Json& candidates, const std::vector<std::vector<float>>& paper_embeddings);
+Json rank_hypotheses(const Json& candidates, const std::vector<std::vector<float>>& paper_embeddings,
+                     const std::set<std::string>& known_paper_ids);
 
 class HypothesisEngine {
 public:

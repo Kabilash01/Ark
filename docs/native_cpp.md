@@ -848,6 +848,16 @@ experiment; generated results are therefore not represented as measurements.
 The command checks for `MP_API_KEY` before starting research, so a missing key
 does not leave a partial loop checkpoint.
 
+## Day 85 hypothesis evidence and specificity
+
+Hypothesis proposals now cite one to three exact paper IDs from the retrieved
+Qdrant evidence. The engine rejects unsupported or duplicate citation IDs and
+returns a compact reference list with titles and source URLs. The generation
+prompt requires a material or intervention, measurable outcome, expected
+direction, and comparator or control, and asks for bounded composition or
+conditions when supported by evidence. Novelty remains an embedding distance
+from retrieved abstracts, not proof that a hypothesis is scientifically new.
+
 ```bash
 printf '%s\n' '{"experiment":"smoke","ranges":[{"name":"learning_rate","minimum":0,"maximum":1}],"target":{"learning_rate":0.5},"trial_count":10}' \
   | build/ark-cpp ml-optimize
