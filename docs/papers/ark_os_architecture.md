@@ -104,6 +104,91 @@ completed benchmark run. This figure shows the first recorded baseline.
 
 ## Methods
 
+### AgentSpec v1.0 message contract
+
+Each worker request is a JSON object that preserves the frozen AgentSpec v1.0
+field names across the Python-to-C++ migration. `make_message` assigns a unique
+task ID, UTC timestamp, `PENDING` status, empty output and memory context,
+priority 5, retry count 0, maximum retries 3, quality score -1 (not yet scored),
+and an empty agent version. Workers fill output, status, score, and the version
+they used. The accepted intents are `RESEARCH`, `CODE`, `SEARCH`, `EXECUTE`,
+`STORE`, `EVALUATE`, `REFLECT`, `DISCOVER`, `SUPERVISE`, `PLAN`, `BROWSE`,
+`SECURITY`, and `VISION`. Status transitions use `PENDING`, `RUNNING`, `DONE`,
+`FAILED`, or `RETRY`.
+
+| Field group | Fields | Purpose |
+| --- | --- | --- |
+| Routing | `task_id`, `sender`, `receiver`, `parent_task_id` | Unique task and parent-child routing. |
+| Intent and content | `intent`, `payload`, `memory_context` | Worker operation and its input/context. |
+| Control | `priority`, `status`, `retry_count`, `max_retries` | Scheduling, lifecycle, and bounded retry state. |
+| Output | `output`, `quality_score`, `timestamp` | Result artifact, evaluator score, and creation time. |
+| Provenance | `agent_version` | Prompt/model revision used for the result. |
+
+The runtime checks envelope fields before accepting pending work. Payload
+schemas are worker-specific and validated by the selected agent. The C++
+message factory fills every contract field, while APIs can still accept older
+messages that contain the required routing subset.
+
+### Four-tier memory model
+
+Memory is modeled by access lifetime and retrieval method rather than one
+general-purpose history store:
+
+| Tier | Primary record | Store and retrieval semantics | Lifetime |
+| --- | --- | --- | --- |
+| Working | Task-scoped key/value state | Redis keys with TTL; task completion caps their remaining lifetime. A bounded process-local fallback is used when Redis is unavailable. | Temporary. |
+| Episodic | Completed task and reflection event | Append-only SQLite rows queried by agent, intent, version, time, or keyword. | Persistent history. |
+| Semantic | Paper or other factual record plus metadata | Text embeddings and cosine retrieval; Qdrant is the vector service, with a local SQLite index for synchronization and service-offline operation. | Persistent, with age-based eviction. |
+| Procedural | Reusable skill steps and success history | SQLite records with normalized vectors; exact cosine scan over a bounded candidate set and success-weighted retrieval. | Persistent, with low-success pruning. |
+
+The tiers have distinct write policies: working state expires, episodic history
+is append-only, semantic records can be removed or evicted after inactivity,
+and procedural skills track successful reuse. These definitions describe the
+native stores; the general task dispatcher does not yet route every worker's
+memory access exclusively through one memory-agent adapter.
+
+### Hardware-adaptive local model selection
+
+`config/model-library.json` maps hardware tiers to general, coding, and vision
+models. The runtime detects VRAM and RAM, chooses the T1–T5 tier, then writes
+the selected profile to `config/active-models.json`. The current selector uses
+these VRAM thresholds: zero selects T5, less than 6 GiB selects T1, less than
+14 GiB selects T2, less than 22 GiB selects T3, and 22 GiB or more selects T4.
+T1/T2 target smaller GPU budgets; T3/T4 select larger general and coding
+models; T5 is the no-GPU profile. A `null` vision entry means that the tier has
+no configured vision model. Model names are configuration, not proof that the
+corresponding weights are installed. The inference adapter routes chat and
+embeddings to loopback Ollama or llama.cpp endpoints; llama.cpp can keep one
+GGUF role loaded and switch general, coding, and vision weights as requested.
+
+### Native orchestration state machine
+
+The original graph behavior is represented directly in the C++ supervisor and
+task scheduler rather than by a Python LangGraph dependency. The main lifecycle
+is:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Classify
+    Classify --> Plan
+    Plan --> Validate
+    Validate --> Dispatch
+    Dispatch --> Evaluate
+    Evaluate --> Reflect
+    Reflect --> Done: completion condition met
+    Reflect --> Plan: retry or follow-up remains (bounded)
+    Reflect --> Failed: retry limit reached or fatal failure
+    Done --> [*]
+    Failed --> [*]
+```
+
+Within `Dispatch`, tasks run in dependency layers; independent tasks may run
+concurrently. The DAG validator rejects cycles, missing dependencies, unknown
+workers, and duplicate IDs before a task starts. Worker failures and transient
+HTTP errors are handled by bounded retries; evaluation feedback is supplied to
+the retry attempt. This state diagram describes the existing native path, not
+the all-20-agent integration criterion, which remains open.
+
 ### Local inference architecture
 
 A shared C++ adapter routes structured chat and embeddings to the selected
