@@ -68,6 +68,7 @@ add_library(ark_native
     cpp/src/security_agent.cpp
     cpp/src/storage.cpp
     cpp/src/terminal.cpp
+    cpp/src/task_scheduler.cpp
     cpp/src/vision_agent.cpp
     cpp/src/vector_memory.cpp
     cpp/src/versions.cpp
@@ -126,6 +127,9 @@ if(BUILD_TESTING)
     add_executable(ark_checkpoint_manager_tests cpp/tests/checkpoint_manager_test.cpp)
     target_link_libraries(ark_checkpoint_manager_tests PRIVATE ark_native)
     add_test(NAME ark_checkpoint_manager_tests COMMAND ark_checkpoint_manager_tests)
+    add_executable(ark_task_scheduler_tests cpp/tests/task_scheduler_test.cpp)
+    target_link_libraries(ark_task_scheduler_tests PRIVATE ark_native)
+    add_test(NAME ark_task_scheduler_tests COMMAND ark_task_scheduler_tests)
     set_tests_properties(ark_vision_agent_tests PROPERTIES TIMEOUT 120)
     add_executable(ark_browser_tests cpp/tests/browser_test.cpp)
     target_link_libraries(ark_browser_tests PRIVATE ark_native httplib::httplib)

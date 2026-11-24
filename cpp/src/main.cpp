@@ -28,6 +28,7 @@
 #include "ark/scientific_report.hpp"
 #include "ark/storage.hpp"
 #include "ark/terminal.hpp"
+#include "ark/task_scheduler.hpp"
 #include "ark/tool_benchmark.hpp"
 #include "ark/vector_memory.hpp"
 #include "ark/versions.hpp"
@@ -996,6 +997,12 @@ ark::Json memory_tier(std::string_view tier, std::string_view query, std::string
 int serve(int port) {
     const auto redis_port = std::stoi(env("ARK_REDIS_PORT", "6379"));
     const auto redis_db = std::stoi(env("ARK_REDIS_DB", "0"));
+    ark::TaskScheduler scheduler(env("ARK_SCHEDULE_DB", "data/schedules.db"), [](std::string_view goal, bool privacy) {
+        const auto task_id = ark::make_message("scheduler", "supervisor_agent", "SUPERVISE", ark::Json::object())
+            .at("task_id").get<std::string>();
+        return run_task(goal, config(), ark::Json::object(), privacy, false, std::nullopt, 10, task_id, {});
+    });
+    scheduler.start();
     const bool listened = ark::serve_api(port, {
         config_dir() / "privacy_config.json",
         [](const ark::Json& task, const ark::TaskEvents& events) {
@@ -1044,6 +1051,7 @@ int serve(int port) {
             return ark::benchmark_history(env("ARK_BENCHMARK_RESULTS", "benchmarks/arkbench/results"), name);
         },
     });
+    scheduler.stop();
     if (!listened) {
         std::cerr << "Could not listen on 127.0.0.1:" << port << '\n';
     }
@@ -1102,6 +1110,8 @@ int main(int argc, char** argv) {
                      "       ark-cpp design-experiment < request.json\n"
                      "       ark-cpp scientific-report < request.json\n"
                      "       ark-cpp sage-checkpoint {list|resume LOOP|load LOOP STEP|save LOOP STEP|clear LOOP}\n"
+                     "       ark-cpp schedule {cron EXPR GOAL|interval SECONDS GOAL|once ISO_UTC GOAL|watch PATH GOAL|cancel|pause|resume ID}\n"
+                     "       ark-cpp schedules\n"
                      "Research without an instruction reads an ARKMessage from stdin.\n";
         return argc < 2 ? 2 : 0;
     }
@@ -1112,6 +1122,23 @@ int main(int argc, char** argv) {
                                  {"elapsed_ms", waited.count()}, {"resource", resource}});
         });
         const std::string_view command = argv[1];
+        if (command == "schedules" && argc == 2) {
+            ark::TaskScheduler scheduler(env("ARK_SCHEDULE_DB", "data/schedules.db"), [](std::string_view, bool) { return ark::Json::object(); });
+            std::cout << scheduler.list().dump(2) << '\n'; return 0;
+        }
+        if (command == "schedule" && argc >= 3) {
+            ark::TaskScheduler scheduler(env("ARK_SCHEDULE_DB", "data/schedules.db"), [](std::string_view, bool) { return ark::Json::object(); });
+            const std::string_view action = argv[2];
+            if (action == "cron" && argc == 5) std::cout << scheduler.schedule_cron(argv[3], argv[4]) << '\n';
+            else if (action == "interval" && argc == 5) std::cout << scheduler.schedule_interval(std::chrono::seconds(std::stoll(argv[3])), argv[4]) << '\n';
+            else if (action == "once" && argc == 5) std::cout << scheduler.schedule_once(argv[3], argv[4]) << '\n';
+            else if (action == "watch" && argc == 5) std::cout << scheduler.schedule_on_file_change(argv[3], argv[4]) << '\n';
+            else if (action == "cancel" && argc == 4) { if (!scheduler.cancel(argv[3])) throw std::invalid_argument("Unknown schedule ID"); std::cout << "cancelled\n"; }
+            else if (action == "pause" && argc == 4) { if (!scheduler.pause(argv[3])) throw std::invalid_argument("Unknown or completed schedule ID"); std::cout << "paused\n"; }
+            else if (action == "resume" && argc == 4) { if (!scheduler.resume(argv[3])) throw std::invalid_argument("Unknown or completed schedule ID"); std::cout << "resumed\n"; }
+            else throw std::invalid_argument("Invalid schedule command arguments");
+            return 0;
+        }
         if (command == "sage-checkpoint" && argc >= 3) {
             const ark::CheckpointManager manager(env("ARK_SAGE_CHECKPOINT_DIR", "data/sage/checkpoints"));
             const std::string_view action = argv[2];

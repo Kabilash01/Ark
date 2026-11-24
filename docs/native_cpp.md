@@ -810,6 +810,17 @@ different local directory. `resume` reports the last saved step and first
 missing step in the standard SAGE workflow. Unit tests simulate an interruption
 at the experiment step, restart, and verify the first two steps are skipped.
 
+## Day 82 native task scheduler
+
+Schedules persist in SQLite at `data/schedules.db` (`ARK_SCHEDULE_DB` can
+override the path). Create schedules with `ark-cpp schedule cron '0 2 * * *'
+'goal'`, `interval <seconds> <goal>`, `once <YYYY-MM-DDTHH:MM:SSZ> <goal>`, or
+`watch <absolute-path> <goal>`. Cron expressions and one-time timestamps use
+UTC. File watches poll path modification times once per second. The scheduler
+executes goals while `ark-cpp serve` is running and records last-run/error
+status. `ark-cpp schedules` lists jobs; `schedule pause|resume|cancel <id>`
+controls them. This is a native C++ scheduler without APScheduler.
+
 ```bash
 printf '%s\n' '{"experiment":"smoke","ranges":[{"name":"learning_rate","minimum":0,"maximum":1}],"target":{"learning_rate":0.5},"trial_count":10}' \
   | build/ark-cpp ml-optimize
