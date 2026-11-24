@@ -770,6 +770,19 @@ uncalibrated model estimate in [0, 1]. Results include the score components and
 rank, not a claim that the hypothesis is original or experimentally validated.
 This requires the existing local Qdrant, Neo4j, embedding, and chat services.
 
+## Day 79 native Experiment Designer
+
+`build/ark-cpp design-experiment` accepts a hypothesis string and asks the
+configured local model for a reproducible dataset plan, method, baseline,
+metric definitions, and a bounded implementation spec. The schema requires the
+code spec to target C++20, list source files and interfaces, restrict
+dependencies where practical, and include acceptance tests. The result is a
+design artifact; generated C++ compilation is not wired into this command yet.
+The existing Coding Agent currently targets Python 3.11 and runs tests in its
+Python sandbox, so routing this C++20 specification through that agent would
+contradict the project's C++ direction. A native C++ code generation and
+compiler sandbox remains a follow-up requirement.
+
 ```bash
 printf '%s\n' '{"experiment":"smoke","ranges":[{"name":"learning_rate","minimum":0,"maximum":1}],"target":{"learning_rate":0.5},"trial_count":10}' \
   | build/ark-cpp ml-optimize

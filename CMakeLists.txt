@@ -45,6 +45,7 @@ add_library(ark_native
     cpp/src/coding.cpp
     cpp/src/conflict_resolver.cpp
     cpp/src/document_agent.cpp
+    cpp/src/experiment_designer.cpp
     cpp/src/devops_agent.cpp
     cpp/src/data_analysis.cpp
     cpp/src/done_condition.cpp
@@ -114,6 +115,9 @@ if(BUILD_TESTING)
     add_executable(ark_hypothesis_engine_tests cpp/tests/hypothesis_engine_test.cpp)
     target_link_libraries(ark_hypothesis_engine_tests PRIVATE ark_native)
     add_test(NAME ark_hypothesis_engine_tests COMMAND ark_hypothesis_engine_tests)
+    add_executable(ark_experiment_designer_tests cpp/tests/experiment_designer_test.cpp)
+    target_link_libraries(ark_experiment_designer_tests PRIVATE ark_native)
+    add_test(NAME ark_experiment_designer_tests COMMAND ark_experiment_designer_tests)
     set_tests_properties(ark_vision_agent_tests PROPERTIES TIMEOUT 120)
     add_executable(ark_browser_tests cpp/tests/browser_test.cpp)
     target_link_libraries(ark_browser_tests PRIVATE ark_native httplib::httplib)
