@@ -124,6 +124,17 @@ backfill or claim month-long empirical frequencies. Native tests exercise the
 journal, deduplication, privacy filtering, and resource-wait observer with
 controlled fixtures; those fixtures are not reported as production outcomes.
 
+## Day 68 concurrency stress
+
+`benchmarks/performance/day68_stress.json` records a 20-task concurrent wave
+against the runtime browser, terminal, and arXiv semaphores, plus a 20-task
+serial reference. The concurrent wave peaked at 1, 2, and 3 active users for
+those resources, respectively, matching their configured capacities. All 20
+parallel SQLite episode writes were retained, and their deterministic quality
+scores matched the serial reference. This harness exercises semaphore and
+SQLite synchronization; it does not measure concurrent model inference or
+external browser and container throughput.
+
 ## Day 24 sandbox
 
 `ark-cpp sandbox` uses the local Docker Engine Unix socket. Pull

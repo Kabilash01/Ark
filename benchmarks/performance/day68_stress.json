@@ -1,0 +1,33 @@
+{
+  "memory_rows_written": 40,
+  "observed_peak": {
+    "arxiv": 3,
+    "browser": 1,
+    "terminal": 2
+  },
+  "scores": [
+    0.3,
+    1.0,
+    0.6,
+    0.2,
+    0.9,
+    0.5,
+    0.1,
+    0.8,
+    0.4,
+    0.0,
+    0.7,
+    0.3,
+    1.0,
+    0.6,
+    0.2,
+    0.9,
+    0.5,
+    0.1,
+    0.8,
+    0.4
+  ],
+  "scores_match_serial": true,
+  "serial_reference_tasks": 20,
+  "stress_tasks": 20
+}
