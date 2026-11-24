@@ -12,6 +12,7 @@
 #include "ark/evaluation.hpp"
 #include "ark/file_system.hpp"
 #include "ark/github_agent.hpp"
+#include "ark/hypothesis_engine.hpp"
 #include "ark/inference.hpp"
 #include "ark/kernel.hpp"
 #include "ark/ml_engineer.hpp"
@@ -1094,6 +1095,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp ml-optimize < request.json\n"
                      "       ark-cpp devops < request.json\n"
                      "       ark-cpp analyze-csv < request.json\n"
+                     "       ark-cpp hypothesize < request.json\n"
                      "Research without an instruction reads an ARKMessage from stdin.\n";
         return argc < 2 ? 2 : 0;
     }
@@ -1138,6 +1140,18 @@ int main(int argc, char** argv) {
         if (command == "analyze-csv" && argc == 2) {
             const auto result = ark::analyze_csv(ark::make_message("user", "data_analysis_agent", "ANALYZE_DATA", ark::Json::parse(std::cin)));
             return print_run(result);
+        }
+        if (command == "hypothesize" && argc == 2) {
+            ark::CurlTransport http;
+            const auto settings = config(false);
+            const ark::Embeddings encoder(std::ref(http), settings.ollama_url, settings.embedding_model);
+            ark::SemanticMemory papers(std::ref(http), settings.qdrant_url, encoder, settings.semantic_db);
+            const auto password = env("ARK_NEO4J_PASSWORD");
+            ark::CitationGraph graph(std::ref(http), env("ARK_NEO4J_URL", "http://127.0.0.1:7474"),
+                env("ARK_NEO4J_DATABASE", "neo4j"), env("ARK_NEO4J_USER", password.empty() ? "" : "neo4j"), password);
+            auto profile = ark::hypothesis_profile(configured_model("ARK_MODEL", "general"));
+            ark::HypothesisEngine engine(std::ref(http), settings.ollama_url, std::move(profile), papers, graph, encoder);
+            return print_run(engine.run(ark::make_message("user", "hypothesis_engine", "HYPOTHESIZE", ark::Json::parse(std::cin))));
         }
         if (command == "benchmark" && argc <= 4) {
             return benchmark(argc >= 3 ? argv[2] : "benchmarks/arkbench/benchmark_v0.1.json",

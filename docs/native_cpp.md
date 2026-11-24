@@ -758,6 +758,18 @@ SVG plots: a histogram, a scatter plot, and a correlation heatmap. Raw CSV text
 and its path are removed from the response message. Labels are XML-escaped, and
 numeric magnitudes above 1e100 are rejected to keep the calculations finite.
 
+## Day 78 native Hypothesis Engine
+
+`build/ark-cpp hypothesize` accepts `{"domain":"..."}`. It retrieves up to 20
+related records from the existing Qdrant semantic collection and up to 20
+unlinked concept pairs from Neo4j, then asks the configured local model for five
+testable candidates. The embedding model compares each candidate with the paper
+abstracts. Novelty is the cosine distance from the nearest reference paper;
+the ranking score is `novelty × feasibility`, where feasibility is an
+uncalibrated model estimate in [0, 1]. Results include the score components and
+rank, not a claim that the hypothesis is original or experimentally validated.
+This requires the existing local Qdrant, Neo4j, embedding, and chat services.
+
 ```bash
 printf '%s\n' '{"experiment":"smoke","ranges":[{"name":"learning_rate","minimum":0,"maximum":1}],"target":{"learning_rate":0.5},"trial_count":10}' \
   | build/ark-cpp ml-optimize

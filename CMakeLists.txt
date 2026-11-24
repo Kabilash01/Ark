@@ -51,6 +51,7 @@ add_library(ark_native
     cpp/src/evaluation.cpp
     cpp/src/file_system.cpp
     cpp/src/github_agent.cpp
+    cpp/src/hypothesis_engine.cpp
     cpp/src/http.cpp
     cpp/src/inference.cpp
     cpp/src/ml_engineer.cpp
@@ -110,6 +111,9 @@ if(BUILD_TESTING)
     add_executable(ark_data_analysis_tests cpp/tests/data_analysis_test.cpp)
     target_link_libraries(ark_data_analysis_tests PRIVATE ark_native)
     add_test(NAME ark_data_analysis_tests COMMAND ark_data_analysis_tests)
+    add_executable(ark_hypothesis_engine_tests cpp/tests/hypothesis_engine_test.cpp)
+    target_link_libraries(ark_hypothesis_engine_tests PRIVATE ark_native)
+    add_test(NAME ark_hypothesis_engine_tests COMMAND ark_hypothesis_engine_tests)
     set_tests_properties(ark_vision_agent_tests PROPERTIES TIMEOUT 120)
     add_executable(ark_browser_tests cpp/tests/browser_test.cpp)
     target_link_libraries(ark_browser_tests PRIVATE ark_native httplib::httplib)
