@@ -1,9 +1,18 @@
 # ARK OS
 
-ARK is a personal operating environment for preserving knowledge and running
-agent workflows. The native runtime builds as the C++20 executable `ark-cpp`.
-See the [native setup and commands](docs/native_cpp.md) and
-[implementation guide](Implementation%20Guide/ARK_OS_Daily_Build_Plan.md).
+ARK OS is a local-first agent runtime with a native C++20 application. It
+includes research, coding, evaluation, memory, browser, sandbox, science, and
+workflow components. The C++ runtime is the active implementation; the Python
+tree remains in the repository as a migration reference and is not required to
+build `ark-cpp`.
+
+## Build
+
+On Linux, install CMake 3.24+, a C++20 compiler, pkg-config, and development
+packages for libcurl, libxml2, OpenSSL, SQLite, hiredis, libgit2, libzip,
+Poppler C++, Cairo PDF, and PangoCairo. CMake uses system nlohmann/json when
+available and otherwise fetches a pinned release. The API uses pinned
+cpp-httplib source.
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -12,6 +21,50 @@ ctest --test-dir build --output-on-failure
 build/ark-cpp --help
 ```
 
-The Python implementation is available as a migration reference. The native
-runtime uses local Ollama for models, Redis and Qdrant for shared data, SQLite
-for local history and skills, and Docker for isolated code execution.
+Full setup details and configuration are in the [native runtime guide](docs/native_cpp.md).
+The project [Implementation Guide](Implementation%20Guide/ARK_OS_Daily_Build_Plan.md)
+describes the longer roadmap.
+
+## Run
+
+For local model-backed research, run Ollama with cloud features disabled,
+install a model listed by `build/ark-cpp models`, and start Qdrant on loopback.
+Some workflows also use Redis, Neo4j, Docker, provider keys, or local audio and
+Whisper tools. These services are optional for building and running the unit
+tests, but required by the workflows that use them.
+
+```bash
+OLLAMA_NO_CLOUD=1 ollama serve
+# In another terminal, after starting Qdrant and installing the selected model:
+build/ark-cpp research "Explain the Transformer architecture"
+```
+
+The stdio MCP server can be launched from clients that support MCP:
+
+```json
+{
+  "mcpServers": {
+    "ark-os": {
+      "command": "/absolute/path/to/Ark/build/ark-cpp",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+It currently exposes `ark_task`, `ark_research`, `ark_code`, `ark_security`,
+and `ark_sage`. The local protocol handshake and tool listing have been smoke
+tested. Client-specific registration and service-backed live tool calls have
+not been verified; see the [Week 15 review](docs/week15_review.md).
+
+## Current evidence and limits
+
+The latest complete native CTest run reported 37 passed and 2 service-gated
+skips out of 39 tests. This is not evidence that every external service or all
+20 planned agents work together in one live task. See the [all-agent integration
+audit](docs/day96_agent_integration.md), [benchmark methods and results](docs/papers/arkbench.md),
+and [current project status](docs/project_status.md) for measured outcomes and
+open work.
+
+ARK OS is provided under the [MIT License](LICENSE). Contributions are covered
+by [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md).
