@@ -1220,6 +1220,93 @@ int main(int argc, char** argv) {
             std::cout << data.dump(2) << '\n';
             return 0;
         }
+        if (command == "sage-materials" && argc == 3) {
+            const auto input = ark::Json::parse(std::cin);
+            const auto topic = input.at("topic").get<std::string>();
+            const auto material_ids = input.at("material_ids").get<std::vector<std::string>>();
+            if (topic.empty() || topic.size() > 1000 || material_ids.size() < 2 || material_ids.size() > 100)
+                throw std::invalid_argument("SAGE requires a topic and 2–100 Materials Project IDs");
+
+            const auto settings = config();
+            ark::CurlTransport http;
+            const ark::Transport transport = std::ref(http);
+            const ark::MaterialsProjectClient materials(transport, env("MP_API_KEY"));
+            const auto require_done = [](const ark::Json& message, std::string_view stage) {
+                if (message.value("status", "") != "DONE") {
+                    const auto detail = message.value("output", ark::Json::object()).value("error_message", "stage failed");
+                    throw std::runtime_error(std::string(stage) + " stage failed: " + detail);
+                }
+                return message.at("output");
+            };
+            const std::vector<std::string> steps{"literature", "hypothesis", "experiment", "analysis", "report"};
+            ark::CheckpointManager checkpoints(env("ARK_SAGE_CHECKPOINT_DIR", "data/sage/checkpoints"));
+            const ark::Json request_signature{{"topic", topic}, {"material_ids", material_ids}};
+            if (const auto saved = checkpoints.load(argv[2], "request")) {
+                if (*saved != request_signature) throw std::invalid_argument("SAGE loop ID already belongs to a different topic or material ID list");
+            } else {
+                checkpoints.save(argv[2], "request", request_signature);
+            }
+            const auto results = checkpoints.run_workflow(argv[2], steps, [&](std::string_view stage, const ark::Json& prior) -> ark::Json {
+                if (stage == "literature") {
+                    auto research_config = settings;
+                    ark::ResearchAgent researcher(transport, std::move(research_config));
+                    return require_done(researcher.run(ark::make_message("user", "research_agent", "RESEARCH", {{"instruction", topic}})), stage);
+                }
+                if (stage == "hypothesis") {
+                    const ark::Embeddings encoder(transport, settings.ollama_url, settings.embedding_model);
+                    ark::SemanticMemory papers(transport, settings.qdrant_url, encoder, settings.semantic_db);
+                    const auto password = env("ARK_NEO4J_PASSWORD");
+                    ark::CitationGraph graph(transport, env("ARK_NEO4J_URL", "http://127.0.0.1:7474"),
+                        env("ARK_NEO4J_DATABASE", "neo4j"), env("ARK_NEO4J_USER", password.empty() ? "" : "neo4j"), password);
+                    ark::HypothesisEngine engine(transport, settings.ollama_url, ark::hypothesis_profile(settings.model), papers, graph, encoder);
+                    return require_done(engine.run(ark::make_message("user", "hypothesis_engine", "HYPOTHESIZE", {{"domain", topic}})), stage);
+                }
+                if (stage == "experiment") {
+                    const auto& hypotheses = prior.at("hypothesis").at("hypotheses");
+                    if (!hypotheses.is_array() || hypotheses.empty()) throw std::runtime_error("Hypothesis stage returned no candidates");
+                    const auto llama = ark::configured_llama_url();
+                    const auto provider = llama.empty() ? ark::InferenceProvider::ollama : ark::InferenceProvider::llama_cpp;
+                    ark::ExperimentDesigner designer(transport, llama.empty() ? settings.ollama_url : llama,
+                        ark::experiment_designer_profile(settings.model), provider);
+                    return require_done(designer.run(ark::make_message("user", "experiment_designer", "DESIGN_EXPERIMENT",
+                        {{"hypothesis", hypotheses.at(0).at("hypothesis")}})), stage);
+                }
+                if (stage == "analysis") {
+                    const auto data = materials.summaries(material_ids,
+                        {"material_id", "formula_pretty", "band_gap", "energy_above_hull"}, 100);
+                    if (data.size() < 2) throw std::runtime_error("Materials Project returned fewer than two material records");
+                    const auto quote = [](const std::string& value) {
+                        std::string escaped = "\"";
+                        for (const char c : value) { if (c == '\"') escaped += "\"\""; else escaped.push_back(c); }
+                        return escaped + "\"";
+                    };
+                    std::string csv = "material_id,formula_pretty,band_gap,energy_above_hull\n";
+                    for (const auto& row : data) {
+                        const auto cell = [&](const char* key) { return row.contains(key) && row.at(key).is_string() ? row.at(key).get<std::string>() : row.value(key, std::string{}); };
+                        csv += quote(cell("material_id")) + "," + quote(cell("formula_pretty")) + ",";
+                        csv += row.contains("band_gap") && row.at("band_gap").is_number() ? row.at("band_gap").dump() : "";
+                        csv += ",";
+                        csv += row.contains("energy_above_hull") && row.at("energy_above_hull").is_number() ? row.at("energy_above_hull").dump() : "";
+                        csv += "\n";
+                    }
+                    return {{"materials", data}, {"analysis", require_done(ark::analyze_csv(
+                        ark::make_message("user", "data_analysis_agent", "ANALYZE_DATA", {{"csv", csv}})), stage)}};
+                }
+                if (stage == "report") {
+                    const auto& candidate = prior.at("hypothesis").at("hypotheses").at(0);
+                    const auto password = env("ARK_NEO4J_PASSWORD");
+                    ark::CitationGraph graph(transport, env("ARK_NEO4J_URL", "http://127.0.0.1:7474"),
+                        env("ARK_NEO4J_DATABASE", "neo4j"), env("ARK_NEO4J_USER", password.empty() ? "" : "neo4j"), password);
+                    ark::ScientificReportGenerator report(graph);
+                    return require_done(report.run(ark::make_message("user", "scientific_report_generator", "GENERATE_REPORT", {
+                        {"title", "Materials screening: " + topic}, {"hypothesis", candidate.at("hypothesis")},
+                        {"spec", prior.at("experiment")}, {"results", prior.at("analysis")}})), stage);
+                }
+                throw std::invalid_argument("Unknown SAGE workflow stage");
+            });
+            std::cout << ark::Json{{"loop_id", argv[2]}, {"status", "DONE"}, {"completed_steps", steps}, {"results", results}}.dump(2) << '\n';
+            return 0;
+        }
         if (command == "design-experiment" && argc == 2) {
             ark::CurlTransport http;
             const auto settings = config(false);

@@ -837,6 +837,17 @@ SAGE materials run still requires live local model, embedding, Qdrant, and
 Neo4j services plus seeded literature; the client test uses a local transport
 fixture and does not claim a live Materials Project query.
 
+Day 84 adds `ark-cpp sage-materials <loop-id>`. Provide a JSON object on stdin
+with `topic` and at least two `material_ids`. It runs the five checkpointed
+stages: arXiv literature, hypotheses, C++ experiment design, Materials Project
+summary screening plus CSV analysis, and a LaTeX report. The request is bound
+to the loop ID so resuming it with a different topic or material list fails
+clearly. Each stage must return `DONE` before its output is checkpointed. The
+Materials Project analysis is database screening, not an executed physical
+experiment; generated results are therefore not represented as measurements.
+The command checks for `MP_API_KEY` before starting research, so a missing key
+does not leave a partial loop checkpoint.
+
 ```bash
 printf '%s\n' '{"experiment":"smoke","ranges":[{"name":"learning_rate","minimum":0,"maximum":1}],"target":{"learning_rate":0.5},"trial_count":10}' \
   | build/ark-cpp ml-optimize
