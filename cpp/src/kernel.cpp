@@ -17,9 +17,9 @@ constexpr std::array<std::string_view, 13> intents{
     "RESEARCH", "CODE", "SEARCH", "EXECUTE", "STORE", "EVALUATE", "REFLECT",
     "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION",
 };
-constexpr std::array<std::string_view, 9> workers{
+constexpr std::array<std::string_view, 10> workers{
     "research_agent", "coding_agent", "evaluation_agent", "memory_agent", "web_search_agent",
-    "browser_agent", "document_agent", "terminal_agent", "security_agent",
+    "browser_agent", "document_agent", "terminal_agent", "security_agent", "vision_agent",
 };
 
 bool contains(const auto& values, std::string_view value) {
@@ -83,7 +83,8 @@ BROWSE (use a specific website), SECURITY (defensive code audit), VISION (analyz
 constexpr std::string_view planner =
     R"(Build a directed acyclic task plan for the supplied goal. Use only the provided available_agents.
 The only task intents are RESEARCH or SEARCH for research_agent, CODE for coding_agent,
-EVALUATE for evaluation_agent, and STORE or SEARCH for memory_agent. Include synthesis in a RESEARCH task.
+EVALUATE for evaluation_agent, STORE or SEARCH for memory_agent, and VISION for vision_agent.
+Use vision_agent only when the task includes an image. Include synthesis in a RESEARCH task.
 Return JSON with a tasks array. Each task has string fields
 task_id, agent, intent, instruction, and arrays depends_on and parallel_with containing task IDs.
 Define each dependency explicitly. Use short, unique IDs such as t1, t2. Keep simple goals to one task.
@@ -107,6 +108,8 @@ Json plan_format(const std::vector<std::string>& agents) {
             allowed_intents.push_back("EVALUATE");
         } else if (agent == "memory_agent") {
             allowed_intents.push_back("STORE");
+        } else if (agent == "vision_agent") {
+            allowed_intents.push_back("VISION");
         }
     }
     const Json task{{"type", "object"}, {"additionalProperties", false},

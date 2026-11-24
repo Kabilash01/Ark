@@ -61,6 +61,7 @@ add_library(ark_native
     cpp/src/security_agent.cpp
     cpp/src/storage.cpp
     cpp/src/terminal.cpp
+    cpp/src/vision_agent.cpp
     cpp/src/vector_memory.cpp
     cpp/src/versions.cpp
     cpp/src/web_search.cpp)
@@ -94,6 +95,10 @@ if(BUILD_TESTING)
     target_link_libraries(ark_tool_workflow_tests PRIVATE ark_native httplib::httplib)
     add_test(NAME ark_tool_workflow_tests COMMAND ark_tool_workflow_tests)
     set_tests_properties(ark_tool_workflow_tests PROPERTIES TIMEOUT 30)
+    add_executable(ark_vision_agent_tests cpp/tests/vision_agent_test.cpp)
+    target_link_libraries(ark_vision_agent_tests PRIVATE ark_native PkgConfig::DOCUMENT_LIBS)
+    add_test(NAME ark_vision_agent_tests COMMAND ark_vision_agent_tests)
+    set_tests_properties(ark_vision_agent_tests PROPERTIES TIMEOUT 120)
     add_executable(ark_browser_tests cpp/tests/browser_test.cpp)
     target_link_libraries(ark_browser_tests PRIVATE ark_native httplib::httplib)
     add_test(NAME ark_browser_tests COMMAND ark_browser_tests)

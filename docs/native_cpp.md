@@ -674,6 +674,36 @@ target remains unmet on this setup. All ten llama.cpp responses matched the
 structured output contract. This measures generation, with the locked Docker
 repair results recorded separately. [Benchmark results](../benchmarks/inference/results.json)
 
+## Days 71–72 native Vision Agent
+
+`build/ark-cpp vision` reads one JSON payload from standard input and analyzes
+one PNG, JPEG, or WebP image (up to 10 MiB). The request has an `instruction`
+and exactly one of `image_path` or embedded `image` data with `mime_type` and
+base64 `data`. The active vision model comes from the configured model profile;
+`ARK_VISION_MODEL` overrides it, and `ARK_LLAMA_URL` selects the llama.cpp
+OpenAI-compatible endpoint.
+
+```json
+{"instruction":"Read the plotted years and approximate values.","image_path":"/tmp/figure.png"}
+```
+
+The response contains `summary`, `caption`, `extracted_text`, normalized
+`chart_type`, up to 10 `{label,value,unit}` observations, and uncertainty notes.
+Scientific-figure guidance covers line and bar plots, scatter plots, heatmaps,
+and confusion matrices. Confusion-matrix observations preserve visible
+row/column labels and cell values; the model is instructed not to derive
+metrics from unclear cells. Embedded image bytes and local paths are removed
+from the returned message.
+
+The automated image tests use deterministic fixtures to check the Ollama and
+llama.cpp image request formats, validation, chart output, caption structure,
+and confusion-matrix normalization. They do not establish visual accuracy for
+every model. A live check with the available small SmolVLM fallback identified
+a bar chart and returned three observations but misread the values. The
+configured Qwen2.5-VL model was not installed locally, so numeric extraction
+accuracy with that model remains unverified. Do not treat estimated chart
+values as ground truth without checking them against the source data.
+
 ## Day 55 Phase 2 integration
 
 The integration test classifies and plans a defensive code-review task,

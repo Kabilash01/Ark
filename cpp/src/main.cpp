@@ -24,6 +24,7 @@
 #include "ark/tool_benchmark.hpp"
 #include "ark/vector_memory.hpp"
 #include "ark/versions.hpp"
+#include "ark/vision_agent.hpp"
 #include "ark/web_search.hpp"
 
 #include <algorithm>
@@ -231,6 +232,9 @@ ark::AgentProfile actor_profile(std::string_view name, const std::string& genera
     } else if (name == "browser_agent") {
         defaults = ark::browser_profile(general_model);
         capabilities = {"BROWSE"};
+    } else if (name == "vision_agent") {
+        defaults = ark::vision_profile(general_model);
+        capabilities = {"VISION"};
     } else {
         throw std::invalid_argument("Unknown versioned agent " + std::string(name));
     }
@@ -270,6 +274,15 @@ ark::Json run_browser_agent(const ark::Transport& http, const ark::ResearchConfi
     const ark::BrowserAgent agent(http, settings.ollama_url, profile,
         {.executable = env("ARK_BROWSER_BINARY", "chromium"), .privacy = settings.privacy});
     return agent.run(std::move(message), activity);
+}
+
+ark::Json run_vision_agent(const ark::Transport& http, const ark::ResearchConfig& settings, ark::Json message,
+                           const ark::AgentProfile& profile) {
+    const auto llama_url = ark::configured_llama_url();
+    const bool use_llama = !llama_url.empty();
+    ark::VisionAgent agent(http, use_llama ? llama_url : settings.ollama_url, profile,
+        use_llama ? ark::InferenceProvider::llama_cpp : ark::InferenceProvider::ollama);
+    return agent.run(std::move(message));
 }
 
 ark::Json run_file_operation(ark::Json payload) {
@@ -435,7 +448,8 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         for (const auto& layer : ark::order_tasks(dag)) {
             for (const auto& task : layer) {
                 if (task.agent != "memory_agent" && !resolved.contains(task.agent)) {
-                    resolved.emplace(task.agent, actor_profile(task.agent, settings.model, redis.get()));
+                    const auto model = task.agent == "vision_agent" ? configured_model("ARK_VISION_MODEL", "vision") : settings.model;
+                    resolved.emplace(task.agent, actor_profile(task.agent, model, redis.get()));
                 }
             }
         }
@@ -511,6 +525,8 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
                     report["status"] = status;
                     emit(events, status == "STARTED" ? "tool_called" : "tool_result", report);
                 });
+        } else if (task.agent == "vision_agent") {
+            result = run_vision_agent(transport, settings, std::move(message), profiles.at(task.agent));
         } else {
             result = research_pool.run([&](std::string_view instance) {
                 auto assigned = source;
@@ -1036,6 +1052,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp evaluate < message.json\n"
                      "       ark-cpp web-search [--privacy|--airgap] <query>\n"
                      "       ark-cpp browse [--privacy|--airgap] <instruction>\n"
+                     "       ark-cpp vision < request.json\n"
                      "       ark-cpp files < operation.json\n"
                      "       ark-cpp status [task_id] | list | stop <task_id> | agents | logs\n"
                      "       ark-cpp models [vram-gib]\n"
@@ -1089,6 +1106,15 @@ int main(int argc, char** argv) {
         }
         if (command == "browser" && argc == 2) {
             return run_browser();
+        }
+        if (command == "vision" && argc == 2) {
+            ark::CurlTransport http;
+            const auto settings = config(false);
+            const auto redis = version_store();
+            const auto profile = actor_profile("vision_agent", configured_model("ARK_VISION_MODEL", "vision"), redis.get());
+            const auto result = run_vision_agent(std::ref(http), settings,
+                ark::make_message("user", "vision_agent", "VISION", ark::Json::parse(std::cin)), profile);
+            return print_run(result);
         }
         if (command == "benchmark" && argc <= 4) {
             return benchmark(argc >= 3 ? argv[2] : "benchmarks/arkbench/benchmark_v0.1.json",
