@@ -748,6 +748,16 @@ the restricted runtime command, logs, and cleanup. A live Docker run built from
 the local `python:3.11-slim` image printed `ARK DevOps integration passed` and
 returned exit code 0; the agent removed the temporary image and container.
 
+## Day 76 native Data Analysis Agent
+
+`build/ark-cpp analyze-csv` accepts exactly one of a UTF-8 `csv` string or
+`csv_path`. It reads up to 10 MiB, 100,000 rows, and 50 columns. Numeric columns
+include count, mean, sample standard deviation, and pairwise-complete Pearson
+correlations. The output also includes a concise summary and three standalone
+SVG plots: a histogram, a scatter plot, and a correlation heatmap. Raw CSV text
+and its path are removed from the response message. Labels are XML-escaped, and
+numeric magnitudes above 1e100 are rejected to keep the calculations finite.
+
 ```bash
 printf '%s\n' '{"experiment":"smoke","ranges":[{"name":"learning_rate","minimum":0,"maximum":1}],"target":{"learning_rate":0.5},"trial_count":10}' \
   | build/ark-cpp ml-optimize

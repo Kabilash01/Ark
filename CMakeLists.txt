@@ -46,6 +46,7 @@ add_library(ark_native
     cpp/src/conflict_resolver.cpp
     cpp/src/document_agent.cpp
     cpp/src/devops_agent.cpp
+    cpp/src/data_analysis.cpp
     cpp/src/done_condition.cpp
     cpp/src/evaluation.cpp
     cpp/src/file_system.cpp
@@ -106,6 +107,9 @@ if(BUILD_TESTING)
     add_executable(ark_devops_agent_tests cpp/tests/devops_agent_test.cpp)
     target_link_libraries(ark_devops_agent_tests PRIVATE ark_native)
     add_test(NAME ark_devops_agent_tests COMMAND ark_devops_agent_tests)
+    add_executable(ark_data_analysis_tests cpp/tests/data_analysis_test.cpp)
+    target_link_libraries(ark_data_analysis_tests PRIVATE ark_native)
+    add_test(NAME ark_data_analysis_tests COMMAND ark_data_analysis_tests)
     set_tests_properties(ark_vision_agent_tests PROPERTIES TIMEOUT 120)
     add_executable(ark_browser_tests cpp/tests/browser_test.cpp)
     target_link_libraries(ark_browser_tests PRIVATE ark_native httplib::httplib)

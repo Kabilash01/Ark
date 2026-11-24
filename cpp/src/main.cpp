@@ -7,6 +7,7 @@
 #include "ark/conflict_resolver.hpp"
 #include "ark/document_agent.hpp"
 #include "ark/devops_agent.hpp"
+#include "ark/data_analysis.hpp"
 #include "ark/done_condition.hpp"
 #include "ark/evaluation.hpp"
 #include "ark/file_system.hpp"
@@ -1092,6 +1093,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp serve [port]\n"
                      "       ark-cpp ml-optimize < request.json\n"
                      "       ark-cpp devops < request.json\n"
+                     "       ark-cpp analyze-csv < request.json\n"
                      "Research without an instruction reads an ARKMessage from stdin.\n";
         return argc < 2 ? 2 : 0;
     }
@@ -1131,6 +1133,10 @@ int main(int argc, char** argv) {
             ark::CurlTransport http;
             const auto result = ark::DevOpsAgent(std::ref(http), env("ARK_DOCKER_SOCKET", "/var/run/docker.sock"))
                 .run(ark::make_message("user", "devops_agent", "DEVOPS", ark::Json::parse(std::cin)));
+            return print_run(result);
+        }
+        if (command == "analyze-csv" && argc == 2) {
+            const auto result = ark::analyze_csv(ark::make_message("user", "data_analysis_agent", "ANALYZE_DATA", ark::Json::parse(std::cin)));
             return print_run(result);
         }
         if (command == "benchmark" && argc <= 4) {
