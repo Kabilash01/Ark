@@ -104,3 +104,25 @@ artifacts. The full native suite currently reports 38 passed and 2
 service-gated skips across 40 tests. This does not close the all-agent runtime
 gap: the normal planner/dispatcher still lacks adapters for every specialist,
 and local model/data services are not available for a complete live task.
+
+## Native roadmap tail — 2026-11-24
+
+- Day 109: native C++ MCP stdio server; local handshake and tool-list smoke
+  verified, but no real client registration or backend tool call verified.
+- Day 110: Week 15 evidence and blocker review recorded.
+- Day 111: README, contributing guide, and code of conduct prepared. The GitHub
+  repository is already public; no GitHub Release has been created. The MIT
+  license remains unchanged.
+- Days 112 and 114: local paper submission packages prepared. No conference or
+  preprint submission was made.
+- Day 113: evidence-based demo capture script prepared; no video recorded.
+- Day 115: custom VLM training claim remains blocked; inference-only scope
+  documented.
+- Day 116: prospective conflict-data analysis protocol added; the current
+  production telemetry capture has zero cases.
+- Day 117: native Obsidian and Notion exporters implemented. Obsidian CLI and
+  mocked Notion request tests pass; no Notion workspace was contacted.
+- Day 118: native deployment guide added and Compose syntax validated. No
+  clean-machine, boot-time, cloud, or Pi deployment was run.
+- Day 119: architecture map added. Full live integration of all 20 agents
+  remains open.

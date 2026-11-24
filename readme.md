@@ -22,6 +22,8 @@ build/ark-cpp --help
 ```
 
 Full setup details and configuration are in the [native runtime guide](docs/native_cpp.md).
+The [architecture map](ARCHITECTURE.md) summarizes runtime components and
+integration limits.
 The project [Implementation Guide](Implementation%20Guide/ARK_OS_Daily_Build_Plan.md)
 describes the longer roadmap.
 
