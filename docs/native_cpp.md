@@ -1087,3 +1087,14 @@ sources. Confidence is evidence-weighted and capped at 0.99; a capability absent
 from the registry is reported unsupported with confidence 0.0. The ten-question
 fixture verifies query matching and confidence handling without claiming the
 current live registry has passed those questions.
+
+## Day 95 native voice input
+
+`ark-cpp voice` records five seconds of mono 16 kHz WAV through `arecord`, runs
+the local C++ `whisper-cli`, and submits the transcript as an ARK task. Use
+`--seconds 1..60` to change capture time or `--file recording.wav` to transcribe
+an existing recording. Configure `ARK_AUDIO_RECORDER`, `ARK_WHISPER_CLI`, and
+`ARK_WHISPER_MODEL`. Audio is temporary and deleted after transcription. The
+machine has `arecord`, but no installed `whisper-cli` or Whisper model, so live
+speech submission has not been verified here; offline tests cover argument
+construction, transcript handling, capture cleanup, and invalid input.

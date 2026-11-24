@@ -37,6 +37,7 @@
 #include "ark/versions.hpp"
 #include "ark/vision_agent.hpp"
 #include "ark/vision_runtime.hpp"
+#include "ark/voice_input.hpp"
 #include "ark/web_search.hpp"
 
 #include <algorithm>
@@ -1159,6 +1160,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp status [task_id] | list | stop <task_id> | agents | logs\n"
                      "       ark-cpp models [vram-gib]\n"
                      "       ark-cpp capability-discovery <question> [map.json]\n"
+                     "       ark-cpp voice [--file recording.wav] [--seconds 1..60]\n"
                      "       ark-cpp classify|plan <goal>\n"
                      "       ark-cpp run [--privacy] [--airgap] [--until <condition>] [--max-iter <n>] <goal> [tests.json]\n"
                      "       ark-cpp --privacy|--airgap <goal> [tests.json]\n"
@@ -1662,6 +1664,22 @@ int main(int argc, char** argv) {
             ark::write_capability_map(map_path, map);
             std::cout << ark::answer_capability_question(map, question).dump(2) << '\n';
             return 0;
+        }
+        if (command == "voice") {
+            std::optional<std::filesystem::path> audio;
+            int seconds = 5;
+            for (int i = 2; i < argc; ++i) {
+                const std::string_view arg(argv[i]);
+                if (arg == "--file" && i + 1 < argc) audio = argv[++i];
+                else if (arg == "--seconds" && i + 1 < argc) seconds = std::stoi(argv[++i]);
+                else throw std::invalid_argument("Usage: ark-cpp voice [--file recording.wav] [--seconds 1..60]");
+            }
+            ark::VoiceInput voice(env("ARK_AUDIO_RECORDER", "arecord"), env("ARK_WHISPER_CLI", "whisper-cli"),
+                                  env("ARK_WHISPER_MODEL"));
+            const auto transcript = audio ? voice.transcribe(*audio) : voice.capture_and_transcribe(seconds);
+            auto result = run_task(transcript, config(), ark::Json::object(), false, false, std::nullopt, 10);
+            result["voice_transcript"] = transcript;
+            return print_run(result);
         }
         if (command == "memory" && (argc == 3 || (argc == 4 && std::string_view(argv[2]) == "search"))) {
             std::cout << recall(config(false), argv[argc - 1]).dump(2) << '\n';

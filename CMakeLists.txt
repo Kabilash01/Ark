@@ -74,6 +74,7 @@ add_library(ark_native
     cpp/src/task_scheduler.cpp
     cpp/src/vision_agent.cpp
     cpp/src/vision_runtime.cpp
+    cpp/src/voice_input.cpp
     cpp/src/vector_memory.cpp
     cpp/src/versions.cpp
     cpp/src/web_search.cpp)
@@ -141,6 +142,9 @@ if(BUILD_TESTING)
     target_link_libraries(ark_capability_discovery_tests PRIVATE ark_native)
     add_test(NAME ark_capability_discovery_tests COMMAND ark_capability_discovery_tests
         "${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/capability/questions_v1.json")
+    add_executable(ark_voice_input_tests cpp/tests/voice_input_test.cpp)
+    target_link_libraries(ark_voice_input_tests PRIVATE ark_native)
+    add_test(NAME ark_voice_input_tests COMMAND ark_voice_input_tests)
     add_executable(ark_checkpoint_manager_tests cpp/tests/checkpoint_manager_test.cpp)
     target_link_libraries(ark_checkpoint_manager_tests PRIVATE ark_native)
     add_test(NAME ark_checkpoint_manager_tests COMMAND ark_checkpoint_manager_tests)
