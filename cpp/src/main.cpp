@@ -3,6 +3,7 @@
 #include "ark/browser.hpp"
 #include "ark/browser_agent.hpp"
 #include "ark/citation_graph.hpp"
+#include "ark/capability_discovery.hpp"
 #include "ark/checkpoint_manager.hpp"
 #include "ark/coding.hpp"
 #include "ark/conflict_resolver.hpp"
@@ -1157,6 +1158,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp files < operation.json\n"
                      "       ark-cpp status [task_id] | list | stop <task_id> | agents | logs\n"
                      "       ark-cpp models [vram-gib]\n"
+                     "       ark-cpp capability-discovery <question> [map.json]\n"
                      "       ark-cpp classify|plan <goal>\n"
                      "       ark-cpp run [--privacy] [--airgap] [--until <condition>] [--max-iter <n>] <goal> [tests.json]\n"
                      "       ark-cpp --privacy|--airgap <goal> [tests.json]\n"
@@ -1637,6 +1639,28 @@ int main(int argc, char** argv) {
             ark::ProceduralMemory skills(skills_path(), encoder);
             std::cout << ark::Json{{"semantic_evicted", semantic.evict_unused()},
                                    {"procedural_evicted", skills.evict_low_success()}}.dump(2) << '\n';
+            return 0;
+        }
+        if (command == "capability-discovery" && argc >= 3) {
+            std::string question = argv[2];
+            for (int i = 3; i < argc && std::string_view(argv[i]).find(".json") == std::string_view::npos; ++i)
+                question += " " + std::string(argv[i]);
+            const auto map_path = argc > 3 && std::string_view(argv[argc - 1]).ends_with(".json")
+                ? std::filesystem::path(argv[argc - 1]) : config_dir() / "capabilities.json";
+            const auto redis = version_store(true);
+            const auto registry = ark::AgentRegistry(*redis).all();
+            const auto episode_path = std::filesystem::path(env("ARK_EPISODIC_DB", "data/episodic_memory.db"));
+            auto reflections = ark::Json::array();
+            if (std::filesystem::exists(episode_path)) reflections = ark::EpisodicMemory(episode_path).recent(500);
+            const auto benchmark_dir = std::filesystem::path(env("ARK_BENCHMARK_RESULTS", "benchmarks/arkbench/results"));
+            auto histories = ark::Json::object();
+            for (const auto& agent : registry) {
+                const auto name = agent.at("name").get<std::string>();
+                histories[name] = ark::benchmark_history(benchmark_dir, name);
+            }
+            const auto map = ark::build_capability_map(registry, reflections, histories);
+            ark::write_capability_map(map_path, map);
+            std::cout << ark::answer_capability_question(map, question).dump(2) << '\n';
             return 0;
         }
         if (command == "memory" && (argc == 3 || (argc == 4 && std::string_view(argv[2]) == "search"))) {

@@ -1075,3 +1075,15 @@ The intermediate run scored all 30 tasks, completed 23, and averaged 0.7853.
 The original ten averaged 0.3560 in this replay, and every new tool contract
 passed. The larger suite uses a different mix of scoring methods than the
 Month 2 baseline. [Intermediate results](../benchmarks/arkbench/results/month4_intermediate.json)
+
+### Capability discovery (Day 93)
+
+`ark-cpp capability-discovery "Can ARK OS research a scientific topic?"` refreshes
+`config/capabilities.json` from the live Redis agent registry, recent episodic
+reflection records, and local ARKBench result history, then answers the question
+with confidence and evidence. Set `ARK_CONFIG_DIR`, `ARK_EPISODIC_DB`,
+`ARK_BENCHMARK_RESULTS`, `ARK_REDIS_PORT`, and `ARK_REDIS_DB` to select the data
+sources. Confidence is evidence-weighted and capped at 0.99; a capability absent
+from the registry is reported unsupported with confidence 0.0. The ten-question
+fixture verifies query matching and confidence handling without claiming the
+current live registry has passed those questions.

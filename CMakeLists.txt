@@ -39,6 +39,7 @@ endif()
 
 add_library(ark_native
     cpp/src/benchmark.cpp
+    cpp/src/capability_discovery.cpp
     cpp/src/browser.cpp
     cpp/src/browser_agent.cpp
     cpp/src/citation_graph.cpp
@@ -136,6 +137,10 @@ if(BUILD_TESTING)
     add_executable(ark_self_improvement_tests cpp/tests/self_improvement_test.cpp)
     target_link_libraries(ark_self_improvement_tests PRIVATE ark_native)
     add_test(NAME ark_self_improvement_tests COMMAND ark_self_improvement_tests)
+    add_executable(ark_capability_discovery_tests cpp/tests/capability_discovery_test.cpp)
+    target_link_libraries(ark_capability_discovery_tests PRIVATE ark_native)
+    add_test(NAME ark_capability_discovery_tests COMMAND ark_capability_discovery_tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/capability/questions_v1.json")
     add_executable(ark_checkpoint_manager_tests cpp/tests/checkpoint_manager_test.cpp)
     target_link_libraries(ark_checkpoint_manager_tests PRIVATE ark_native)
     add_test(NAME ark_checkpoint_manager_tests COMMAND ark_checkpoint_manager_tests)

@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "questions": [
+    {"question": "Can ARK OS research a scientific topic?", "capability": "RESEARCH"},
+    {"question": "Can ARK OS write code?", "capability": "CODE"},
+    {"question": "Can ARK OS evaluate an artifact?", "capability": "EVALUATE"},
+    {"question": "Can ARK OS plan a multi-step goal?", "capability": "PLAN"},
+    {"question": "Can ARK OS supervise a task workflow?", "capability": "SUPERVISE"},
+    {"question": "Can ARK OS reflect on task outcomes?", "capability": "REFLECT"},
+    {"question": "Can ARK OS browse the web?", "capability": "BROWSE"},
+    {"question": "Can ARK OS analyze images with vision?", "capability": "VISION"},
+    {"question": "Can ARK OS use search?", "capability": "SEARCH"},
+    {"question": "Can ARK OS execute a task?", "capability": "EXECUTE"}
+  ]
+}
