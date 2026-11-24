@@ -71,6 +71,7 @@ add_library(ark_native
     cpp/src/terminal.cpp
     cpp/src/task_scheduler.cpp
     cpp/src/vision_agent.cpp
+    cpp/src/vision_runtime.cpp
     cpp/src/vector_memory.cpp
     cpp/src/versions.cpp
     cpp/src/web_search.cpp)
@@ -107,6 +108,9 @@ if(BUILD_TESTING)
     add_executable(ark_vision_agent_tests cpp/tests/vision_agent_test.cpp)
     target_link_libraries(ark_vision_agent_tests PRIVATE ark_native PkgConfig::DOCUMENT_LIBS)
     add_test(NAME ark_vision_agent_tests COMMAND ark_vision_agent_tests)
+    add_executable(ark_vision_runtime_tests cpp/tests/vision_runtime_test.cpp)
+    target_link_libraries(ark_vision_runtime_tests PRIVATE ark_native)
+    add_test(NAME ark_vision_runtime_tests COMMAND ark_vision_runtime_tests)
     add_executable(ark_ml_engineer_tests cpp/tests/ml_engineer_test.cpp)
     target_link_libraries(ark_ml_engineer_tests PRIVATE ark_native)
     add_test(NAME ark_ml_engineer_tests COMMAND ark_ml_engineer_tests)

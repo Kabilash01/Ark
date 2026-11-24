@@ -704,6 +704,32 @@ configured Qwen2.5-VL model was not installed locally, so numeric extraction
 accuracy with that model remains unverified. Do not treat estimated chart
 values as ground truth without checking them against the source data.
 
+## Day 86 native VLM runtime setup
+
+The guide's Python/PyTorch bridge-training step is not added because the
+project direction is C++ only. ARK's native `VisionAgent` already sends image
+content to Ollama or llama.cpp; llama.cpp's multimodal runtime uses `libmtmd`
+and supports Qwen2.5-VL GGUF models with image input. See the upstream
+[multimodal guide](https://github.com/ggml-org/llama.cpp/blob/master/docs/multimodal.md).
+
+`build/ark-cpp vision-check` reads the local llama-server `/props` endpoint and
+reports the loaded model's declared image capability before a figure-analysis
+request. It only accepts loopback HTTP and passes `ARK_LLAMA_API_KEY` as a
+Bearer token when configured. To start a small Qwen2.5-VL runtime, use:
+
+```bash
+llama-server -hf ggml-org/Qwen2.5-VL-3B-Instruct-GGUF \
+  --alias qwen2.5vl:3b --host 127.0.0.1 --port 8080
+ARK_LLAMA_URL=http://127.0.0.1:8080 ARK_VISION_MODEL=qwen2.5vl:3b \
+  build/ark-cpp vision-check
+```
+
+This runtime uses pretrained weights and does not train the custom SigLIP/Qwen
+projection described in the original guide. No local inference server or VLM
+weights were installed during this setup pass, so an actual model load and
+image inference remain unverified here; the new capability check is fixture
+tested.
+
 ## Day 73 native ML Engineer
 
 `build/ark-cpp ml-optimize` accepts a JSON object containing bounded numeric

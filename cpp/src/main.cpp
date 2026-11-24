@@ -34,6 +34,7 @@
 #include "ark/vector_memory.hpp"
 #include "ark/versions.hpp"
 #include "ark/vision_agent.hpp"
+#include "ark/vision_runtime.hpp"
 #include "ark/web_search.hpp"
 
 #include <algorithm>
@@ -1179,6 +1180,14 @@ int main(int argc, char** argv) {
             const auto result = run_vision_agent(std::ref(http), settings,
                 ark::make_message("user", "vision_agent", "VISION", ark::Json::parse(std::cin)), profile);
             return print_run(result);
+        }
+        if (command == "vision-check" && argc == 2) {
+            const auto endpoint = ark::configured_llama_url();
+            if (endpoint.empty()) throw std::invalid_argument("Set ARK_LLAMA_URL to a local llama-server with a vision model loaded");
+            ark::CurlTransport http;
+            const auto result = ark::inspect_vision_runtime(std::ref(http), endpoint, env("ARK_LLAMA_API_KEY"));
+            std::cout << result.dump(2) << '\n';
+            return result.at("vision_supported") == true ? 0 : 1;
         }
         if (command == "ml-optimize" && argc == 2) {
             ark::CurlTransport http;
