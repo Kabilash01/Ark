@@ -51,6 +51,7 @@ add_library(ark_native
     cpp/src/github_agent.cpp
     cpp/src/http.cpp
     cpp/src/inference.cpp
+    cpp/src/ml_engineer.cpp
     cpp/src/kernel.cpp
     cpp/src/message.cpp
     cpp/src/privacy.cpp
@@ -98,6 +99,9 @@ if(BUILD_TESTING)
     add_executable(ark_vision_agent_tests cpp/tests/vision_agent_test.cpp)
     target_link_libraries(ark_vision_agent_tests PRIVATE ark_native PkgConfig::DOCUMENT_LIBS)
     add_test(NAME ark_vision_agent_tests COMMAND ark_vision_agent_tests)
+    add_executable(ark_ml_engineer_tests cpp/tests/ml_engineer_test.cpp)
+    target_link_libraries(ark_ml_engineer_tests PRIVATE ark_native)
+    add_test(NAME ark_ml_engineer_tests COMMAND ark_ml_engineer_tests)
     set_tests_properties(ark_vision_agent_tests PROPERTIES TIMEOUT 120)
     add_executable(ark_browser_tests cpp/tests/browser_test.cpp)
     target_link_libraries(ark_browser_tests PRIVATE ark_native httplib::httplib)

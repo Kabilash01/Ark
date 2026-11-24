@@ -12,6 +12,7 @@
 #include "ark/github_agent.hpp"
 #include "ark/inference.hpp"
 #include "ark/kernel.hpp"
+#include "ark/ml_engineer.hpp"
 #include "ark/privacy.hpp"
 #include "ark/reflection.hpp"
 #include "ark/reflection_study.hpp"
@@ -1088,6 +1089,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp inference-benchmark <suite.json> <report.json>\n"
                      "       ark-cpp browser < actions.json\n"
                      "       ark-cpp serve [port]\n"
+                     "       ark-cpp ml-optimize < request.json\n"
                      "Research without an instruction reads an ARKMessage from stdin.\n";
         return argc < 2 ? 2 : 0;
     }
@@ -1114,6 +1116,13 @@ int main(int argc, char** argv) {
             const auto profile = actor_profile("vision_agent", configured_model("ARK_VISION_MODEL", "vision"), redis.get());
             const auto result = run_vision_agent(std::ref(http), settings,
                 ark::make_message("user", "vision_agent", "VISION", ark::Json::parse(std::cin)), profile);
+            return print_run(result);
+        }
+        if (command == "ml-optimize" && argc == 2) {
+            ark::CurlTransport http;
+            const auto payload = ark::Json::parse(std::cin);
+            const auto result = ark::run_ml_engineer(std::ref(http), env("MLFLOW_TRACKING_URI"),
+                ark::make_message("user", "ml_engineer_agent", "ML_OPTIMIZE", payload));
             return print_run(result);
         }
         if (command == "benchmark" && argc <= 4) {

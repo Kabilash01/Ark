@@ -704,6 +704,28 @@ configured Qwen2.5-VL model was not installed locally, so numeric extraction
 accuracy with that model remains unverified. Do not treat estimated chart
 values as ground truth without checking them against the source data.
 
+## Day 73 native ML Engineer
+
+`build/ark-cpp ml-optimize` accepts a JSON object containing bounded numeric
+`ranges`, a `target`, optional `trial_count` (1–1000), and an optional seed.
+The command is a deterministic smoke objective that minimizes squared distance
+from the target. The C++ `optimize_hyperparameters` API accepts an objective
+callback, so native training code can score real model trials without a Python
+runtime. The adaptive sampler is an ARK TPE-style implementation, not the
+Optuna library; the name and output make this implementation explicit.
+
+Set `MLFLOW_TRACKING_URI` to log the study through MLflow's REST API. It creates
+or reuses a named experiment, records the trial objective and each numeric
+hyperparameter as stepped metrics, records stable optimizer metadata as run
+parameters, and marks the run finished. Tests use a fake tracking server to
+verify request sequencing and payloads; a live MLflow service was not available
+for this verification.
+
+```bash
+printf '%s\n' '{"experiment":"smoke","ranges":[{"name":"learning_rate","minimum":0,"maximum":1}],"target":{"learning_rate":0.5},"trial_count":10}' \
+  | build/ark-cpp ml-optimize
+```
+
 ## Day 55 Phase 2 integration
 
 The integration test classifies and plans a defensive code-review task,
