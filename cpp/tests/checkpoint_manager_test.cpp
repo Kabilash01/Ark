@@ -11,7 +11,8 @@ void saves_resumes_lists_and_clears() {
     const auto root = std::filesystem::temp_directory_path() / ("ark-sage-checkpoints-" + ark::random_uuid());
     struct Cleanup { std::filesystem::path path; ~Cleanup() { std::error_code error; std::filesystem::remove_all(path, error); } } cleanup{root};
     const ark::CheckpointManager manager(root);
-    const std::vector<std::string> workflow{"literature", "hypothesis", "experiment", "analysis", "report"};
+    const std::vector<std::string> workflow{"literature", "hypothesis", "experiment", "analysis", "report",
+        "experiment_second", "analysis_second", "report_second"};
     check(!manager.load("loop-1", "literature") && manager.get_resume_point("loop-1").empty(), "missing checkpoint should be empty");
     manager.save("loop-1", "literature", {{"papers", 20}, {"summary", "retrieved"}});
     manager.save("loop-1", "hypothesis", {{"count", 5}});
@@ -34,8 +35,9 @@ void saves_resumes_lists_and_clears() {
     const auto resumed = manager.run_workflow("loop-1", workflow, [&](std::string_view step, const Json&) {
         ++calls; return Json{{"step", step}};
     });
-    check(calls == 3 && resumed.size() == 5 && manager.get_resume_point("loop-1") == "report",
-        "workflow failed to skip saved steps and resume through completion");
+    check(calls == 6 && resumed.size() == 8 && manager.get_resume_point("loop-1") == "report_second"
+        && resumed.at("report_second").at("step") == "report_second",
+        "workflow failed to skip saved steps and automatically checkpoint the second hypothesis run");
     manager.clear("loop-1");
     check(manager.list_checkpoints("loop-1").empty() && manager.next_step("loop-1", workflow) == "literature",
         "clear did not remove loop checkpoints");

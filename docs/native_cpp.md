@@ -725,7 +725,7 @@ ARK_LLAMA_URL=http://127.0.0.1:8080 ARK_VISION_MODEL=qwen2.5vl:3b \
 ```
 
 This runtime uses pretrained weights and does not train the custom SigLIP/Qwen
-projection described in the original guide. No local inference server or VLM
+projection described in the original guide. No running local inference server or VLM
 weights were installed during this setup pass, so an actual model load and
 image inference remain unverified here; the new capability check is fixture
 tested.
@@ -875,15 +875,33 @@ Neo4j services plus seeded literature; the client test uses a local transport
 fixture and does not claim a live Materials Project query.
 
 Day 84 adds `ark-cpp sage-materials <loop-id>`. Provide a JSON object on stdin
-with `topic` and at least two `material_ids`. It runs the five checkpointed
-stages: arXiv literature, hypotheses, C++ experiment design, Materials Project
-summary screening plus CSV analysis, and a LaTeX report. The request is bound
-to the loop ID so resuming it with a different topic or material list fails
-clearly. Each stage must return `DONE` before its output is checkpointed. The
+with `topic` and at least two `material_ids`. Its first five checkpointed
+stages run arXiv literature, hypotheses, C++ experiment design, Materials
+Project summary screening plus CSV analysis, and a LaTeX report. The request
+and workflow version are bound to the loop ID so resuming with different inputs
+or incompatible checkpoint schemas fails clearly. Each stage must return `DONE` before its output is checkpointed. The
 Materials Project analysis is database screening, not an executed physical
 experiment; generated results are therefore not represented as measurements.
 The command checks for `MP_API_KEY` before starting research, so a missing key
 does not leave a partial loop checkpoint.
+
+## Day 88 training monitor status
+
+There is no Stage 1 SigLIP/Qwen training run to monitor: the Python training
+recipe was replaced with native C++ inference on pretrained GGUF VLMs to follow
+the all-C++ project direction. `vision-check` verifies the loaded llama.cpp
+model advertises image input. MLflow optimization runs cover the separate
+native hyperparameter smoke workflow; they are not VLM training loss curves.
+
+## Day 89 two-hypothesis SAGE run
+
+The native SAGE command automatically processes the top two ranked hypotheses.
+It designs a separate C++ experiment for each, reuses the identical Materials
+Project screening artifact, and writes a separate cited LaTeX report per
+hypothesis. All eight workflow stages checkpoint independently, so a failure
+in the second report resumes there without repeating literature retrieval or
+the first report. The second screening intentionally reuses the same material
+records rather than issuing an identical API request again.
 
 ## Day 85 hypothesis evidence and specificity
 

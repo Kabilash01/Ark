@@ -1247,9 +1247,10 @@ int main(int argc, char** argv) {
                 }
                 return message.at("output");
             };
-            const std::vector<std::string> steps{"literature", "hypothesis", "experiment", "analysis", "report"};
+            const std::vector<std::string> steps{"literature", "hypothesis", "experiment", "analysis", "report",
+                "experiment_second", "analysis_second", "report_second"};
             ark::CheckpointManager checkpoints(env("ARK_SAGE_CHECKPOINT_DIR", "data/sage/checkpoints"));
-            const ark::Json request_signature{{"topic", topic}, {"material_ids", material_ids}};
+            const ark::Json request_signature{{"workflow_version", 2}, {"topic", topic}, {"material_ids", material_ids}};
             if (const auto saved = checkpoints.load(argv[2], "request")) {
                 if (*saved != request_signature) throw std::invalid_argument("SAGE loop ID already belongs to a different topic or material ID list");
             } else {
@@ -1270,16 +1271,18 @@ int main(int argc, char** argv) {
                     ark::HypothesisEngine engine(transport, settings.ollama_url, ark::hypothesis_profile(settings.model), papers, graph, encoder);
                     return require_done(engine.run(ark::make_message("user", "hypothesis_engine", "HYPOTHESIZE", {{"domain", topic}})), stage);
                 }
-                if (stage == "experiment") {
+                if (stage == "experiment" || stage == "experiment_second") {
+                    const std::size_t candidate_index = stage == "experiment_second" ? 1 : 0;
                     const auto& hypotheses = prior.at("hypothesis").at("hypotheses");
-                    if (!hypotheses.is_array() || hypotheses.empty()) throw std::runtime_error("Hypothesis stage returned no candidates");
+                    if (!hypotheses.is_array() || hypotheses.size() <= candidate_index) throw std::runtime_error("Hypothesis stage returned too few candidates");
                     const auto llama = ark::configured_llama_url();
                     const auto provider = llama.empty() ? ark::InferenceProvider::ollama : ark::InferenceProvider::llama_cpp;
                     ark::ExperimentDesigner designer(transport, llama.empty() ? settings.ollama_url : llama,
                         ark::experiment_designer_profile(settings.model), provider);
                     return require_done(designer.run(ark::make_message("user", "experiment_designer", "DESIGN_EXPERIMENT",
-                        {{"hypothesis", hypotheses.at(0).at("hypothesis")}})), stage);
+                        {{"hypothesis", hypotheses.at(candidate_index).at("hypothesis")}})), stage);
                 }
+                if (stage == "analysis_second") return prior.at("analysis");
                 if (stage == "analysis") {
                     const auto data = materials.summaries(material_ids,
                         {"material_id", "formula_pretty", "band_gap", "energy_above_hull"}, 100);
@@ -1301,8 +1304,10 @@ int main(int argc, char** argv) {
                     return {{"materials", data}, {"analysis", require_done(ark::analyze_csv(
                         ark::make_message("user", "data_analysis_agent", "ANALYZE_DATA", {{"csv", csv}})), stage)}};
                 }
-                if (stage == "report") {
-                    const auto& candidate = prior.at("hypothesis").at("hypotheses").at(0);
+                if (stage == "report" || stage == "report_second") {
+                    const bool second = stage == "report_second";
+                    const auto candidate_index = second ? 1 : 0;
+                    const auto& candidate = prior.at("hypothesis").at("hypotheses").at(candidate_index);
                     ark::Json references = ark::Json::array();
                     const auto& available = prior.at("hypothesis").value("references", ark::Json::array());
                     for (const auto& paper_id : candidate.at("paper_ids")) {
@@ -1319,8 +1324,11 @@ int main(int argc, char** argv) {
                         env("ARK_NEO4J_DATABASE", "neo4j"), env("ARK_NEO4J_USER", password.empty() ? "" : "neo4j"), password);
                     ark::ScientificReportGenerator report(graph);
                     return require_done(report.run(ark::make_message("user", "scientific_report_generator", "GENERATE_REPORT", {
-                        {"title", "Materials screening: " + topic}, {"hypothesis", candidate.at("hypothesis")},
-                        {"spec", prior.at("experiment")}, {"results", prior.at("analysis")}, {"references", std::move(references)}})), stage);
+                        {"title", "Materials screening: hypothesis " + std::to_string(candidate_index + 1) + " — " + topic},
+                        {"hypothesis", candidate.at("hypothesis")},
+                        {"spec", prior.at(second ? "experiment_second" : "experiment")},
+                        {"results", prior.at(second ? "analysis_second" : "analysis")},
+                        {"references", std::move(references)}})), stage);
                 }
                 throw std::invalid_argument("Unknown SAGE workflow stage");
             });
