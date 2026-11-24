@@ -93,6 +93,18 @@ The native router runs the Research, Coding, and Evaluation Agents. The Redis
 bus, registry, all four memory tiers, and the REST and WebSocket API have
 native implementations. The research worker uses abstracts and metadata.
 
+## Day 66 research worker balancing
+
+Research dispatch uses two process-local worker slots. Each slot tracks its
+load count and mean evaluator score. A free slot with a score below `0.65` is
+deprioritized while a slot without evaluation history remains eligible. Ties
+favor the slot with fewer lifetime assignments. Evaluation results update the
+slot associated with the completed research result. This is a lightweight
+in-process routing policy, not a claim that two separate model servers or
+hardware workers are running. The native test dispatches two independent
+research workers concurrently and checks assignment balance, score-based
+selection, and slot release after exceptions.
+
 ## Day 24 sandbox
 
 `ark-cpp sandbox` uses the local Docker Engine Unix socket. Pull

@@ -1,4 +1,5 @@
 #include "ark/research.hpp"
+#include <cmath>
 #include "ark/conflict_resolver.hpp"
 #include "ark/privacy.hpp"
 #include "ark/kernel.hpp"
@@ -360,6 +361,58 @@ void ResearchAgent::persist(const Json& sources) {
     }
     Embeddings encoder(transport_, config_.ollama_url, config_.embedding_model);
     SemanticMemory(transport_, config_.qdrant_url, std::move(encoder), config_.semantic_db).store(records);
+}
+
+Json ResearchPool::run(const std::function<Json(std::string_view)>& execute) {
+    std::unique_lock lock(mutex_);
+    ready_.wait(lock, [&] { return std::any_of(replicas_.begin(), replicas_.end(), [](const auto& replica) { return !replica.busy; }); });
+    const auto selected = std::min_element(replicas_.begin(), replicas_.end(), [](const auto& a, const auto& b) {
+        if (a.busy != b.busy) return !a.busy;
+        if (a.preferred() != b.preferred()) return a.preferred();
+        return a.load_count < b.load_count;
+    });
+    selected->busy = true;
+    ++selected->load_count;
+    lock.unlock();
+    struct Release {
+        std::mutex& mutex;
+        std::condition_variable& ready;
+        bool& busy;
+        ~Release() {
+            const std::lock_guard guard(mutex);
+            busy = false;
+            ready.notify_one();
+        }
+    } release{mutex_, ready_, selected->busy};
+    auto result = execute(selected->name);
+    result["agent_instance"] = selected->name;
+    return result;
+}
+
+void ResearchPool::record_score(std::string_view instance, double score) {
+    if (!std::isfinite(score) || score < 0.0 || score > 1.0) {
+        throw std::invalid_argument("Research score must be between zero and one");
+    }
+    const std::lock_guard lock(mutex_);
+    for (auto& replica : replicas_) {
+        if (replica.name == instance) {
+            ++replica.scored;
+            replica.score_sum += score;
+            return;
+        }
+    }
+    throw std::invalid_argument("Unknown research replica");
+}
+
+Json ResearchPool::snapshot() {
+    const std::lock_guard lock(mutex_);
+    auto output = Json::array();
+    for (const auto& replica : replicas_) {
+        output.push_back({{"instance", replica.name}, {"busy", replica.busy}, {"load_count", replica.load_count},
+            {"quality_samples", replica.scored},
+            {"avg_quality_score", replica.scored ? Json(replica.score_sum / replica.scored) : Json(nullptr)}});
+    }
+    return output;
 }
 
 } // namespace ark

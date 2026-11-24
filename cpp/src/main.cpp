@@ -45,6 +45,8 @@ std::string env(const char* name, std::string fallback = "") {
 
 std::filesystem::path config_dir() { return env("ARK_CONFIG_DIR", "config"); }
 
+ark::ResearchPool research_pool;
+
 std::string configured_model(const char* override, const char* role) {
     const auto selected = env(override);
     return selected.empty()
@@ -467,6 +469,11 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         } else if (task.agent == "evaluation_agent") {
             message["payload"]["instruction"] = goal + "\n" + task.instruction;
             result = run_evaluation(transport, settings, std::move(message), profiles.at(task.agent));
+            const auto target = result.at("output").value("evaluated_task", "");
+            if (dependencies.contains(target) && dependencies.at(target).contains("agent_instance")) {
+                research_pool.record_score(dependencies.at(target).at("agent_instance").get_ref<const std::string&>(),
+                                           result.at("quality_score").get<double>());
+            }
         } else if (task.agent == "web_search_agent") {
             result = run_web_search(transport, settings, std::move(message), profiles.at(task.agent));
         } else if (task.agent == "browser_agent") {
@@ -478,7 +485,12 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
                     emit(events, status == "STARTED" ? "tool_called" : "tool_result", report);
                 });
         } else {
-            result = ark::ResearchAgent(transport, settings, profiles.at(task.agent)).run(std::move(message));
+            result = research_pool.run([&](std::string_view instance) {
+                auto assigned = source;
+                assigned["agent_instance"] = instance;
+                emit(events, "agent_assigned", assigned);
+                return ark::ResearchAgent(transport, settings, profiles.at(task.agent)).run(std::move(message));
+            });
         }
         result["retry_count"] = attempt - 1;
         const auto& output = result.at("output");
@@ -512,6 +524,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         }
         activity.erase("activity");
         activity["status"] = result.at("status");
+        if (result.contains("agent_instance")) activity["agent_instance"] = result.at("agent_instance");
         emit(events, "agent_done", activity);
         return result;
     }, [&](std::string_view name) {
@@ -1128,8 +1141,10 @@ int main(int argc, char** argv) {
             ark::CurlTransport http;
             const auto settings = config();
             const auto redis = version_store();
-            ark::ResearchAgent agent(std::ref(http), settings, actor_profile("research_agent", settings.model, redis.get()));
-            const auto result = agent.run(std::move(message));
+            const auto profile = actor_profile("research_agent", settings.model, redis.get());
+            const auto result = research_pool.run([&](std::string_view) {
+                return ark::ResearchAgent(std::ref(http), settings, profile).run(std::move(message));
+            });
             std::cout << result.dump(2) << '\n';
             return result.at("status") == "DONE" ? 0 : 1;
         }

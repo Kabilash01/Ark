@@ -1,6 +1,8 @@
 #include "ark/research.hpp"
 
 #include <iostream>
+#include <future>
+#include <latch>
 #include <map>
 #include <stdexcept>
 
@@ -207,6 +209,36 @@ void rejects_untrusted_responses() {
           "must reject arXiv feeds containing DTD declarations");
 }
 
+void research_replicas_balance_and_prefer_quality() {
+    ark::ResearchPool pool;
+    std::latch started(2);
+    const auto work = [&](std::string_view) {
+        started.count_down();
+        started.wait();
+        Services service;
+        service.discovery = Services::Discovery::Scholar;
+        ark::ResearchAgent agent(std::ref(service), config());
+        return agent.run(request({{"instruction", "Summarize arXiv:1706.03762"}}));
+    };
+    auto first = std::async(std::launch::async, [&] { return pool.run(work); });
+    auto second = std::async(std::launch::async, [&] { return pool.run(work); });
+    const auto a = first.get();
+    const auto b = second.get();
+    check(a.at("status") == "DONE" && b.at("status") == "DONE", "replicas did not both run");
+    check(a.at("agent_instance") != b.at("agent_instance"), "replicas overlapped on the same slot");
+    const auto quick = [](std::string_view) { return Json{{"status", "DONE"}}; };
+    for (int i = 0; i < 18; ++i) pool.run(quick);
+    const auto balanced = pool.snapshot();
+    check(balanced.at(0).at("load_count") == 10 && balanced.at(1).at("load_count") == 10, balanced.dump());
+    pool.record_score("research_agent#1", 0.30);
+    pool.record_score("research_agent#2", 0.90);
+    check(pool.run(quick).at("agent_instance") == "research_agent#2", "lower-quality replica was not deprioritized");
+    try {
+        pool.run([](std::string_view) -> Json { throw std::runtime_error("fixture error"); });
+    } catch (const std::runtime_error&) {}
+    check(pool.run(quick).at("agent_instance") == "research_agent#2", "failed replica did not release its slot");
+}
+
 } // namespace
 
 int main() {
@@ -216,6 +248,7 @@ int main() {
         explicit_paper_bypasses_search();
         blocks_disallowed_network();
         rejects_untrusted_responses();
+        research_replicas_balance_and_prefer_quality();
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;
