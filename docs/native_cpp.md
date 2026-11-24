@@ -821,6 +821,22 @@ executes goals while `ark-cpp serve` is running and records last-run/error
 status. `ark-cpp schedules` lists jobs; `schedule pause|resume|cancel <id>`
 controls them. This is a native C++ scheduler without APScheduler.
 
+## Day 83 Materials Project client and Week 12 review
+
+`MaterialsProjectClient` queries the official `/materials/summary/` endpoint
+from native C++. It sends `MP_API_KEY` through the `X-API-KEY` header, requests
+selected material IDs and fields, and caps a request at 1000 records. The
+client accepts HTTPS endpoints and HTTP loopback endpoints for tests. Run
+`printf '%s\\n' '{"material_ids":["mp-149"],"fields":["formula_pretty","band_gap"]}'
+| build/ark-cpp materials-query` after setting `MP_API_KEY`.
+
+The Day 71–82 native Vision, ML, DevOps, CSV analysis, Hypothesis Engine,
+Experiment Designer, report generator, checkpoint, and scheduler components
+are present. Day 83 adds the native materials data source. A full end-to-end
+SAGE materials run still requires live local model, embedding, Qdrant, and
+Neo4j services plus seeded literature; the client test uses a local transport
+fixture and does not claim a live Materials Project query.
+
 ```bash
 printf '%s\n' '{"experiment":"smoke","ranges":[{"name":"learning_rate","minimum":0,"maximum":1}],"target":{"learning_rate":0.5},"trial_count":10}' \
   | build/ark-cpp ml-optimize

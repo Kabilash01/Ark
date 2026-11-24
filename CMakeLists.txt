@@ -58,6 +58,7 @@ add_library(ark_native
     cpp/src/http.cpp
     cpp/src/inference.cpp
     cpp/src/ml_engineer.cpp
+    cpp/src/materials_project.cpp
     cpp/src/kernel.cpp
     cpp/src/message.cpp
     cpp/src/privacy.cpp
@@ -118,6 +119,9 @@ if(BUILD_TESTING)
     add_executable(ark_hypothesis_engine_tests cpp/tests/hypothesis_engine_test.cpp)
     target_link_libraries(ark_hypothesis_engine_tests PRIVATE ark_native)
     add_test(NAME ark_hypothesis_engine_tests COMMAND ark_hypothesis_engine_tests)
+    add_executable(ark_materials_project_tests cpp/tests/materials_project_test.cpp)
+    target_link_libraries(ark_materials_project_tests PRIVATE ark_native)
+    add_test(NAME ark_materials_project_tests COMMAND ark_materials_project_tests)
     add_executable(ark_experiment_designer_tests cpp/tests/experiment_designer_test.cpp)
     target_link_libraries(ark_experiment_designer_tests PRIVATE ark_native)
     add_test(NAME ark_experiment_designer_tests COMMAND ark_experiment_designer_tests)

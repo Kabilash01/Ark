@@ -18,6 +18,7 @@
 #include "ark/inference.hpp"
 #include "ark/kernel.hpp"
 #include "ark/ml_engineer.hpp"
+#include "ark/materials_project.hpp"
 #include "ark/privacy.hpp"
 #include "ark/reflection.hpp"
 #include "ark/reflection_study.hpp"
@@ -1207,6 +1208,17 @@ int main(int argc, char** argv) {
             auto profile = ark::hypothesis_profile(configured_model("ARK_MODEL", "general"));
             ark::HypothesisEngine engine(std::ref(http), settings.ollama_url, std::move(profile), papers, graph, encoder);
             return print_run(engine.run(ark::make_message("user", "hypothesis_engine", "HYPOTHESIZE", ark::Json::parse(std::cin))));
+        }
+        if (command == "materials-query" && argc == 2) {
+            ark::CurlTransport http;
+            const auto input = ark::Json::parse(std::cin);
+            const auto ids = input.at("material_ids").get<std::vector<std::string>>();
+            const auto fields = input.value("fields", std::vector<std::string>{});
+            const auto limit = input.value("limit", 100);
+            const auto data = ark::MaterialsProjectClient(std::ref(http), env("MP_API_KEY"))
+                .summaries(ids, fields, limit);
+            std::cout << data.dump(2) << '\n';
+            return 0;
         }
         if (command == "design-experiment" && argc == 2) {
             ark::CurlTransport http;
