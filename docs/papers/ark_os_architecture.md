@@ -41,6 +41,29 @@ the submitted solution. The results record completion, elapsed time, and the
 evaluator's ratings alongside the evidence checks. This design supports
 comparisons between recorded configurations using the same dataset.
 
+### Resource coordination and native workflows
+
+The runtime bounds concurrent browser, terminal, and arXiv operations with
+FIFO semaphores. Research dispatch assigns work among two process-local slots
+using assignment counts and evaluator history. An evaluator score below the
+configured threshold deprioritizes a slot, while an unrated slot remains
+eligible. This policy routes requests among logical instances; it does not
+imply separate model servers or machines.
+
+The kernel can execute dependency graphs that combine local document, terminal,
+and defensive security workers. The Month 4 benchmark adapter opts these
+workers into its validated DAG path and restricts fixture data flow to selected
+tool output strings written into document paragraph text. The adapter records
+each participating agent version with the case result. In the 20-task
+concurrency fixture, observed peaks matched configured resource capacities and
+all SQLite writes survived. This measurement covers scheduling and local
+storage, not inference or external tool throughput.
+
+The final v1.0 evaluation includes 50 cases. On the ten unchanged research and
+coding task IDs, the measured score rose from 0.4035 in the recorded Month 2
+baseline to 0.438, an 8.55% relative improvement. The overall 50-case mean is
+reported separately because it includes new deterministic tool workflows.
+
 ![A research, coding, and evaluation DAG. The coding node is running.](figures/ark_runtime_dag.png)
 
 The task inspector derives the displayed edges from the validated plan.

@@ -135,6 +135,32 @@ scores matched the serial reference. This harness exercises semaphore and
 SQLite synchronization; it does not measure concurrent model inference or
 external browser and container throughput.
 
+## Day 69 ARKBench v1.0
+
+`benchmarks/arkbench/benchmark_v1.0.json` preserves the 30 v0.5 cases and adds
+10 dependency-graph coordination cases and 10 mixed terminal, security, and
+document workflows. The coordination and mixed cases run through the native
+kernel DAG dispatcher. Their declared bindings can copy only the terminal
+stdout or a matched local advisory ID into an existing document paragraph;
+they cannot alter a command, URL, or model prompt. Each result records the
+coordinator version and the versions of the participating tool agents.
+
+The combined report at `benchmarks/arkbench/results/month4_final.json` contains
+50 scored cases. It records the original 30-case run and the separately
+executed 20 new workflow cases. The first ten matched research and coding IDs
+scored 0.438 against 0.4035 in the Month 2 baseline, an 8.55% improvement. The
+50-case mean spans deterministic tool checks and model-graded research and
+coding, so use the matched original cohort for the Month 2 comparison.
+
+## Day 70 Month 4 closeout
+
+The implementation and verification evidence are summarized in
+[`docs/month4_results.md`](month4_results.md). The architecture draft now
+describes the rated research slots, bounded resource dispatch, and the new
+tool-workflow DAG path. Conflict telemetry is ready for continued collection,
+but the initial capture has no historical observations and does not support
+claims about real-world conflict frequencies.
+
 ## Day 24 sandbox
 
 `ark-cpp sandbox` uses the local Docker Engine Unix socket. Pull
