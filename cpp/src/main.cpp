@@ -1303,13 +1303,24 @@ int main(int argc, char** argv) {
                 }
                 if (stage == "report") {
                     const auto& candidate = prior.at("hypothesis").at("hypotheses").at(0);
+                    ark::Json references = ark::Json::array();
+                    const auto& available = prior.at("hypothesis").value("references", ark::Json::array());
+                    for (const auto& paper_id : candidate.at("paper_ids")) {
+                        for (const auto& reference : available) {
+                            if (reference.value("paper_id", "") == paper_id.get<std::string>()) {
+                                references.push_back({{"paper_id", reference.at("paper_id")},
+                                    {"title", reference.at("title")}, {"url", reference.value("url", "")}});
+                                break;
+                            }
+                        }
+                    }
                     const auto password = env("ARK_NEO4J_PASSWORD");
                     ark::CitationGraph graph(transport, env("ARK_NEO4J_URL", "http://127.0.0.1:7474"),
                         env("ARK_NEO4J_DATABASE", "neo4j"), env("ARK_NEO4J_USER", password.empty() ? "" : "neo4j"), password);
                     ark::ScientificReportGenerator report(graph);
                     return require_done(report.run(ark::make_message("user", "scientific_report_generator", "GENERATE_REPORT", {
                         {"title", "Materials screening: " + topic}, {"hypothesis", candidate.at("hypothesis")},
-                        {"spec", prior.at("experiment")}, {"results", prior.at("analysis")}})), stage);
+                        {"spec", prior.at("experiment")}, {"results", prior.at("analysis")}, {"references", std::move(references)}})), stage);
                 }
                 throw std::invalid_argument("Unknown SAGE workflow stage");
             });

@@ -46,9 +46,36 @@ void rejects_unsafe_figure_paths() {
     const auto result = ark::ScientificReportGenerator(graph).run(report_request(Json::array({{{"path", "../escape.pdf"}, {"caption", "unsafe"}}})));
     check(result.at("status") == "FAILED", "unsafe figure path was accepted");
 }
+
+void includes_hypothesis_evidence_in_safe_bibliography() {
+    ark::CitationGraph graph([](const ark::Request&) -> ark::Response { throw std::runtime_error("direct evidence must not query Neo4j"); }, "http://127.0.0.1:7474");
+    auto request = report_request(Json::array({{{"path", "figures/result.svg"}, {"caption", "band gap screening"}}}));
+    request["payload"]["paper_ids"] = Json::array();
+    request["payload"]["references"] = Json::array({{{"paper_id", "2401.00001"}, {"title", "A & B solar materials"},
+        {"url", "https://arxiv.org/abs/2401.00001"}}});
+    const auto result = ark::ScientificReportGenerator(graph).run(std::move(request));
+    check(result.at("status") == "DONE" && result.at("output").at("citation_count") == 1,
+        "supplied paper evidence did not produce a citation");
+    const auto content = result.at("output").at("content").get<std::string>();
+    check(content.find("A \\& B solar materials") != std::string::npos
+        && content.find("\\url{https://arxiv.org/abs/2401.00001}") != std::string::npos
+        && content.find("\\begin{figure}[!htbp]") != std::string::npos,
+        "bibliography, URL, or figure placement was not rendered safely");
+}
+
+void rejects_unsafe_reference_urls() {
+    ark::CitationGraph graph([](const ark::Request&) -> ark::Response { throw std::runtime_error("should not query graph"); }, "http://127.0.0.1:7474");
+    auto request = report_request(Json::array());
+    request["payload"].erase("paper_ids");
+    request["payload"]["references"] = Json::array({{{"paper_id", "paper_1"}, {"title", "unsafe source"},
+        {"url", "javascript:alert(1)"}}});
+    const auto result = ark::ScientificReportGenerator(graph).run(std::move(request));
+    check(result.at("status") == "FAILED", "unsafe bibliography URL was accepted");
+}
 }
 
 int main() {
-    try { creates_latex_with_graph_citations_and_escaped_inputs(); rejects_unsafe_figure_paths(); }
+    try { creates_latex_with_graph_citations_and_escaped_inputs(); rejects_unsafe_figure_paths();
+        includes_hypothesis_evidence_in_safe_bibliography(); rejects_unsafe_reference_urls(); }
     catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }

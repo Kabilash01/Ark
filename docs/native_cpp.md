@@ -730,6 +730,17 @@ weights were installed during this setup pass, so an actual model load and
 image inference remain unverified here; the new capability check is fixture
 tested.
 
+## Day 87 SAGE report citations and layout
+
+The report generator accepts evidence references from the Hypothesis Engine,
+filters them to the selected hypothesis's exact `paper_ids`, and writes those
+titles and validated HTTPS source URLs into the bibliography. Unsafe URLs are
+rejected before LaTeX generation. Figures use `[!htbp]` placement. Tests cover
+graph citations, direct arXiv references, escaped text, URL rejection, and
+section structure. `pdflatex` and `tectonic` are not installed here, and Day 84
+has no live experiment artifact yet, so PDF compilation against a real SAGE
+run remains unverified.
+
 ## Day 73 native ML Engineer
 
 `build/ark-cpp ml-optimize` accepts a JSON object containing bounded numeric

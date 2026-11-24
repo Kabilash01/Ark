@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <regex>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 
@@ -64,7 +65,26 @@ Json ScientificReportGenerator::run(Json message) const {
         const auto results = describe_results(payload.at("results"));
 
         Json citations = Json::array();
-        if (payload.contains("paper_ids")) {
+        if (payload.contains("references")) {
+            const auto& references = payload.at("references");
+            if (!references.is_array() || references.size() > 20) throw std::invalid_argument("Report accepts at most 20 direct references");
+            std::set<std::string> seen;
+            static const std::regex safe_url(R"(^https://[A-Za-z0-9.-]+(/[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]*)?$)");
+            for (const auto& reference : references) {
+                if (!reference.is_object()) throw std::invalid_argument("Every report reference must be an object");
+                const auto id = required_text(reference, "paper_id", 200);
+                const auto title = required_text(reference, "title", 1000);
+                if (!seen.insert(id).second) continue;
+                Json item{{"id", id}, {"title", title}, {"source", "supplied_evidence"}};
+                if (reference.contains("url") && !reference.at("url").is_null() && !reference.at("url").get<std::string>().empty()) {
+                    const auto url = reference.at("url").get<std::string>();
+                    if (url.size() > 2000 || !std::regex_match(url, safe_url) || url.find("..") != std::string::npos)
+                        throw std::invalid_argument("Reference URL must be a safe HTTPS URL");
+                    item["url"] = url;
+                }
+                citations.push_back(std::move(item));
+            }
+        } else if (payload.contains("paper_ids")) {
             if (!payload.at("paper_ids").is_array() || payload.at("paper_ids").size() > 20) throw std::invalid_argument("paper_ids must contain at most 20 graph IDs");
             for (const auto& id : payload.at("paper_ids")) {
                 if (!id.is_string()) throw std::invalid_argument("Paper graph IDs must be strings");
@@ -101,7 +121,7 @@ Json ScientificReportGenerator::run(Json message) const {
             static const std::regex safe(R"([A-Za-z0-9_./-]+)");
             if (!std::regex_match(path, safe) || path.starts_with('/') || path.find("..") != std::string::npos)
                 throw std::invalid_argument("Figure path must be a safe relative filename");
-            tex << "\\begin{figure}[ht]\n\\centering\n\\includegraphics[width=0.9\\linewidth]{\\detokenize{" << path
+            tex << "\\begin{figure}[!htbp]\n\\centering\n\\includegraphics[width=0.9\\linewidth]{\\detokenize{" << path
                 << "}}\n\\caption{" << latex(caption) << "}\n\\end{figure}\n";
         }
         if (figures.empty()) tex << "No figure files were supplied.\n";
@@ -110,7 +130,10 @@ Json ScientificReportGenerator::run(Json message) const {
             for (std::size_t i = 0; i < citations.size(); ++i) {
                 const auto& row = citations.at(i);
                 tex << "\\bibitem{arkref" << i << "}" << latex(row.value("title", "Untitled"))
-                    << ". Citation graph record " << latex(row.value("id", "unknown")) << ".\n";
+                    << ". Source identifier: \\texttt{" << latex(row.value("id", "unknown")) << "}.";
+                if (row.contains("url")) tex << " Available at \\url{" << row.at("url").get<std::string>() << "}.";
+                else if (!(row.contains("source") && row.at("source") == "supplied_evidence")) tex << " Citation graph record.";
+                tex << "\n";
             }
             tex << "\\end{thebibliography}\n";
         }
