@@ -43,3 +43,28 @@ history at capture time. It does not establish that no conflicts occurred in
 earlier runs. A later empirical analysis should report the actual observation
 window and event counts, separate test fixtures from production operation, and
 avoid extrapolating from an incomplete collection period.
+
+## Prospective analysis protocol
+
+The collector currently emits observations rather than a complete exposure
+denominator. A future report should therefore present distinct case counts and
+outcome counts, not rates per task, request, or unit of runtime. For timed
+cases, report the number of timed observations with the mean, and include a
+median and percentile range computed from the raw case-level durations before
+making latency comparisons. Keep each conflict class separate: resource waits
+measure semaphore acquisition delay; priority waits use queue age at selection;
+output conflicts record bounded reconciliation and escalation; memory events
+record review outcomes only where review timestamps exist.
+
+Use a predeclared window with its start and end timestamps. Report whether the
+window has complete production logging and give the number of running tasks,
+resource requests, and memory reviews only if those denominators are collected
+and validated. Do not treat missing elapsed time as zero. Repeated updates to a
+case are one case for case-level outcome counts; retain the event history when
+describing state transitions. Analyze fixture events separately from production
+observations. Any claim that the resolver improves outcomes requires a
+comparison design with a defined baseline; the current journal has no such
+control group.
+
+The current zero-case capture cannot support a statistical comparison. The
+protocol above is prospective and does not alter the reported initial result.
