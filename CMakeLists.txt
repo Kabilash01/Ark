@@ -48,6 +48,7 @@ add_library(ark_native
     cpp/src/document_agent.cpp
     cpp/src/experiment_designer.cpp
     cpp/src/scientific_report.cpp
+    cpp/src/self_improvement.cpp
     cpp/src/devops_agent.cpp
     cpp/src/data_analysis.cpp
     cpp/src/done_condition.cpp
@@ -132,6 +133,9 @@ if(BUILD_TESTING)
     add_executable(ark_scientific_report_tests cpp/tests/scientific_report_test.cpp)
     target_link_libraries(ark_scientific_report_tests PRIVATE ark_native)
     add_test(NAME ark_scientific_report_tests COMMAND ark_scientific_report_tests)
+    add_executable(ark_self_improvement_tests cpp/tests/self_improvement_test.cpp)
+    target_link_libraries(ark_self_improvement_tests PRIVATE ark_native)
+    add_test(NAME ark_self_improvement_tests COMMAND ark_self_improvement_tests)
     add_executable(ark_checkpoint_manager_tests cpp/tests/checkpoint_manager_test.cpp)
     target_link_libraries(ark_checkpoint_manager_tests PRIVATE ark_native)
     add_test(NAME ark_checkpoint_manager_tests COMMAND ark_checkpoint_manager_tests)

@@ -27,6 +27,7 @@
 #include "ark/sandbox.hpp"
 #include "ark/security_agent.hpp"
 #include "ark/scientific_report.hpp"
+#include "ark/self_improvement.hpp"
 #include "ark/storage.hpp"
 #include "ark/terminal.hpp"
 #include "ark/task_scheduler.hpp"
@@ -58,6 +59,23 @@ std::string env(const char* name, std::string fallback = "") {
 std::filesystem::path config_dir() { return env("ARK_CONFIG_DIR", "config"); }
 
 ark::ResearchPool research_pool;
+std::optional<std::pair<std::string, std::string>> active_prompt_override;
+std::mutex active_prompt_override_mutex;
+
+class PromptOverrideGuard {
+public:
+    PromptOverrideGuard(std::string agent, std::string prompt) {
+        const std::lock_guard lock(active_prompt_override_mutex);
+        previous_ = active_prompt_override;
+        active_prompt_override = std::make_pair(std::move(agent), std::move(prompt));
+    }
+    ~PromptOverrideGuard() {
+        const std::lock_guard lock(active_prompt_override_mutex);
+        active_prompt_override = std::move(previous_);
+    }
+private:
+    std::optional<std::pair<std::string, std::string>> previous_;
+};
 
 std::string configured_model(const char* override, const char* role) {
     const auto selected = env(override);
@@ -248,11 +266,17 @@ ark::AgentProfile actor_profile(std::string_view name, const std::string& genera
     } else {
         throw std::invalid_argument("Unknown versioned agent " + std::string(name));
     }
+    auto selected = defaults;
     if (redis) {
-        try { return ark::AgentVersioner(*redis).ensure(name, capabilities, defaults); }
+        try { selected = ark::AgentVersioner(*redis).ensure(name, capabilities, defaults); }
         catch (const ark::RedisUnavailable&) {}
     }
-    return defaults;
+    {
+        const std::lock_guard lock(active_prompt_override_mutex);
+        if (active_prompt_override && active_prompt_override->first == name && selected.prompts.contains("system"))
+            selected.prompts["system"] = active_prompt_override->second;
+    }
+    return selected;
 }
 
 std::unique_ptr<ark::Redis> runtime_redis(int port, int db) {
@@ -933,6 +957,66 @@ int benchmark(const std::filesystem::path& suite_path, const std::filesystem::pa
     return totals.at("scored") == totals.at("total") ? 0 : 1;
 }
 
+int self_improve_agent(std::string_view target, const std::filesystem::path& suite_path,
+                       const std::filesystem::path& report_path) {
+    if (std::filesystem::weakly_canonical(suite_path) == std::filesystem::weakly_canonical(report_path))
+        throw std::invalid_argument("Self-improvement report path must differ from the benchmark suite");
+    if (target != "research_agent" && target != "coding_agent")
+        throw std::invalid_argument("Self-improvement A/B runs currently support research_agent or coding_agent");
+    const auto suite = ark::read_json(suite_path);
+    if (!suite.contains("tasks") || !suite.at("tasks").is_array() || suite.at("tasks").size() != 10)
+        throw std::invalid_argument("Self-improvement requires exactly 10 ARKBench tasks");
+    const auto expected_kind = target == "research_agent" ? "research" : "coding";
+    for (const auto& task : suite.at("tasks")) {
+        if (task.value("kind", "") != expected_kind)
+            throw std::invalid_argument("Every A/B case must exercise the target agent using kind " + std::string(expected_kind));
+    }
+
+    const auto settings = config();
+    const auto redis = version_store(true, true);
+    const auto current = actor_profile(target, settings.model, redis.get());
+    const auto episodic_path = std::filesystem::path(env("ARK_EPISODIC_DB", "data/episodic_memory.db"));
+    const auto logs = std::filesystem::exists(episodic_path)
+        ? ark::EpisodicMemory(episodic_path).pending_improvements(50) : ark::Json::array();
+    ark::CurlTransport http;
+    const auto llama_url = ark::configured_llama_url();
+    const bool use_llama = !llama_url.empty();
+    ark::SelfImprovementAgent improver(std::ref(http), use_llama ? llama_url : settings.ollama_url,
+        settings.model, use_llama ? ark::InferenceProvider::llama_cpp : ark::InferenceProvider::ollama);
+    auto proposal = improver.propose(target, current, logs);
+    if (proposal.value("status", "") == "NO_ACTION") {
+        ark::write_json(report_path, proposal);
+        std::cout << proposal.dump(2) << '\n';
+        return 0;
+    }
+
+    const auto sandbox = docker_sandbox(std::ref(http));
+    const auto candidate_prompt = proposal.at("candidate_system_prompt").get<std::string>();
+    const auto comparison = improver.compare(current, candidate_prompt, suite.at("tasks"),
+        [&](const ark::AgentProfile& tested_profile, const ark::Json& task) {
+            auto one_case = suite;
+            one_case["tasks"] = ark::Json::array({task});
+            PromptOverrideGuard override_prompt(std::string(target), tested_profile.prompts.at("system"));
+            const auto result = ark::run_benchmark(one_case,
+                [&](const ark::Json& dag) { return dispatch(dag, settings, "SELF_IMPROVE", {}, ark::Json::object(), true); },
+                [&](const ark::SandboxWorkspace& workspace) { return sandbox.run_tests(workspace); });
+            const auto score = result.at("summary").at("mean_score");
+            if (!score.is_number()) throw std::runtime_error("A/B benchmark case returned no measured score");
+            return score.get<double>();
+        });
+    const auto promotion = improver.promote_if_better(target, current, candidate_prompt, comparison,
+        [&](const ark::AgentProfile& candidate, double score) {
+            return ark::AgentVersioner(*redis).bump(target, "patch", {
+                {"prompts", {{"system", candidate.prompts.at("system")}}}, {"benchmark_score", score},
+                {"changed_by", "self_improvement_agent"},
+                {"change_summary", "Prompt passed a ten-case A/B improvement gate"}});
+        });
+    const ark::Json report{{"proposal", proposal}, {"comparison", comparison}, {"promotion", promotion}};
+    ark::write_json(report_path, report);
+    std::cout << report.dump(2) << '\n';
+    return 0;
+}
+
 void api_command(std::string_view path, std::string_view method = "GET") {
     ark::CurlTransport http;
     const auto port = std::stoi(env("ARK_API_PORT", "8000"));
@@ -1082,6 +1166,7 @@ int main(int argc, char** argv) {
                      "       ark-cpp audit|episodes\n"
                      "       ark-cpp episodes-archive | memory-prune\n"
                      "       ark-cpp reflection-queue\n"
+                     "       ark-cpp self-improve <research_agent|coding_agent> <suite.json> <report.json>\n"
                      "       ark-cpp versions <agent>\n"
                      "       ark-cpp version-bump <agent> <patch|minor|major> <change.json>\n"
                      "       ark-cpp version-rollback <agent> <version>\n"
@@ -1399,6 +1484,8 @@ int main(int argc, char** argv) {
             || ((command == "version-bump" || command == "version-compare") && argc == 5)) {
             return manage_versions(command, argv[2], argv + 3);
         }
+        if (command == "self-improve" && argc == 5)
+            return self_improve_agent(argv[2], argv[3], argv[4]);
         if (command == "serve" && argc <= 3) {
             return serve(argc == 3 ? std::stoi(argv[2]) : 8000);
         }

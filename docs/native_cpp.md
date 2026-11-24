@@ -915,6 +915,25 @@ When no paths are supplied, report generation continues with no figures. The
 existing Vision Agent fixture test verifies confusion-matrix labels, cell
 values, and a misclassification caption; a live VLM remains unavailable here.
 
+## Day 92 native self-improvement
+
+Run `ark-cpp self-improve research_agent <suite.json> <report.json>` or use
+`coding_agent`. The suite must contain exactly 10 ARKBench research or coding
+tasks for that target. The agent reads up to 50 pending reflection records for
+the target with quality below 0.65, asks the configured local model for a
+replacement system prompt, then evaluates both prompts on the same 10 cases.
+It calls `AgentVersioner::bump` only when the candidate mean exceeds the
+baseline mean by strictly more than 0.05. Otherwise it writes a rejection
+report and leaves the active version unchanged. The report includes per-case
+scores, means, rationale, and the resulting version when promoted.
+
+This uses the native local inference and versioning stack rather than the
+guide's Claude-based prompt generator. A live benchmark and promotion still
+require Redis, the configured inference service, and (for coding suites) the
+Docker test image. The self-improvement unit test uses deterministic reflection,
+inference, and evaluator fixtures; it verifies target filtering, all 10 paired
+scores, the strict threshold, and the version-commit callback.
+
 The Week 13 status and live verification requirements are recorded in
 [the review](week13_review.md).
 

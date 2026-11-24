@@ -40,3 +40,8 @@ Run `ark-cpp sage-materials` with configured local services, `MP_API_KEY`, and
 two or more material IDs. Repeat with two relative figure paths to verify live
 captioning and the generated `.tex` reports. PDF compilation also remains
 unverified because neither `pdflatex` nor `tectonic` is installed.
+
+The Week 14 native self-improvement implementation follows the same local-only
+model direction. Its A/B gate is fixture-tested, but no live prompt candidate
+has been promoted because the local inference and Redis services are not
+running in this environment.
