@@ -51,9 +51,36 @@ void validates_agent_contract_and_finite_scores() {
     catch (const std::invalid_argument&) { rejected = true; }
     check(rejected, "invalid hyperparameter range was accepted");
 }
+
+void trains_and_validates_native_linear_model() {
+    Json features = Json::array(), targets = Json::array();
+    for (int i = 0; i < 100; ++i) {
+        const double x = static_cast<double>(i) / 100.0;
+        features.push_back(Json::array({x}));
+        targets.push_back(1.2 + 2.5 * x);
+    }
+    const Json payload{{"model", "linear_regression"}, {"dataset", {{"features", features}, {"targets", targets}}},
+        {"ranges", Json::array({{{"name", "learning_rate"}, {"minimum", 0.02}, {"maximum", 0.3}},
+            {{"name", "l2"}, {"minimum", 0.0}, {"maximum", 0.05}}})},
+        {"trial_count", 10}, {"epochs", 120}, {"seed", 13}};
+    auto message = ark::make_message("test", "ml_engineer_agent", "ML_OPTIMIZE", payload);
+    const auto result = ark::run_ml_engineer({}, "", std::move(message));
+    check(result.at("status") == "DONE", result.dump());
+    check(!result.at("payload").contains("dataset"), "raw training data leaked in the response message");
+    const auto& output = result.at("output");
+    check(output.at("model") == "linear_regression" && output.at("trials").size() == 10,
+        "linear experiment did not return its model and trial history");
+    check(output.at("validation_rows") == 20 && output.at("validation_rmse").get<double>() < 0.25,
+        "held-out validation RMSE was unexpectedly high");
+    check(output.at("plot").at("series").at(0).at("values").size() == 10,
+        "pipeline did not return plot-ready validation history");
+    check(std::abs(output.at("intercept").get<double>() - 1.2) < 0.25
+        && std::abs(output.at("coefficients").at(0).get<double>() - 2.5) < 0.5,
+        "fitted linear parameters were far from the known synthetic model");
+}
 }
 
 int main() {
-    try { optimizes_and_tracks_ten_trials(); validates_agent_contract_and_finite_scores(); }
+    try { optimizes_and_tracks_ten_trials(); validates_agent_contract_and_finite_scores(); trains_and_validates_native_linear_model(); }
     catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }

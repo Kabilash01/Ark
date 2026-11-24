@@ -23,6 +23,10 @@ Json optimize_hyperparameters(const std::vector<HyperparameterRange>& ranges,
                               std::size_t trials, const TrialObjective& objective,
                               bool maximize = false, std::uint64_t seed = 42);
 
+// Trains and validates a linear regression model from an inline numeric
+// dataset; no user-supplied code is executed.
+Json run_linear_regression_experiment(const Json& payload);
+
 class MlflowLogger {
 public:
     explicit MlflowLogger(Transport transport, std::string tracking_url);

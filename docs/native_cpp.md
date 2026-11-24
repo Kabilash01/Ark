@@ -721,6 +721,17 @@ parameters, and marks the run finished. Tests use a fake tracking server to
 verify request sequencing and payloads; a live MLflow service was not available
 for this verification.
 
+## Day 74 native experiment pipeline
+
+Set `model` to `linear_regression`, provide `dataset.features` as numeric row
+arrays and `dataset.targets`, and include a bounded `learning_rate` range.
+Optional `l2` defaults to 0–0.1. The pipeline uses a seeded 80/20
+train/validation split, trains only on training rows, selects trials by
+validation RMSE, and returns coefficients, metrics, all trials, and plot-ready
+validation history. It accepts up to 5,000 rows, 32 features, 100 trials, and
+300 epochs. This first native pipeline supports linear regression; other model
+families and CSV ingestion remain future extensions.
+
 ```bash
 printf '%s\n' '{"experiment":"smoke","ranges":[{"name":"learning_rate","minimum":0,"maximum":1}],"target":{"learning_rate":0.5},"trial_count":10}' \
   | build/ark-cpp ml-optimize

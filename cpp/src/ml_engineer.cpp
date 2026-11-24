@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <numeric>
 #include <random>
 #include <stdexcept>
 
@@ -10,6 +11,75 @@ namespace ark {
 namespace {
 
 double oriented(double value, bool maximize) { return maximize ? -value : value; }
+
+struct Dataset {
+    std::vector<std::vector<double>> x;
+    std::vector<double> y;
+    std::vector<std::size_t> train;
+    std::vector<std::size_t> validation;
+};
+
+Dataset read_dataset(const Json& payload) {
+    if (!payload.contains("dataset") || !payload.at("dataset").is_object()) throw std::invalid_argument("linear_regression requires an inline dataset object");
+    const auto& data = payload.at("dataset");
+    if (!data.contains("features") || !data.at("features").is_array() || !data.contains("targets") || !data.at("targets").is_array())
+        throw std::invalid_argument("dataset requires numeric features and targets arrays");
+    const auto& features = data.at("features");
+    const auto& targets = data.at("targets");
+    if (features.size() < 10 || features.size() > 5000 || targets.size() != features.size()) throw std::invalid_argument("dataset requires 10–5000 rows with one target per row");
+    Dataset result;
+    std::size_t dimensions = 0;
+    for (std::size_t i = 0; i < features.size(); ++i) {
+        if (!features[i].is_array() || features[i].empty() || features[i].size() > 32 || !targets[i].is_number()) throw std::invalid_argument("invalid numeric feature row or target");
+        if (dimensions == 0) dimensions = features[i].size();
+        if (features[i].size() != dimensions) throw std::invalid_argument("feature rows must have matching dimensions");
+        std::vector<double> row;
+        for (const auto& value : features[i]) {
+            if (!value.is_number() || !std::isfinite(value.get<double>())) throw std::invalid_argument("features must be finite numbers");
+            row.push_back(value.get<double>());
+        }
+        const auto target = targets[i].get<double>();
+        if (!std::isfinite(target)) throw std::invalid_argument("targets must be finite numbers");
+        result.x.push_back(std::move(row)); result.y.push_back(target);
+    }
+    std::vector<std::size_t> order(result.x.size());
+    std::iota(order.begin(), order.end(), 0);
+    std::mt19937_64 random(payload.value("seed", std::uint64_t{42}));
+    std::shuffle(order.begin(), order.end(), random);
+    const auto split = order.size() * 8 / 10;
+    result.train.assign(order.begin(), order.begin() + static_cast<std::ptrdiff_t>(split));
+    result.validation.assign(order.begin() + static_cast<std::ptrdiff_t>(split), order.end());
+    return result;
+}
+
+struct Fit { std::vector<double> weights; double rmse; };
+
+Fit fit_linear(const Dataset& data, const std::vector<std::size_t>& train,
+               const std::vector<std::size_t>& evaluate, double rate, double l2, std::size_t epochs) {
+    std::vector<double> weights(data.x.front().size() + 1, 0.0);
+    for (std::size_t epoch = 0; epoch < epochs; ++epoch) {
+        std::vector<double> gradient(weights.size(), 0.0);
+        for (auto row : train) {
+            double prediction = weights[0];
+            for (std::size_t j = 0; j + 1 < weights.size(); ++j) prediction += weights[j + 1] * data.x[row][j];
+            const auto error = prediction - data.y[row];
+            gradient[0] += error;
+            for (std::size_t j = 0; j + 1 < weights.size(); ++j) gradient[j + 1] += error * data.x[row][j];
+        }
+        for (std::size_t j = 0; j < weights.size(); ++j) {
+            gradient[j] = gradient[j] * 2.0 / static_cast<double>(train.size()) + (j == 0 ? 0.0 : 2.0 * l2 * weights[j]);
+            weights[j] -= rate * gradient[j];
+            if (!std::isfinite(weights[j]) || std::abs(weights[j]) > 1e12) throw std::runtime_error("training diverged; reduce learning_rate range");
+        }
+    }
+    double squared = 0;
+    for (auto row : evaluate) {
+        double prediction = weights[0];
+        for (std::size_t j = 0; j + 1 < weights.size(); ++j) prediction += weights[j + 1] * data.x[row][j];
+        const auto error = prediction - data.y[row]; squared += error * error;
+    }
+    return {std::move(weights), std::sqrt(squared / static_cast<double>(evaluate.size()))};
+}
 
 Json mlflow_request(const Transport& transport, std::string url, std::string_view method, Json body = Json::object()) {
     const auto response = transport({std::move(url), std::string(method), body.dump(), {"Content-Type: application/json"}});
@@ -74,6 +144,53 @@ Json optimize_hyperparameters(const std::vector<HyperparameterRange>& ranges, st
     return {{"trials", std::move(observations)}, {"best_parameters", best->parameters},
             {"best_objective", best->score}, {"direction", maximize ? "maximize" : "minimize"},
             {"optimizer", "ark_tpe_style_v1"}};
+}
+
+Json run_linear_regression_experiment(const Json& payload) {
+    if (payload.value("model", "") != "linear_regression") throw std::invalid_argument("Supported native experiment model: linear_regression");
+    const auto data = read_dataset(payload);
+    if (!payload.contains("ranges") || !payload.at("ranges").is_array()) throw std::invalid_argument("Experiment requires hyperparameter ranges");
+    std::vector<HyperparameterRange> ranges;
+    for (const auto& range : payload.at("ranges")) {
+        ranges.push_back({range.at("name").get<std::string>(), range.at("minimum").get<double>(), range.at("maximum").get<double>()});
+    }
+    const auto has_rate = std::find_if(ranges.begin(), ranges.end(), [](const auto& range) { return range.name == "learning_rate"; });
+    if (has_rate == ranges.end()) throw std::invalid_argument("Experiment ranges must include learning_rate");
+    const auto has_l2 = std::find_if(ranges.begin(), ranges.end(), [](const auto& range) { return range.name == "l2"; });
+    if (has_l2 == ranges.end()) ranges.push_back({"l2", 0.0, 0.1});
+    for (const auto& range : ranges) {
+        if (range.name != "learning_rate" && range.name != "l2") throw std::invalid_argument("Unsupported linear_regression hyperparameter: " + range.name);
+        if (range.name == "learning_rate" && range.minimum <= 0) throw std::invalid_argument("learning_rate range must be positive");
+        if (range.name == "l2" && range.minimum < 0) throw std::invalid_argument("l2 range cannot be negative");
+    }
+    const auto epochs = payload.value("epochs", std::size_t{100});
+    const auto trial_count = payload.value("trial_count", std::size_t{10});
+    if (epochs == 0 || epochs > 300) throw std::invalid_argument("epochs must be between 1 and 300");
+    if (trial_count == 0 || trial_count > 100) throw std::invalid_argument("linear_regression trial_count must be between 1 and 100");
+    const auto seed = payload.value("seed", std::uint64_t{42});
+    const auto study = optimize_hyperparameters(ranges, trial_count, [&](const Json& parameters) {
+        try {
+            return fit_linear(data, data.train, data.validation, parameters.at("learning_rate").get<double>(),
+                              parameters.at("l2").get<double>(), epochs).rmse;
+        } catch (const std::runtime_error&) {
+            return 1e18; // Keep divergent proposals in the trial history as poor candidates.
+        }
+    }, false, seed);
+    const auto& best = study.at("best_parameters");
+    const auto trained = fit_linear(data, data.train, data.train, best.at("learning_rate").get<double>(), best.at("l2").get<double>(), epochs);
+    const auto validation = fit_linear(data, data.train, data.validation, best.at("learning_rate").get<double>(), best.at("l2").get<double>(), epochs);
+    auto coefficients = Json::array();
+    for (std::size_t i = 1; i < trained.weights.size(); ++i) coefficients.push_back(trained.weights[i]);
+    auto curve = Json::array();
+    for (const auto& trial : study.at("trials")) curve.push_back({{"x", trial.at("trial")}, {"y", trial.at("objective")}});
+    return {{"model", "linear_regression"}, {"dataset_rows", data.x.size()},
+        {"train_rows", data.train.size()}, {"validation_rows", data.validation.size()},
+        {"best_parameters", best}, {"best_objective", study.at("best_objective")},
+        {"train_rmse", trained.rmse}, {"validation_rmse", validation.rmse},
+        {"intercept", trained.weights[0]}, {"coefficients", std::move(coefficients)},
+        {"plot", {{"title", "Validation RMSE by trial"}, {"x_label", "Trial"}, {"y_label", "Validation RMSE"},
+                   {"series", Json::array({{{"name", "validation_rmse"}, {"values", std::move(curve)}}})}}},
+        {"trials", study.at("trials")}, {"optimizer", study.at("optimizer")}};
 }
 
 MlflowLogger::MlflowLogger(Transport transport, std::string tracking_url)
@@ -145,6 +262,19 @@ Json run_ml_engineer(Transport transport, std::string tracking_url, Json message
             ranges.push_back({item.at("name").get<std::string>(), item.at("minimum").get<double>(), item.at("maximum").get<double>()});
         }
         const auto trials = payload.value("trial_count", std::size_t{10});
+        if (payload.value("model", "") == "linear_regression") {
+            auto study = run_linear_regression_experiment(payload);
+            if (!tracking_url.empty()) {
+                MlflowLogger logger(std::move(transport), std::move(tracking_url));
+                study["mlflow"] = logger.log_study(payload.value("experiment", "ark-native"), study);
+            }
+            message["status"] = "DONE";
+            message["quality_score"] = -1.0;
+            message["output"] = std::move(study);
+            message["payload"].erase("dataset");
+            message["payload"].erase("target");
+            return message;
+        }
         if (!payload.contains("target") || !payload.at("target").is_object()) {
             throw std::invalid_argument("Native smoke objective requires target values for each parameter");
         }
@@ -165,6 +295,7 @@ Json run_ml_engineer(Transport transport, std::string tracking_url, Json message
         message["status"] = "DONE";
         message["quality_score"] = -1.0;
         message["output"] = std::move(study);
+        message["payload"].erase("target");
     } catch (const TransientHttpError& error) {
         message["status"] = "RETRY";
         message["quality_score"] = -1.0;
