@@ -21,6 +21,7 @@
 #include "ark/ml_engineer.hpp"
 #include "ark/materials_project.hpp"
 #include "ark/mcp_server.hpp"
+#include "ark/obsidian_export.hpp"
 #include "ark/privacy.hpp"
 #include "ark/reflection.hpp"
 #include "ark/reflection_study.hpp"
@@ -1268,6 +1269,8 @@ int main(int argc, char** argv) {
                      "       ark-cpp capability-discovery <question> [map.json]\n"
                      "       ark-cpp voice [--file recording.wav] [--seconds 1..60]\n"
                      "       ark-cpp mcp  # MCP stdio server for Claude Code, Cursor, and other MCP clients\n"
+                     "       ark-cpp export-obsidian <vault-directory> < result.json\n"
+                     "       ark-cpp export-notion < result.json  # requires ARK_NOTION_TOKEN and ARK_NOTION_PARENT_PAGE_ID\n"
                      "       ark-cpp classify|plan <goal>\n"
                      "       ark-cpp run [--privacy] [--airgap] [--until <condition>] [--max-iter <n>] <goal> [tests.json]\n"
                      "       ark-cpp --privacy|--airgap <goal> [tests.json]\n"
@@ -1790,6 +1793,20 @@ int main(int argc, char** argv) {
         }
         if (command == "mcp" && argc == 2) {
             return mcp_stdio(std::filesystem::canonical("/proc/self/exe"));
+        }
+        if (command == "export-obsidian" && argc == 3) {
+            const auto result = ark::Json::parse(std::cin);
+            std::cout << ark::Json{{"path", ark::export_obsidian_note(argv[2], result).string()},
+                                   {"task_id", result.at("task_id")}}.dump(2) << '\n';
+            return 0;
+        }
+        if (command == "export-notion" && argc == 2) {
+            ark::CurlTransport http;
+            const auto result = ark::Json::parse(std::cin);
+            const auto exported = ark::export_notion_page(std::ref(http), env("ARK_NOTION_TOKEN"),
+                env("ARK_NOTION_PARENT_PAGE_ID"), result);
+            std::cout << exported.dump(2) << '\n';
+            return 0;
         }
         if (command == "memory" && (argc == 3 || (argc == 4 && std::string_view(argv[2]) == "search"))) {
             std::cout << recall(config(false), argv[argc - 1]).dump(2) << '\n';

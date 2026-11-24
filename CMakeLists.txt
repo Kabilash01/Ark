@@ -62,6 +62,7 @@ add_library(ark_native
     cpp/src/ml_engineer.cpp
     cpp/src/materials_project.cpp
     cpp/src/mcp_server.cpp
+    cpp/src/obsidian_export.cpp
     cpp/src/kernel.cpp
     cpp/src/message.cpp
     cpp/src/privacy.cpp
@@ -149,6 +150,9 @@ if(BUILD_TESTING)
     add_executable(ark_mcp_server_tests cpp/tests/mcp_server_test.cpp)
     target_link_libraries(ark_mcp_server_tests PRIVATE ark_native)
     add_test(NAME ark_mcp_server_tests COMMAND ark_mcp_server_tests)
+    add_executable(ark_obsidian_export_tests cpp/tests/obsidian_export_test.cpp)
+    target_link_libraries(ark_obsidian_export_tests PRIVATE ark_native)
+    add_test(NAME ark_obsidian_export_tests COMMAND ark_obsidian_export_tests)
     add_executable(ark_checkpoint_manager_tests cpp/tests/checkpoint_manager_test.cpp)
     target_link_libraries(ark_checkpoint_manager_tests PRIVATE ark_native)
     add_test(NAME ark_checkpoint_manager_tests COMMAND ark_checkpoint_manager_tests)

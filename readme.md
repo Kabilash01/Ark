@@ -57,10 +57,17 @@ and `ark_sage`. The local protocol handshake and tool listing have been smoke
 tested. Client-specific registration and service-backed live tool calls have
 not been verified; see the [Week 15 review](docs/week15_review.md).
 
+Completed task results can be exported to a local Obsidian vault with
+`build/ark-cpp export-obsidian <vault-directory> < result.json`. An explicit
+`build/ark-cpp export-notion < result.json` call can create a child page when
+`ARK_NOTION_TOKEN` and `ARK_NOTION_PARENT_PAGE_ID` are set. Notion export sends
+the supplied result fields to Notion; no live workspace has been connected or
+tested here.
+
 ## Current evidence and limits
 
-The latest complete native CTest run reported 37 passed and 2 service-gated
-skips out of 39 tests. This is not evidence that every external service or all
+The latest complete native CTest run reported 38 passed and 2 service-gated
+skips out of 40 tests. This is not evidence that every external service or all
 20 planned agents work together in one live task. See the [all-agent integration
 audit](docs/day96_agent_integration.md), [benchmark methods and results](docs/papers/arkbench.md),
 and [current project status](docs/project_status.md) for measured outcomes and

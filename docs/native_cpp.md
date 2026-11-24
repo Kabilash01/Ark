@@ -1138,3 +1138,27 @@ The wire implementation follows MCP's documented
 [stdio transport](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports),
 [initialization lifecycle](https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle),
 and [tool result/error format](https://modelcontextprotocol.io/specification/2025-11-25/server/tools).
+
+## Day 117 research-note export
+
+`build/ark-cpp export-obsidian <vault-directory> < result.json` writes one
+Markdown note per ARK result. The task ID is hex-encoded into the filename,
+metadata is JSON-escaped for YAML, and a repeated export atomically replaces
+the matching regular note. The exporter refuses symlink targets and escapes
+structured JSON before embedding it in HTML.
+
+```bash
+printf '%s\n' '{"task_id":"demo-1","title":"Example","status":"DONE","output":{"summary":"A local result"}}' \
+  | build/ark-cpp export-obsidian "$HOME/Documents/Research"
+```
+
+`build/ark-cpp export-notion < result.json` creates a child page beneath the
+configured Notion page using `ARK_NOTION_TOKEN` and
+`ARK_NOTION_PARENT_PAGE_ID`. It sends the task ID, title, status, and bounded
+summary over HTTPS to Notion's page endpoint using the pinned API version
+`2026-03-11`. It does not run automatically: invoking this command transmits
+the supplied task fields to the external workspace. Local request-shape tests
+cover the payload, destination, and headers; a live Notion workspace call has
+not been run. See the official [create page](https://developers.notion.com/reference/post-page)
+and [append block children](https://developers.notion.com/reference/patch-block-children)
+documentation for the API contract and current limits.

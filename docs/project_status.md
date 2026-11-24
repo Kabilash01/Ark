@@ -100,7 +100,7 @@ Coding and Evaluation Agents before the Day 27 MVP integration test.
 The subsequent C++ implementation and verification notes are in
 [`native_cpp.md`](native_cpp.md), with the current review in
 [`week15_review.md`](week15_review.md). Days 105–109 now have paper and MCP
-artifacts. The full native suite currently reports 37 passed and 2
-service-gated skips across 39 tests. This does not close the all-agent runtime
+artifacts. The full native suite currently reports 38 passed and 2
+service-gated skips across 40 tests. This does not close the all-agent runtime
 gap: the normal planner/dispatcher still lacks adapters for every specialist,
 and local model/data services are not available for a complete live task.
