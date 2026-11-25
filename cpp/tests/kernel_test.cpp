@@ -188,6 +188,41 @@ void memory_tasks_require_typed_episode_operations() {
     check(rejected, "memory search accepted an unbounded limit");
 }
 
+void data_analysis_tasks_accept_only_bounded_inline_csv() {
+    auto analysis = task("analyze", Json::array(), "data_analysis_agent");
+    analysis["intent"] = "ANALYZE_DATA";
+    analysis["payload"] = {{"csv", "x,y,label\n1,2,a\n2,4,b\n3,6,c\n"}};
+    const Json plan{{"tasks", {analysis}}};
+    bool rejected = false;
+    try { (void)ark::order_tasks(plan); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    check(rejected, "data analysis task was accepted without native-tool opt-in");
+    check(ark::order_tasks(plan, true).at(0).at(0).payload == analysis.at("payload"),
+          "inline CSV payload was not preserved");
+    analysis["payload"] = {{"csv_path", "/tmp/input.csv"}};
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {analysis}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("inline CSV text only") != std::string_view::npos;
+    }
+    check(rejected, "saved-DAG analysis accepted a host CSV path");
+    analysis["payload"] = {{"csv", std::string(60 * 1024 + 1, 'x')}};
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {analysis}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("60 KiB") != std::string_view::npos;
+    }
+    check(rejected, "saved-DAG analysis accepted oversized CSV input");
+    analysis["payload"] = {{"csv", "x,y\n1,2\n3,4\n"}};
+    analysis["intent"] = "EXECUTE";
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {analysis}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("requires ANALYZE_DATA") != std::string_view::npos;
+    }
+    check(rejected, "data analysis worker accepted unrelated intent");
+}
+
 void route_in_parallel() {
     std::mutex mutex;
     std::condition_variable partners;
@@ -393,6 +428,7 @@ int main() {
         security_tasks_preserve_only_bounded_source_inputs();
         document_tasks_allow_only_confined_write_requests();
         memory_tasks_require_typed_episode_operations();
+        data_analysis_tasks_accept_only_bounded_inline_csv();
         route_in_parallel();
         skip_blocked_tasks();
         retries_without_replaying_successful_tasks();

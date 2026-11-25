@@ -85,6 +85,10 @@ support `STORE` with a `store_episode` summary/metadata payload and `SEARCH`
 with a `search_episodes` query and limit. Both use the SQLite episode database
 selected by `ARK_EPISODIC_DB` (default `data/episodic_memory.db`); task payloads
 cannot select a database path or invoke arbitrary memory operations.
+The deterministic `data_analysis_agent` is also available in saved DAGs with
+`ANALYZE_DATA` and a single inline `csv` field capped at 60 KiB. File paths are
+rejected in this route; use `ark-cpp analyze-csv` for larger local CSV inputs
+(up to the agent's 10 MiB direct-input limit).
 
 Set `ARK_REDIS_PORT` and `ARK_EPISODIC_DB` to persist native run metadata to
 Redis and SQLite. Run `ark-cpp audit` and `ark-cpp episodes` with the same

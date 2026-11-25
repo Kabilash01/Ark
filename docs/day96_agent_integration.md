@@ -49,6 +49,9 @@ writes with payload-derived content and filenames confined to
 The previously planner-visible `memory_agent` now has explicit episodic
 `STORE` and `SEARCH` adapters using the configured SQLite database, with
 bounded action schemas and no task-selected database path.
+The deterministic Data Analysis Agent also runs as a typed saved-DAG worker
+using inline CSV input capped at 60 KiB; direct CLI analysis retains its larger
+10 MiB file-input mode.
 These are explicit saved-plan integrations; the normal natural-language
 planner does not invent source files, document content, or automatically
 schedule these specialist tasks. The live model-to-tool flows remain unverified

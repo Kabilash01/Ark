@@ -125,6 +125,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   planner-supplied paths remain unavailable through this route.
 - Routed `memory_agent` `STORE` and `SEARCH` tasks through typed episodic
   operations using SQLite, rejecting arbitrary paths and unsupported actions.
+- Routed `data_analysis_agent` through saved DAGs for bounded inline CSV input;
+  host file paths and CSV payloads above 60 KiB are rejected.
 
 ## No standalone day-tagged commit
 

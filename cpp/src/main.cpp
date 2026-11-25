@@ -561,7 +561,8 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         std::map<std::string, ark::AgentProfile, std::less<>> resolved;
         for (const auto& layer : ark::order_tasks(dag, include_native_tools)) {
             for (const auto& task : layer) {
-                if (task.agent != "memory_agent" && !resolved.contains(task.agent)) {
+                if (task.agent != "memory_agent" && task.agent != "data_analysis_agent"
+                    && !resolved.contains(task.agent)) {
                     const auto model = task.agent == "vision_agent" ? configured_model("ARK_VISION_MODEL", "vision") : settings.model;
                     resolved.emplace(task.agent, actor_profile(task.agent, model, redis.get()));
                 }
@@ -575,6 +576,9 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     if (std::any_of(dag.at("tasks").begin(), dag.at("tasks").end(), [](const auto& task) {
             return task.value("agent", "") == "memory_agent";
         })) versions["memory_agent"] = "1.0.0";
+    if (std::any_of(dag.at("tasks").begin(), dag.at("tasks").end(), [](const auto& task) {
+            return task.value("agent", "") == "data_analysis_agent";
+        })) versions["data_analysis_agent"] = "1.0.0";
     if (events) {
         auto plan = ark::Json::array();
         for (const auto& task : dag.at("tasks")) {
@@ -688,6 +692,10 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
             }
             result = { {"task_id", message.at("task_id")}, {"status", "DONE"}, {"intent", task.intent},
                 {"agent_version", "memory_agent@1.0.0"}, {"quality_score", -1.0}, {"output", std::move(output)} };
+        } else if (task.agent == "data_analysis_agent") {
+            message["payload"] = task.payload;
+            result = ark::analyze_csv(std::move(message));
+            result["agent_version"] = "data_analysis_agent@1.0.0";
         } else {
             result = research_pool.run([&](std::string_view instance) {
                 auto assigned = source;
@@ -732,7 +740,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         emit(events, "agent_done", activity);
         return result;
     }, [&](std::string_view name) {
-        if (name == "memory_agent") return true;
+        if (name == "memory_agent" || name == "data_analysis_agent") return true;
         if (!profiles.contains(name)) {
             return false;
         }

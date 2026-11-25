@@ -13,13 +13,13 @@
 namespace ark {
 namespace {
 
-constexpr std::array<std::string_view, 14> intents{
+constexpr std::array<std::string_view, 15> intents{
     "RESEARCH", "CODE", "SEARCH", "EXECUTE", "STORE", "EVALUATE", "REFLECT",
-    "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION", "DOCUMENT",
+    "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION", "DOCUMENT", "ANALYZE_DATA",
 };
-constexpr std::array<std::string_view, 10> workers{
+constexpr std::array<std::string_view, 11> workers{
     "research_agent", "coding_agent", "evaluation_agent", "memory_agent", "web_search_agent",
-    "browser_agent", "document_agent", "terminal_agent", "security_agent", "vision_agent",
+    "browser_agent", "document_agent", "terminal_agent", "security_agent", "vision_agent", "data_analysis_agent",
 };
 
 bool contains(const auto& values, std::string_view value) {
@@ -152,13 +152,25 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
             throw std::invalid_argument("Duplicate task ID " + task.id);
         }
         const bool tool_worker = task.agent == "document_agent" || task.agent == "terminal_agent"
-            || task.agent == "security_agent";
+            || task.agent == "security_agent" || task.agent == "data_analysis_agent";
         if ((!contains(workers, task.agent) || (tool_worker && !include_native_tools)) || !contains(intents, task.intent)) {
             throw std::invalid_argument("Unknown worker or intent for task " + task.id + ": "
                                         + task.agent + " / " + task.intent);
         }
         if (task.agent == "terminal_agent" && task.intent != "EXECUTE") {
             throw std::invalid_argument("terminal_agent requires EXECUTE intent for task " + task.id);
+        }
+        if (task.agent == "data_analysis_agent") {
+            if (task.intent != "ANALYZE_DATA") {
+                throw std::invalid_argument("data_analysis_agent requires ANALYZE_DATA intent for task " + task.id);
+            }
+            if (task.payload.size() != 1 || !task.payload.contains("csv") || !task.payload.at("csv").is_string()) {
+                throw std::invalid_argument("Data analysis tasks require inline CSV text only");
+            }
+            const auto& csv = task.payload.at("csv").get_ref<const std::string&>();
+            if (csv.empty() || csv.size() > 60 * 1024) {
+                throw std::invalid_argument("Saved-DAG CSV input must be between 1 byte and 60 KiB");
+            }
         }
         if (task.agent == "memory_agent") {
             if (!task.payload.contains("action") || !task.payload.at("action").is_string()) {

@@ -139,5 +139,6 @@ also supports typed `security_agent` inputs; local task checks reject host
 report paths, and ARKBench fixture routing remains covered. Saved DAG dispatch
 now also supports confined DOCX, XLSX, and PDF document writes with no
 planner-controlled output path. The saved-DAG memory worker now provides typed
-episodic writes and searches against SQLite. Live model-to-Docker remains
-unverified, and the all-20-agent integration criterion stays open.
+episodic writes and searches against SQLite. Deterministic CSV analysis is now
+also routed through saved DAGs with bounded inline input. Live model-to-Docker
+remains unverified, and the all-20-agent integration criterion stays open.
