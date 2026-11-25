@@ -129,6 +129,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   host file paths and CSV payloads above 60 KiB are rejected.
 - Routed scientific report generation through saved DAGs with supplied
   references and inline LaTeX output; citation-graph queries are disabled.
+- Routed the ML Engineer's linear-regression experiment through saved DAGs with
+  bounded inline numeric data and no MLflow side effects.
 
 ## No standalone day-tagged commit
 

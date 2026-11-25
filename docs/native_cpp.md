@@ -93,6 +93,10 @@ rejected in this route; use `ark-cpp analyze-csv` for larger local CSV inputs
 hypothesis, method specification, results object, and optional supplied
 references/figure descriptors. Saved-DAG report tasks cannot query Neo4j or
 choose output paths; they return LaTeX content in the task result.
+The native `ml_engineer_agent` route supports only `linear_regression` with
+inline numeric features and targets. Saved-DAG limits are 1,000 rows, 16
+features, 20 trials, 100 epochs, and a 10-million row-feature-trial-epoch
+budget. It does not log to MLflow or execute caller-provided code.
 
 Set `ARK_REDIS_PORT` and `ARK_EPISODIC_DB` to persist native run metadata to
 Redis and SQLite. Run `ark-cpp audit` and `ark-cpp episodes` with the same

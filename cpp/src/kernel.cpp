@@ -13,14 +13,14 @@
 namespace ark {
 namespace {
 
-constexpr std::array<std::string_view, 16> intents{
+constexpr std::array<std::string_view, 17> intents{
     "RESEARCH", "CODE", "SEARCH", "EXECUTE", "STORE", "EVALUATE", "REFLECT",
-    "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION", "DOCUMENT", "ANALYZE_DATA", "GENERATE_REPORT",
+    "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION", "DOCUMENT", "ANALYZE_DATA", "GENERATE_REPORT", "ML_OPTIMIZE",
 };
-constexpr std::array<std::string_view, 12> workers{
+constexpr std::array<std::string_view, 13> workers{
     "research_agent", "coding_agent", "evaluation_agent", "memory_agent", "web_search_agent",
     "browser_agent", "document_agent", "terminal_agent", "security_agent", "vision_agent", "data_analysis_agent",
-    "scientific_report_generator",
+    "scientific_report_generator", "ml_engineer_agent",
 };
 
 bool contains(const auto& values, std::string_view value) {
@@ -154,7 +154,7 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
         }
         const bool tool_worker = task.agent == "document_agent" || task.agent == "terminal_agent"
             || task.agent == "security_agent" || task.agent == "data_analysis_agent"
-            || task.agent == "scientific_report_generator";
+            || task.agent == "scientific_report_generator" || task.agent == "ml_engineer_agent";
         if ((!contains(workers, task.agent) || (tool_worker && !include_native_tools)) || !contains(intents, task.intent)) {
             throw std::invalid_argument("Unknown worker or intent for task " + task.id + ": "
                                         + task.agent + " / " + task.intent);
@@ -206,6 +206,35 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
             if (task.payload.contains("figures")
                 && (!task.payload.at("figures").is_array() || task.payload.at("figures").size() > 12)) {
                 throw std::invalid_argument("Scientific report figures must be an array of at most 12 entries");
+            }
+        }
+        if (task.agent == "ml_engineer_agent") {
+            if (task.intent != "ML_OPTIMIZE") {
+                throw std::invalid_argument("ml_engineer_agent requires ML_OPTIMIZE intent for task " + task.id);
+            }
+            static const std::set<std::string, std::less<>> allowed{
+                "dataset", "epochs", "model", "ranges", "seed", "trial_count"};
+            for (auto it = task.payload.begin(); it != task.payload.end(); ++it) {
+                if (!allowed.contains(it.key())) {
+                    throw std::invalid_argument("Unsupported ML task payload field: " + it.key());
+                }
+            }
+            if (task.payload.value("model", "") != "linear_regression" || !task.payload.contains("dataset")
+                || !task.payload.at("dataset").is_object() || !task.payload.at("dataset").contains("features")
+                || !task.payload.at("dataset").at("features").is_array()
+                || task.payload.at("dataset").at("features").size() < 10
+                || task.payload.at("dataset").at("features").size() > 1000) {
+                throw std::invalid_argument("Saved-DAG ML tasks require a linear_regression dataset with 10–1000 rows");
+            }
+            const auto& features = task.payload.at("dataset").at("features");
+            if (!features.at(0).is_array() || features.at(0).empty() || features.at(0).size() > 16) {
+                throw std::invalid_argument("Saved-DAG ML features must have 1–16 dimensions");
+            }
+            const auto epochs = task.payload.value("epochs", std::size_t{100});
+            const auto trials = task.payload.value("trial_count", std::size_t{10});
+            if (epochs == 0 || epochs > 100 || trials == 0 || trials > 20
+                || features.size() * features.at(0).size() * epochs * trials > 10'000'000) {
+                throw std::invalid_argument("Saved-DAG ML compute budget exceeded");
             }
         }
         if (task.agent == "memory_agent") {

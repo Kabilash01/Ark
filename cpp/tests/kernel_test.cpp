@@ -255,6 +255,41 @@ void scientific_report_tasks_require_supplied_bounded_evidence() {
     check(rejected, "scientific report worker accepted an unrelated intent");
 }
 
+void ml_tasks_require_bounded_inline_linear_regression_data() {
+    auto ml = task("fit", Json::array(), "ml_engineer_agent");
+    ml["intent"] = "ML_OPTIMIZE";
+    Json features = Json::array(), targets = Json::array();
+    for (int i = 0; i < 10; ++i) {
+        features.push_back(Json::array({static_cast<double>(i)}));
+        targets.push_back(1.0 + 2.0 * i);
+    }
+    ml["payload"] = {{"model", "linear_regression"}, {"dataset", {{"features", features}, {"targets", targets}}},
+        {"ranges", Json::array({{{"name", "learning_rate"}, {"minimum", 0.01}, {"maximum", 0.1}}})},
+        {"trial_count", 2}, {"epochs", 5}};
+    const Json plan{{"tasks", {ml}}};
+    bool rejected = false;
+    try { (void)ark::order_tasks(plan); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    check(rejected, "ML task was accepted without native-tool opt-in");
+    check(ark::order_tasks(plan, true).at(0).at(0).payload == ml.at("payload"),
+          "typed ML payload was not preserved");
+    ml["payload"]["experiment"] = "external side effect";
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {ml}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("Unsupported ML task payload field") != std::string_view::npos;
+    }
+    check(rejected, "saved-DAG ML task accepted an MLflow experiment field");
+    ml["payload"].erase("experiment");
+    ml["payload"]["model"] = "arbitrary_code";
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {ml}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("linear_regression") != std::string_view::npos;
+    }
+    check(rejected, "saved-DAG ML task accepted an unsupported model");
+}
+
 void route_in_parallel() {
     std::mutex mutex;
     std::condition_variable partners;
@@ -462,6 +497,7 @@ int main() {
         memory_tasks_require_typed_episode_operations();
         data_analysis_tasks_accept_only_bounded_inline_csv();
         scientific_report_tasks_require_supplied_bounded_evidence();
+        ml_tasks_require_bounded_inline_linear_regression_data();
         route_in_parallel();
         skip_blocked_tasks();
         retries_without_replaying_successful_tasks();

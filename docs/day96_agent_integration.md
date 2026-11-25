@@ -55,6 +55,9 @@ using inline CSV input capped at 60 KiB; direct CLI analysis retains its larger
 The Scientific Report Generator accepts bounded supplied study results and
 references, returns LaTeX inline, and has citation-graph lookups disabled in
 saved-DAG dispatch.
+The ML Engineer also supports a deterministic inline linear-regression path
+with explicit row, feature, trial, epoch, and total-compute limits; it does not
+enable MLflow logging through saved DAGs.
 These are explicit saved-plan integrations; the normal natural-language
 planner does not invent source files, document content, or automatically
 schedule these specialist tasks. The live model-to-tool flows remain unverified
