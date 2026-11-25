@@ -169,6 +169,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   source-data preservation and the saved-DAG size limit.
 - Preserved specialist native-tool authorization through dispatch and added an
   exact inline-CSV execution path verified with a live local analysis run.
+- Accepted omitted optional reflection proposal fields and verified a live CSV
+  run with successful analysis and reflection on a local model.
 
 ## No standalone day-tagged commit
 

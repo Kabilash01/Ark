@@ -128,3 +128,7 @@ The exact `Analyze this CSV:` form creates a deterministic analysis task from
 the supplied bytes; a live two-row run returned `DONE` and mean `1.5`. The
 optional reflection from that small model failed because it omitted
 `skill_update`, so this run does not verify reflection or the full model path.
+The reflection validator now defaults omitted proposal fields to no proposal
+while retaining required text validation. A second live two-row run returned
+`DONE` for both analysis and reflection, with mean `1.5`. The small model and
+single deterministic task still do not establish the all-agent criterion.

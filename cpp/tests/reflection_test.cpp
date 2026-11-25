@@ -58,6 +58,13 @@ void persists_reflection_skills_and_flags() {
     task["quality_score"] = nullptr;
     check(!agent.run(task, episodes, skills).contains("skill_id") && skills.all().size() == 1,
           "failed task incorrectly added a skill");
+    reply.erase("skill_update");
+    reply.erase("flag_for_self_improvement");
+    reply.erase("agent_version_recommendation");
+    const auto sparse = agent.run(task, episodes, skills);
+    check(sparse.at("status") == "DONE" && sparse.at("skill_update").is_null()
+              && sparse.at("flag_for_self_improvement") == false,
+          "missing optional reflection fields should mean no proposal");
     skills.add("CODE", "Run the contract suite", {"Run a sampled test"}, "coding_agent");
     reply["what_worked"] = 5;
     const auto invalid = agent.run(task, episodes, skills);
@@ -65,7 +72,7 @@ void persists_reflection_skills_and_flags() {
           "invalid output should be logged as a failed reflection");
     check(received_conflict && invalid.at("memory_conflicts_pending_human_review").size() == 1,
           "Reflection did not receive the durable memory conflict");
-    check(reopened.by_agent("reflection_agent").size() == 3, "missing reflection episodes");
+    check(reopened.by_agent("reflection_agent").size() == 4, "missing reflection episodes");
 }
 
 } // namespace

@@ -31,6 +31,9 @@ Json validated_report(Json report, const Json& versions) {
             throw std::invalid_argument("Invalid reflection field: " + std::string(key));
         }
     }
+    if (!report.contains("skill_update")) report["skill_update"] = nullptr;
+    if (!report.contains("flag_for_self_improvement")) report["flag_for_self_improvement"] = false;
+    if (!report.contains("agent_version_recommendation")) report["agent_version_recommendation"] = nullptr;
     const auto& skill = report.at("skill_update");
     if (!skill.is_null()) {
         const auto& steps = skill.at("steps");
