@@ -47,3 +47,9 @@ worker, result retrieval, events, and invalid-goal handling. The standard
 can also run with `ARK_TEST_CHROMIUM`, `ARK_TEST_DOCKER_SOCKET`, and
 `ARK_TEST_REDIS_PORT` set. The Day 96 all-20-agent task and service-backed SAGE
 run remain separate unfinished verification goals.
+
+On 2026-11-25, the local product check passed through the browser's **New task**
+form and the API. Report, bounded ML, and Docker tasks submitted through the
+API also returned `DONE`; an invalid goal returned HTTP 422 and an incomplete
+report returned `FAILED` with an error. With Chromium, Docker, and Redis
+enabled, the full native CTest suite passed all 40 tests.
