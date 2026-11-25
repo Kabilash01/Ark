@@ -108,6 +108,9 @@ and capability map without writing files or querying external services.
 validated `owner/repository` with bounded pagination. It uses `GH_TOKEN` or
 `GITHUB_TOKEN` when configured; write actions such as PR creation, local commits,
 pushes, and cloning remain unavailable through saved DAGs.
+`experiment_designer` accepts a single hypothesis of at most 2,500 bytes and
+uses the configured local Ollama or llama.cpp backend to return its structured
+C++20 study design. It requires a running local model for live execution.
 
 Set `ARK_REDIS_PORT` and `ARK_EPISODIC_DB` to persist native run metadata to
 Redis and SQLite. Run `ark-cpp audit` and `ark-cpp episodes` with the same

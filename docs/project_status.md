@@ -149,5 +149,6 @@ other model families are not included in that route. File-system operations
 use configured workspace aliases; Capability Discovery now answers from
 inline evidence in the same dispatcher. GitHub, DevOps, Hypothesis Engine, and
 Experiment Designer remain outside full unified dispatch; GitHub supports only
-read-only issue listing through saved DAGs. Live full-stack verification is
-still open.
+read-only issue listing and Experiment Designer requires the local model.
+DevOps and Hypothesis Engine are not yet routed through saved DAGs. Live
+full-stack verification is still open.

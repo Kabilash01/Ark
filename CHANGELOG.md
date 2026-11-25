@@ -137,6 +137,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   reflection, and benchmark evidence without filesystem or network writes.
 - Added read-only GitHub open-issue listing to saved DAGs; PR, push, clone, and
   commit actions remain excluded from that route.
+- Routed Experiment Designer tasks through configured local inference with a
+  single bounded hypothesis payload.
 
 ## No standalone day-tagged commit
 

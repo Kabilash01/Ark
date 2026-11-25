@@ -567,6 +567,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
                     && task.agent != "file_system_agent"
                     && task.agent != "capability_discovery_agent"
                     && task.agent != "github_agent"
+                    && task.agent != "experiment_designer"
                     && !resolved.contains(task.agent)) {
                     const auto model = task.agent == "vision_agent" ? configured_model("ARK_VISION_MODEL", "vision") : settings.model;
                     resolved.emplace(task.agent, actor_profile(task.agent, model, redis.get()));
@@ -599,6 +600,9 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     if (std::any_of(dag.at("tasks").begin(), dag.at("tasks").end(), [](const auto& task) {
             return task.value("agent", "") == "github_agent";
         })) versions["github_agent"] = "1.0.0";
+    if (std::any_of(dag.at("tasks").begin(), dag.at("tasks").end(), [](const auto& task) {
+            return task.value("agent", "") == "experiment_designer";
+        })) versions["experiment_designer"] = "1.0.0";
     if (events) {
         auto plan = ark::Json::array();
         for (const auto& task : dag.at("tasks")) {
@@ -744,6 +748,14 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
             result = ark::GitHubAgent(transport, env("GH_TOKEN", env("GITHUB_TOKEN")))
                 .run(ark::make_message("router", "github_agent", task.intent, task.payload, parent_id));
             result["agent_version"] = "github_agent@1.0.0";
+        } else if (task.agent == "experiment_designer") {
+            const auto llama = ark::configured_llama_url();
+            const auto provider = llama.empty() ? ark::InferenceProvider::ollama : ark::InferenceProvider::llama_cpp;
+            const auto model_url = llama.empty() ? settings.ollama_url : llama;
+            const auto profile = ark::experiment_designer_profile(configured_model("ARK_MODEL", "general"));
+            result = ark::ExperimentDesigner(transport, model_url, profile, provider)
+                .run(ark::make_message("router", "experiment_designer", task.intent, task.payload, parent_id));
+            result["agent_version"] = "experiment_designer@" + profile.version;
         } else {
             result = research_pool.run([&](std::string_view instance) {
                 auto assigned = source;
@@ -791,7 +803,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         if (name == "memory_agent" || name == "data_analysis_agent"
             || name == "scientific_report_generator" || name == "ml_engineer_agent"
             || name == "file_system_agent" || name == "capability_discovery_agent"
-            || name == "github_agent") return true;
+            || name == "github_agent" || name == "experiment_designer") return true;
         if (!profiles.contains(name)) {
             return false;
         }

@@ -56,6 +56,9 @@ evidence and answers a bounded `DISCOVER` question without writing a file.
 GitHub saved-DAG support is limited to read-only open-issue listing for a
 validated repository; PR creation, commits, pushes, and cloning remain outside
 this route.
+Experiment Designer tasks now accept a bounded hypothesis and call the
+configured local inference provider; end-to-end execution requires that local
+model service.
 These are explicit saved-plan integrations; the normal natural-language
 planner does not invent source files, document content, or automatically
 schedule these specialist tasks. The live model-to-tool flows remain unverified

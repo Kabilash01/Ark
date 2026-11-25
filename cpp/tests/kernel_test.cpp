@@ -375,6 +375,33 @@ void github_saved_dag_tasks_are_read_only() {
     check(rejected, "saved-DAG GitHub task accepted an invalid repository path");
 }
 
+void experiment_design_tasks_require_one_bounded_hypothesis() {
+    auto experiment = task("design", Json::array(), "experiment_designer");
+    experiment["intent"] = "DESIGN_EXPERIMENT";
+    experiment["payload"] = {{"hypothesis", "Treatment increases the measured conductivity."}};
+    const Json plan{{"tasks", {experiment}}};
+    bool rejected = false;
+    try { (void)ark::order_tasks(plan); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    check(rejected, "experiment design task was accepted without native-tool opt-in");
+    check(ark::order_tasks(plan, true).at(0).at(0).payload == experiment.at("payload"),
+          "bounded hypothesis was not preserved");
+    experiment["payload"]["model"] = "attacker-injected";
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {experiment}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("one hypothesis field") != std::string_view::npos;
+    }
+    check(rejected, "experiment task accepted arbitrary planner fields");
+    experiment["payload"] = {{"hypothesis", std::string(2501, 'h')}};
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {experiment}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("2500 bytes") != std::string_view::npos;
+    }
+    check(rejected, "experiment task accepted an oversized hypothesis");
+}
+
 void route_in_parallel() {
     std::mutex mutex;
     std::condition_variable partners;
@@ -586,6 +613,7 @@ int main() {
         file_system_tasks_are_limited_to_configured_workspace_operations();
         capability_discovery_tasks_use_only_typed_evidence();
         github_saved_dag_tasks_are_read_only();
+        experiment_design_tasks_require_one_bounded_hypothesis();
         route_in_parallel();
         skip_blocked_tasks();
         retries_without_replaying_successful_tasks();
