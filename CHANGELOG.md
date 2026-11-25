@@ -110,7 +110,14 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
 - **Day 117** — Add C++ Obsidian and Notion export ([`a8cca3e`](https://github.com/Kabilash01/Ark/commit/a8cca3e))
 - **Day 118** — Add native deployment guide ([`b4f56ac`](https://github.com/Kabilash01/Ark/commit/b4f56ac))
 - **Day 119** — Add architecture map and status ([`69afd33`](https://github.com/Kabilash01/Ark/commit/69afd33))
-- **Day 120** — Audit day-tagged commit history and release blockers (this commit)
+- **Day 120** — Audit day-tagged commit history and release blockers ([`a38f2e9`](https://github.com/Kabilash01/Ark/commit/a38f2e9))
+
+## Post-plan follow-up — 2026-11-25
+
+- Routed explicit `EXECUTE` goals through the supervised native terminal worker
+  in the restricted Docker sandbox. Planner and kernel tests cover the typed
+  route and the native-tool opt-in boundary; a live planner-to-Docker run is
+  still unverified.
 
 ## No standalone day-tagged commit
 

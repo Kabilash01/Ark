@@ -83,7 +83,9 @@ BROWSE (use a specific website), SECURITY (defensive code audit), VISION (analyz
 constexpr std::string_view planner =
     R"(Build a directed acyclic task plan for the supplied goal. Use only the provided available_agents.
 The only task intents are RESEARCH or SEARCH for research_agent, CODE for coding_agent,
-EVALUATE for evaluation_agent, STORE or SEARCH for memory_agent, and VISION for vision_agent.
+EVALUATE for evaluation_agent, STORE or SEARCH for memory_agent, VISION for vision_agent,
+and EXECUTE for terminal_agent when it is listed as available. For terminal_agent, put the
+literal shell command to execute in the task instruction; it will run inside the restricted Docker sandbox.
 Use vision_agent only when the task includes an image. Include synthesis in a RESEARCH task.
 Return JSON with a tasks array. Each task has string fields
 task_id, agent, intent, instruction, and arrays depends_on and parallel_with containing task IDs.
@@ -110,6 +112,8 @@ Json plan_format(const std::vector<std::string>& agents) {
             allowed_intents.push_back("STORE");
         } else if (agent == "vision_agent") {
             allowed_intents.push_back("VISION");
+        } else if (agent == "terminal_agent") {
+            allowed_intents.push_back("EXECUTE");
         }
     }
     const Json task{{"type", "object"}, {"additionalProperties", false},
@@ -146,6 +150,9 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
         if ((!contains(workers, task.agent) || (tool_worker && !include_native_tools)) || !contains(intents, task.intent)) {
             throw std::invalid_argument("Unknown worker or intent for task " + task.id + ": "
                                         + task.agent + " / " + task.intent);
+        }
+        if (task.agent == "terminal_agent" && task.intent != "EXECUTE") {
+            throw std::invalid_argument("terminal_agent requires EXECUTE intent for task " + task.id);
         }
         (void)ids(raw, "parallel_with");
         tasks.push_back(std::move(task));
@@ -242,11 +249,11 @@ Json dispatch_plan(const Json& dag, const TaskHandler& execute,
 
 SupervisedRun supervise_plan(const Json& dag, const AttemptHandler& execute,
                              const AgentAvailable& available, std::size_t max_workers,
-                             const OutputConflictReview& review_conflict) {
+                             const OutputConflictReview& review_conflict, bool include_native_tools) {
     if (!execute) {
         throw std::invalid_argument("Supervisor requires an attempt handler");
     }
-    const auto layers = order_tasks(dag);
+    const auto layers = order_tasks(dag, include_native_tools);
     std::map<std::string, int> counts;
     std::set<std::string> research_tasks;
     for (const auto& layer : layers) {
@@ -496,7 +503,8 @@ std::string Planner::classify(std::string_view goal) const {
     return intent;
 }
 
-Json Planner::plan(std::string_view goal, const std::vector<std::string>& agents, const Json& context) const {
+Json Planner::plan(std::string_view goal, const std::vector<std::string>& agents, const Json& context,
+                   bool include_native_tools) const {
     if (agents.empty()) {
         throw std::invalid_argument("At least one worker must be available for planning");
     }
@@ -506,7 +514,7 @@ Json Planner::plan(std::string_view goal, const std::vector<std::string>& agents
         input["memory_context"] = context;
     }
     const auto output = Json::parse(request(planner_, input.dump(), plan_format(agents), cloud.dump()));
-    for (const auto& layer : order_tasks(output)) {
+    for (const auto& layer : order_tasks(output, include_native_tools)) {
         for (const auto& task : layer) {
             if (!contains(agents, task.agent)) {
                 throw std::runtime_error("Local model selected an unavailable worker");

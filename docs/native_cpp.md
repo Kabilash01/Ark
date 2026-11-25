@@ -34,8 +34,11 @@ build/ark-cpp research < message.json
 
 Use `ark-cpp classify <goal>` to inspect the local Supervisor's intent and
 `ark-cpp plan <goal>` to print a validated task DAG. `ark-cpp run <goal>`
-classifies, plans, and dispatches research goals. `ark-cpp dispatch < dag.json`
-also accepts a saved plan. The router derives parallel batches from the
+classifies, plans, and dispatches research goals. Explicit `EXECUTE` goals are
+planned for `terminal_agent`; its literal shell command runs inside the
+restricted Docker sandbox. The shared planner enables native tools only for
+this explicit path. `ark-cpp dispatch < dag.json` also accepts a saved plan.
+The router derives parallel batches from the
 dependency edges and skips tasks whose prerequisites failed.
 The dispatcher refreshes `STATE.md` after each worker finishes. Use
 `ARK_STATE_PATH` to select a different snapshot file.

@@ -129,3 +129,12 @@ and local model/data services are not available for a complete live task.
 - Day 120: day-tagged Git history and release blockers indexed in
   [`CHANGELOG.md`](../CHANGELOG.md). The tag, GitHub Release, research
   submissions, and demo publication remain incomplete.
+
+## Follow-on integration — 2026-11-25
+
+The shared C++ planner now routes explicit `EXECUTE` goals through the
+supervised terminal worker in the restricted Docker sandbox. Planner and
+kernel tests validate that route and its opt-in boundary. The full suite
+reports 38 passed and 2 service-gated skips out of 40 tests. A live model-to-
+Docker run was not verified, and the all-20-agent integration criterion stays
+open.

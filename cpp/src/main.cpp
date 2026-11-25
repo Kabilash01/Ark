@@ -334,6 +334,9 @@ ark::AgentProfile actor_profile(std::string_view name, const std::string& genera
     } else if (name == "vision_agent") {
         defaults = ark::vision_profile(general_model);
         capabilities = {"VISION"};
+    } else if (name == "terminal_agent") {
+        defaults = {"1.0.0", "docker-sandbox", {{"system", "Run requested shell commands only inside the restricted Docker sandbox."}}};
+        capabilities = {"EXECUTE"};
     } else {
         throw std::invalid_argument("Unknown versioned agent " + std::string(name));
     }
@@ -527,7 +530,7 @@ void attach_reflection(ark::Json& result, const ark::ResearchConfig& settings, s
 
 ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, std::string_view intent = "PLAN",
                    std::string parent_id = {}, ark::Json versions = ark::Json::object(), bool via_api = false,
-                   const ark::TaskEvents& events = {}) {
+                   const ark::TaskEvents& events = {}, bool include_native_tools = false) {
     if (parent_id.empty()) {
         parent_id = ark::make_message("user", "supervisor_agent", intent, ark::Json::object())
             .at("task_id").get<std::string>();
@@ -632,6 +635,11 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
                 });
         } else if (task.agent == "vision_agent") {
             result = run_vision_agent(transport, settings, std::move(message), profiles.at(task.agent));
+        } else if (task.agent == "terminal_agent") {
+            message["payload"]["command"] = task.instruction;
+            message["payload"]["timeout_seconds"] = 30;
+            result = ark::TerminalAgent(docker_sandbox(std::ref(http))).run(std::move(message));
+            result["agent_version"] = "terminal_agent@" + profiles.at(task.agent).version;
         } else {
             result = research_pool.run([&](std::string_view instance) {
                 auto assigned = source;
@@ -692,7 +700,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         const ark::Json source{{"agent", "supervisor_agent"}};
         return ark::review_output_conflict([&](const auto& request) { return report_request(events, http, request, source); },
                                            settings.ollama_url, env("ARK_EVAL_MODEL", settings.model), research, coding);
-    });
+    }, include_native_tools);
     for (auto report : conflicts) {
         report["task_id"] = parent_id;
         if (report.contains("case_id")) record_conflict(report.at("case_id").get<std::string>(), report);
@@ -763,10 +771,12 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
                     {"parallel_with", ark::Json::array()}}});
                 break;
             }
-            if (intent != "RESEARCH" && intent != "SEARCH" && intent != "CODE") {
+            if (intent != "RESEARCH" && intent != "SEARCH" && intent != "CODE" && intent != "EXECUTE") {
                 throw std::invalid_argument("No native worker available for intent " + intent);
             }
-            const auto agents = intent == "CODE" && !explicit_research ? std::vector<std::string>{"coding_agent"}
+            const bool include_native_tools = intent == "EXECUTE";
+            const auto agents = intent == "EXECUTE" ? std::vector<std::string>{"terminal_agent"}
+                : intent == "CODE" && !explicit_research ? std::vector<std::string>{"coding_agent"}
                 : intent == "SEARCH" ? std::vector<std::string>{"research_agent"}
                 : std::vector<std::string>{"research_agent", "coding_agent"};
             auto context = recall(settings, goal);
@@ -774,7 +784,7 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
             const auto instruction = std::string(goal) + std::string(followup);
             owner = "planner_agent";
             emit(events, "agent_started", {{"agent", owner}});
-            dag = planner.plan(instruction, agents, context);
+            dag = planner.plan(instruction, agents, context, include_native_tools);
             emit(events, "agent_done", {{"agent", owner}, {"status", "DONE"}});
             dag["memory_context"] = std::move(context);
             break;
@@ -807,7 +817,8 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
     if (!trusted_tests.empty()) {
         dag["coding_test_files"] = trusted_tests;
     }
-    return dispatch(dag, settings, intent, std::move(task_id), versions, via_api, events);
+    return dispatch(dag, settings, intent, std::move(task_id), versions, via_api, events,
+                    intent == "EXECUTE");
 }
 
 ark::Json run_task(std::string_view goal, const ark::ResearchConfig& settings, const ark::Json& trusted_tests,

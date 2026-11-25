@@ -41,7 +41,8 @@ Json dispatch_plan(const Json& dag, const TaskHandler& execute,
                    bool include_native_tools = false);
 SupervisedRun supervise_plan(const Json& dag, const AttemptHandler& execute,
                              const AgentAvailable& available, std::size_t max_workers = 4,
-                             const OutputConflictReview& review_conflict = {});
+                             const OutputConflictReview& review_conflict = {},
+                             bool include_native_tools = false);
 
 Json review_output_conflict(const Transport& transport, std::string_view url, std::string_view model,
                             const Json& research, const Json& code);
@@ -60,7 +61,7 @@ public:
 
     std::string classify(std::string_view goal) const;
     Json plan(std::string_view goal, const std::vector<std::string>& agents,
-              const Json& context = Json::array()) const;
+              const Json& context = Json::array(), bool include_native_tools = false) const;
 
 private:
     Transport transport_;

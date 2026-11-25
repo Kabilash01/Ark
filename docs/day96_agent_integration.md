@@ -24,3 +24,18 @@ for the existing native modules, dependency-aware routing for the materials,
 prediction, security, deployment, and paper stages, plus the local services
 needed by those stages. Existing unit tests verify individual agents and DAG
 execution; they do not establish that all 20 activate in one task.
+
+## Follow-on implementation update — 2026-11-25
+
+The normal `ark-cpp run` path now accepts an `EXECUTE` classification, constrains
+the planner to `terminal_agent`, and dispatches its literal command through the
+existing restricted Docker sandbox. The supervisor enables the native-tool DAG
+path only for this explicit execution flow. Kernel and planner fixture tests
+cover the intent/worker contract and native-tool opt-in.
+
+This closes the earlier terminal-routing gap for one intent; it does not close
+the all-agent criterion. Document and security workers still need typed,
+bounded inputs and dedicated adapters, and the DevOps, analysis, GitHub, and
+science specialists remain direct workflows. The live planner → terminal →
+Docker → evaluator flow has not been run here because model and service
+availability remains gated.

@@ -37,6 +37,8 @@ install a model listed by `build/ark-cpp models`, and start Qdrant on loopback.
 Some workflows also use Redis, Neo4j, Docker, provider keys, or local audio and
 Whisper tools. These services are optional for building and running the unit
 tests, but required by the workflows that use them.
+Explicit execution goals are routed through the Docker-isolated terminal
+worker; model-backed planning and a working local Docker service are required.
 
 ```bash
 OLLAMA_NO_CLOUD=1 ollama serve
