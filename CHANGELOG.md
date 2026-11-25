@@ -127,6 +127,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   operations using SQLite, rejecting arbitrary paths and unsupported actions.
 - Routed `data_analysis_agent` through saved DAGs for bounded inline CSV input;
   host file paths and CSV payloads above 60 KiB are rejected.
+- Routed scientific report generation through saved DAGs with supplied
+  references and inline LaTeX output; citation-graph queries are disabled.
 
 ## No standalone day-tagged commit
 

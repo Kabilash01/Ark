@@ -89,6 +89,10 @@ The deterministic `data_analysis_agent` is also available in saved DAGs with
 `ANALYZE_DATA` and a single inline `csv` field capped at 60 KiB. File paths are
 rejected in this route; use `ark-cpp analyze-csv` for larger local CSV inputs
 (up to the agent's 10 MiB direct-input limit).
+`scientific_report_generator` accepts a `GENERATE_REPORT` task with a bounded
+hypothesis, method specification, results object, and optional supplied
+references/figure descriptors. Saved-DAG report tasks cannot query Neo4j or
+choose output paths; they return LaTeX content in the task result.
 
 Set `ARK_REDIS_PORT` and `ARK_EPISODIC_DB` to persist native run metadata to
 Redis and SQLite. Run `ark-cpp audit` and `ark-cpp episodes` with the same

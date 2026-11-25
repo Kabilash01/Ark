@@ -13,13 +13,14 @@
 namespace ark {
 namespace {
 
-constexpr std::array<std::string_view, 15> intents{
+constexpr std::array<std::string_view, 16> intents{
     "RESEARCH", "CODE", "SEARCH", "EXECUTE", "STORE", "EVALUATE", "REFLECT",
-    "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION", "DOCUMENT", "ANALYZE_DATA",
+    "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION", "DOCUMENT", "ANALYZE_DATA", "GENERATE_REPORT",
 };
-constexpr std::array<std::string_view, 11> workers{
+constexpr std::array<std::string_view, 12> workers{
     "research_agent", "coding_agent", "evaluation_agent", "memory_agent", "web_search_agent",
     "browser_agent", "document_agent", "terminal_agent", "security_agent", "vision_agent", "data_analysis_agent",
+    "scientific_report_generator",
 };
 
 bool contains(const auto& values, std::string_view value) {
@@ -152,7 +153,8 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
             throw std::invalid_argument("Duplicate task ID " + task.id);
         }
         const bool tool_worker = task.agent == "document_agent" || task.agent == "terminal_agent"
-            || task.agent == "security_agent" || task.agent == "data_analysis_agent";
+            || task.agent == "security_agent" || task.agent == "data_analysis_agent"
+            || task.agent == "scientific_report_generator";
         if ((!contains(workers, task.agent) || (tool_worker && !include_native_tools)) || !contains(intents, task.intent)) {
             throw std::invalid_argument("Unknown worker or intent for task " + task.id + ": "
                                         + task.agent + " / " + task.intent);
@@ -170,6 +172,40 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
             const auto& csv = task.payload.at("csv").get_ref<const std::string&>();
             if (csv.empty() || csv.size() > 60 * 1024) {
                 throw std::invalid_argument("Saved-DAG CSV input must be between 1 byte and 60 KiB");
+            }
+        }
+        if (task.agent == "scientific_report_generator") {
+            if (task.intent != "GENERATE_REPORT") {
+                throw std::invalid_argument("scientific_report_generator requires GENERATE_REPORT intent for task " + task.id);
+            }
+            static const std::set<std::string, std::less<>> allowed{
+                "figures", "hypothesis", "references", "results", "spec", "title"};
+            for (auto it = task.payload.begin(); it != task.payload.end(); ++it) {
+                if (!allowed.contains(it.key())) {
+                    throw std::invalid_argument("Unsupported scientific report payload field: " + it.key());
+                }
+            }
+            const auto valid_text = [](const Json& object, std::string_view key) {
+                return object.is_object() && object.contains(key) && object.at(key).is_string()
+                    && !object.at(key).get_ref<const std::string&>().empty();
+            };
+            if (!valid_text(task.payload, "hypothesis") || !task.payload.contains("spec")
+                || !valid_text(task.payload.at("spec"), "dataset") || !valid_text(task.payload.at("spec"), "method")
+                || !valid_text(task.payload.at("spec"), "baseline") || !task.payload.contains("results")
+                || !task.payload.at("results").is_object() || task.payload.at("results").empty()
+                || task.payload.at("results").dump().size() > 50 * 1024) {
+                throw std::invalid_argument("Scientific report task requires hypothesis, spec, and bounded results objects");
+            }
+            if (task.payload.contains("title") && !task.payload.at("title").is_string()) {
+                throw std::invalid_argument("Scientific report title must be text");
+            }
+            if (task.payload.contains("references")
+                && (!task.payload.at("references").is_array() || task.payload.at("references").size() > 20)) {
+                throw std::invalid_argument("Scientific report references must be an array of at most 20 entries");
+            }
+            if (task.payload.contains("figures")
+                && (!task.payload.at("figures").is_array() || task.payload.at("figures").size() > 12)) {
+                throw std::invalid_argument("Scientific report figures must be an array of at most 12 entries");
             }
         }
         if (task.agent == "memory_agent") {

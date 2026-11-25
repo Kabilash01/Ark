@@ -562,6 +562,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         for (const auto& layer : ark::order_tasks(dag, include_native_tools)) {
             for (const auto& task : layer) {
                 if (task.agent != "memory_agent" && task.agent != "data_analysis_agent"
+                    && task.agent != "scientific_report_generator"
                     && !resolved.contains(task.agent)) {
                     const auto model = task.agent == "vision_agent" ? configured_model("ARK_VISION_MODEL", "vision") : settings.model;
                     resolved.emplace(task.agent, actor_profile(task.agent, model, redis.get()));
@@ -579,6 +580,9 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     if (std::any_of(dag.at("tasks").begin(), dag.at("tasks").end(), [](const auto& task) {
             return task.value("agent", "") == "data_analysis_agent";
         })) versions["data_analysis_agent"] = "1.0.0";
+    if (std::any_of(dag.at("tasks").begin(), dag.at("tasks").end(), [](const auto& task) {
+            return task.value("agent", "") == "scientific_report_generator";
+        })) versions["scientific_report_generator"] = "1.0.0";
     if (events) {
         auto plan = ark::Json::array();
         for (const auto& task : dag.at("tasks")) {
@@ -696,6 +700,14 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
             message["payload"] = task.payload;
             result = ark::analyze_csv(std::move(message));
             result["agent_version"] = "data_analysis_agent@1.0.0";
+        } else if (task.agent == "scientific_report_generator") {
+            message["payload"] = task.payload;
+            const ark::Transport no_graph_access = [](const ark::Request&) -> ark::Response {
+                throw std::logic_error("Saved-DAG scientific reports cannot query the citation graph");
+            };
+            ark::CitationGraph graph(no_graph_access, "http://127.0.0.1:7474");
+            result = ark::ScientificReportGenerator(graph).run(std::move(message));
+            result["agent_version"] = "scientific_report_generator@1.0.0";
         } else {
             result = research_pool.run([&](std::string_view instance) {
                 auto assigned = source;
@@ -740,7 +752,8 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         emit(events, "agent_done", activity);
         return result;
     }, [&](std::string_view name) {
-        if (name == "memory_agent" || name == "data_analysis_agent") return true;
+        if (name == "memory_agent" || name == "data_analysis_agent"
+            || name == "scientific_report_generator") return true;
         if (!profiles.contains(name)) {
             return false;
         }

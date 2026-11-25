@@ -223,6 +223,38 @@ void data_analysis_tasks_accept_only_bounded_inline_csv() {
     check(rejected, "data analysis worker accepted unrelated intent");
 }
 
+void scientific_report_tasks_require_supplied_bounded_evidence() {
+    auto report = task("draft", Json::array(), "scientific_report_generator");
+    report["intent"] = "GENERATE_REPORT";
+    report["payload"] = {{"hypothesis", "Treatment increases outcome"},
+        {"spec", {{"dataset", "Three sample fixture"}, {"method", "Compare treatment and control"},
+                   {"baseline", "Control"}}},
+        {"results", {{"samples", 12}, {"estimate", 0.4}}},
+        {"references", Json::array({{{"paper_id", "fixture-1"}, {"title", "Supplied reference"}}})}};
+    const Json plan{{"tasks", {report}}};
+    bool rejected = false;
+    try { (void)ark::order_tasks(plan); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    check(rejected, "scientific report task was accepted without native-tool opt-in");
+    check(ark::order_tasks(plan, true).at(0).at(0).payload == report.at("payload"),
+          "scientific report payload was not preserved");
+    report["payload"]["paper_ids"] = Json::array({"any-graph-id"});
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {report}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("Unsupported scientific report payload field") != std::string_view::npos;
+    }
+    check(rejected, "saved-DAG report accepted a citation-graph query field");
+    report["payload"].erase("paper_ids");
+    report["intent"] = "RESEARCH";
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {report}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("requires GENERATE_REPORT") != std::string_view::npos;
+    }
+    check(rejected, "scientific report worker accepted an unrelated intent");
+}
+
 void route_in_parallel() {
     std::mutex mutex;
     std::condition_variable partners;
@@ -429,6 +461,7 @@ int main() {
         document_tasks_allow_only_confined_write_requests();
         memory_tasks_require_typed_episode_operations();
         data_analysis_tasks_accept_only_bounded_inline_csv();
+        scientific_report_tasks_require_supplied_bounded_evidence();
         route_in_parallel();
         skip_blocked_tasks();
         retries_without_replaying_successful_tasks();
