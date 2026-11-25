@@ -63,6 +63,9 @@ model service.
 DevOps tasks now use the existing network-disabled container runner with a
 bounded inline Docker build context and argument-array command; the Docker
 daemon remains a runtime requirement.
+Hypothesis Engine tasks now route a bounded domain to the configured local
+inference, semantic memory, and citation graph services. Those backends remain
+required for a live run.
 These are explicit saved-plan integrations; the normal natural-language
 planner does not invent source files, document content, or automatically
 schedule these specialist tasks. The live model-to-tool flows remain unverified

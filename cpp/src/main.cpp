@@ -569,6 +569,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
                     && task.agent != "github_agent"
                     && task.agent != "experiment_designer"
                     && task.agent != "devops_agent"
+                    && task.agent != "hypothesis_engine"
                     && !resolved.contains(task.agent)) {
                     const auto model = task.agent == "vision_agent" ? configured_model("ARK_VISION_MODEL", "vision") : settings.model;
                     resolved.emplace(task.agent, actor_profile(task.agent, model, redis.get()));
@@ -607,6 +608,9 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     if (std::any_of(dag.at("tasks").begin(), dag.at("tasks").end(), [](const auto& task) {
             return task.value("agent", "") == "devops_agent";
         })) versions["devops_agent"] = "1.0.0";
+    if (std::any_of(dag.at("tasks").begin(), dag.at("tasks").end(), [](const auto& task) {
+            return task.value("agent", "") == "hypothesis_engine";
+        })) versions["hypothesis_engine"] = "1.0.0";
     if (events) {
         auto plan = ark::Json::array();
         for (const auto& task : dag.at("tasks")) {
@@ -764,6 +768,16 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
             result = ark::DevOpsAgent(transport, env("ARK_DOCKER_SOCKET", "/var/run/docker.sock"))
                 .run(ark::make_message("router", "devops_agent", task.intent, task.payload, parent_id));
             result["agent_version"] = "devops_agent@1.0.0";
+        } else if (task.agent == "hypothesis_engine") {
+            ark::Embeddings encoder(transport, settings.ollama_url, settings.embedding_model);
+            ark::SemanticMemory papers(transport, settings.qdrant_url, encoder, settings.semantic_db);
+            const auto password = env("ARK_NEO4J_PASSWORD");
+            ark::CitationGraph graph(transport, env("ARK_NEO4J_URL", "http://127.0.0.1:7474"),
+                env("ARK_NEO4J_DATABASE", "neo4j"), env("ARK_NEO4J_USER", password.empty() ? "" : "neo4j"), password);
+            const auto profile = ark::hypothesis_profile(configured_model("ARK_MODEL", "general"));
+            result = ark::HypothesisEngine(transport, settings.ollama_url, profile, papers, graph, encoder)
+                .run(ark::make_message("router", "hypothesis_engine", task.intent, task.payload, parent_id));
+            result["agent_version"] = "hypothesis_engine@" + profile.version;
         } else {
             result = research_pool.run([&](std::string_view instance) {
                 auto assigned = source;
@@ -811,7 +825,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         if (name == "memory_agent" || name == "data_analysis_agent"
             || name == "scientific_report_generator" || name == "ml_engineer_agent"
             || name == "file_system_agent" || name == "capability_discovery_agent"
-            || name == "github_agent" || name == "experiment_designer") return true;
+            || name == "github_agent" || name == "experiment_designer" || name == "hypothesis_engine") return true;
         if (name == "devops_agent") return true;
         if (!profiles.contains(name)) {
             return false;

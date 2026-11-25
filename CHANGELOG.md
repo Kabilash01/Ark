@@ -141,6 +141,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   single bounded hypothesis payload.
 - Routed bounded DevOps build/run tasks through the existing network-disabled
   Docker execution path.
+- Routed Hypothesis Engine tasks through the configured local model, semantic
+  memory, and citation graph services.
 
 ## No standalone day-tagged commit
 

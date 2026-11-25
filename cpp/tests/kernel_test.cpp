@@ -429,6 +429,33 @@ void devops_tasks_require_bounded_relative_build_contexts() {
     check(rejected, "DevOps task accepted an unsupported top-level field");
 }
 
+void hypothesis_tasks_require_a_bounded_domain_only() {
+    auto hypothesis = task("hypothesize", Json::array(), "hypothesis_engine");
+    hypothesis["intent"] = "HYPOTHESIZE";
+    hypothesis["payload"] = {{"domain", "perovskite solar cell stability"}};
+    const Json plan{{"tasks", {hypothesis}}};
+    bool rejected = false;
+    try { (void)ark::order_tasks(plan); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    check(rejected, "hypothesis task was accepted without native-tool opt-in");
+    check(ark::order_tasks(plan, true).at(0).at(0).payload == hypothesis.at("payload"),
+          "bounded hypothesis domain was not preserved");
+    hypothesis["payload"]["citation_graph_url"] = "http://attacker.invalid";
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {hypothesis}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("one domain string") != std::string_view::npos;
+    }
+    check(rejected, "hypothesis task accepted a caller-selected service endpoint");
+    hypothesis["payload"] = {{"domain", std::string(1001, 'x')}};
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {hypothesis}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("1000 bytes") != std::string_view::npos;
+    }
+    check(rejected, "hypothesis task accepted an oversized domain");
+}
+
 void route_in_parallel() {
     std::mutex mutex;
     std::condition_variable partners;
@@ -642,6 +669,7 @@ int main() {
         github_saved_dag_tasks_are_read_only();
         experiment_design_tasks_require_one_bounded_hypothesis();
         devops_tasks_require_bounded_relative_build_contexts();
+        hypothesis_tasks_require_a_bounded_domain_only();
         route_in_parallel();
         skip_blocked_tasks();
         retries_without_replaying_successful_tasks();

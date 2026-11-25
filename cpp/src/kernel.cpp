@@ -14,14 +14,14 @@
 namespace ark {
 namespace {
 
-constexpr std::array<std::string_view, 21> intents{
+constexpr std::array<std::string_view, 22> intents{
     "RESEARCH", "CODE", "SEARCH", "EXECUTE", "STORE", "EVALUATE", "REFLECT",
-    "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION", "DOCUMENT", "ANALYZE_DATA", "GENERATE_REPORT", "ML_OPTIMIZE", "FILES", "GITHUB", "DESIGN_EXPERIMENT", "DEVOPS",
+    "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION", "DOCUMENT", "ANALYZE_DATA", "GENERATE_REPORT", "ML_OPTIMIZE", "FILES", "GITHUB", "DESIGN_EXPERIMENT", "DEVOPS", "HYPOTHESIZE",
 };
-constexpr std::array<std::string_view, 18> workers{
+constexpr std::array<std::string_view, 19> workers{
     "research_agent", "coding_agent", "evaluation_agent", "memory_agent", "web_search_agent",
     "browser_agent", "document_agent", "terminal_agent", "security_agent", "vision_agent", "data_analysis_agent",
-    "scientific_report_generator", "ml_engineer_agent", "file_system_agent", "capability_discovery_agent", "github_agent", "experiment_designer", "devops_agent",
+    "scientific_report_generator", "ml_engineer_agent", "file_system_agent", "capability_discovery_agent", "github_agent", "experiment_designer", "devops_agent", "hypothesis_engine",
 };
 
 bool contains(const auto& values, std::string_view value) {
@@ -157,7 +157,8 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
             || task.agent == "security_agent" || task.agent == "data_analysis_agent"
             || task.agent == "scientific_report_generator" || task.agent == "ml_engineer_agent"
             || task.agent == "file_system_agent" || task.agent == "capability_discovery_agent"
-            || task.agent == "github_agent" || task.agent == "experiment_designer" || task.agent == "devops_agent";
+            || task.agent == "github_agent" || task.agent == "experiment_designer" || task.agent == "devops_agent"
+            || task.agent == "hypothesis_engine";
         if ((!contains(workers, task.agent) || (tool_worker && !include_native_tools)) || !contains(intents, task.intent)) {
             throw std::invalid_argument("Unknown worker or intent for task " + task.id + ": "
                                         + task.agent + " / " + task.intent);
@@ -356,6 +357,16 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
                 if (!arg.is_string() || arg.get<std::string>().empty() || arg.get<std::string>().size() > 1000) {
                     throw std::invalid_argument("DevOps command arguments must be non-empty strings up to 1000 bytes");
                 }
+            }
+        }
+        if (task.agent == "hypothesis_engine") {
+            if (task.intent != "HYPOTHESIZE") {
+                throw std::invalid_argument("hypothesis_engine requires HYPOTHESIZE intent for task " + task.id);
+            }
+            if (task.payload.size() != 1 || !task.payload.contains("domain")
+                || !task.payload.at("domain").is_string() || task.payload.at("domain").get<std::string>().empty()
+                || task.payload.at("domain").get<std::string>().size() > 1000) {
+                throw std::invalid_argument("Hypothesis tasks require one domain string of 1–1000 bytes");
             }
         }
         if (task.agent == "memory_agent") {

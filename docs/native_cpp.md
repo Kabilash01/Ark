@@ -115,6 +115,10 @@ C++20 study design. It requires a running local model for live execution.
 Dockerfile and run an argument array in its existing network-disabled,
 resource-limited Docker container. Saved-DAG contexts are capped at 48 KiB and
 require relative text paths; a configured Docker socket is required at runtime.
+`hypothesis_engine` accepts one bounded scientific domain and uses the
+configured local inference model, semantic-paper store, and citation graph to
+generate ranked hypotheses. It requires Ollama, Qdrant, and Neo4j services/data
+for a live run; callers cannot override those service endpoints in task payloads.
 
 Set `ARK_REDIS_PORT` and `ARK_EPISODIC_DB` to persist native run metadata to
 Redis and SQLite. Run `ark-cpp audit` and `ark-cpp episodes` with the same
