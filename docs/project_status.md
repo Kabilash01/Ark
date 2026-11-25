@@ -145,4 +145,5 @@ generation now accepts supplied evidence and returns LaTeX inline without
 graph lookups. Live model-to-Docker remains unverified, and the all-20-agent
 integration criterion stays open. A bounded deterministic linear-regression
 route for the ML Engineer is also available through saved DAGs; MLflow and
-other model families are not included in that route.
+other model families are not included in that route. File-system reads and
+writes now use configured workspace aliases through the same dispatcher.

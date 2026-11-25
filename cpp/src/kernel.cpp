@@ -13,14 +13,14 @@
 namespace ark {
 namespace {
 
-constexpr std::array<std::string_view, 17> intents{
+constexpr std::array<std::string_view, 18> intents{
     "RESEARCH", "CODE", "SEARCH", "EXECUTE", "STORE", "EVALUATE", "REFLECT",
-    "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION", "DOCUMENT", "ANALYZE_DATA", "GENERATE_REPORT", "ML_OPTIMIZE",
+    "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION", "DOCUMENT", "ANALYZE_DATA", "GENERATE_REPORT", "ML_OPTIMIZE", "FILES",
 };
-constexpr std::array<std::string_view, 13> workers{
+constexpr std::array<std::string_view, 14> workers{
     "research_agent", "coding_agent", "evaluation_agent", "memory_agent", "web_search_agent",
     "browser_agent", "document_agent", "terminal_agent", "security_agent", "vision_agent", "data_analysis_agent",
-    "scientific_report_generator", "ml_engineer_agent",
+    "scientific_report_generator", "ml_engineer_agent", "file_system_agent",
 };
 
 bool contains(const auto& values, std::string_view value) {
@@ -154,7 +154,8 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
         }
         const bool tool_worker = task.agent == "document_agent" || task.agent == "terminal_agent"
             || task.agent == "security_agent" || task.agent == "data_analysis_agent"
-            || task.agent == "scientific_report_generator" || task.agent == "ml_engineer_agent";
+            || task.agent == "scientific_report_generator" || task.agent == "ml_engineer_agent"
+            || task.agent == "file_system_agent";
         if ((!contains(workers, task.agent) || (tool_worker && !include_native_tools)) || !contains(intents, task.intent)) {
             throw std::invalid_argument("Unknown worker or intent for task " + task.id + ": "
                                         + task.agent + " / " + task.intent);
@@ -235,6 +236,40 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
             if (epochs == 0 || epochs > 100 || trials == 0 || trials > 20
                 || features.size() * features.at(0).size() * epochs * trials > 10'000'000) {
                 throw std::invalid_argument("Saved-DAG ML compute budget exceeded");
+            }
+        }
+        if (task.agent == "file_system_agent") {
+            if (task.intent != "FILES") {
+                throw std::invalid_argument("file_system_agent requires FILES intent for task " + task.id);
+            }
+            static const std::set<std::string, std::less<>> allowed{
+                "content", "operation", "overwrite", "path", "root"};
+            for (auto it = task.payload.begin(); it != task.payload.end(); ++it) {
+                if (!allowed.contains(it.key())) {
+                    throw std::invalid_argument("Unsupported file system task payload field: " + it.key());
+                }
+            }
+            if (!task.payload.contains("root") || !task.payload.at("root").is_string()
+                || task.payload.at("root").get<std::string>().empty()
+                || !task.payload.contains("operation") || !task.payload.at("operation").is_string()) {
+                throw std::invalid_argument("File system task requires a configured root alias and operation");
+            }
+            const auto operation = task.payload.at("operation").get<std::string>();
+            if (operation != "list" && operation != "read" && operation != "write") {
+                throw std::invalid_argument("File system operation must be list, read, or write");
+            }
+            if (operation != "list" && (!task.payload.contains("path") || !task.payload.at("path").is_string())) {
+                throw std::invalid_argument("File read/write task requires a relative path");
+            }
+            if (operation == "write" && (!task.payload.contains("content") || !task.payload.at("content").is_string()
+                || task.payload.at("content").get_ref<const std::string&>().size() > 48 * 1024)) {
+                throw std::invalid_argument("Saved-DAG file writes require text content no larger than 48 KiB");
+            }
+            if (operation != "write" && (task.payload.contains("content") || task.payload.contains("overwrite"))) {
+                throw std::invalid_argument("File content and overwrite are valid only for write operations");
+            }
+            if (task.payload.contains("overwrite") && !task.payload.at("overwrite").is_boolean()) {
+                throw std::invalid_argument("File overwrite must be a boolean");
             }
         }
         if (task.agent == "memory_agent") {

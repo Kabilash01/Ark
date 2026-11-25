@@ -58,6 +58,9 @@ saved-DAG dispatch.
 The ML Engineer also supports a deterministic inline linear-regression path
 with explicit row, feature, trial, epoch, and total-compute limits; it does not
 enable MLflow logging through saved DAGs.
+The File System Agent now routes list/read/write tasks through the configured
+workspace aliases, with relative-path validation and a 48 KiB saved-DAG write
+limit.
 These are explicit saved-plan integrations; the normal natural-language
 planner does not invent source files, document content, or automatically
 schedule these specialist tasks. The live model-to-tool flows remain unverified

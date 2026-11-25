@@ -131,6 +131,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   references and inline LaTeX output; citation-graph queries are disabled.
 - Routed the ML Engineer's linear-regression experiment through saved DAGs with
   bounded inline numeric data and no MLflow side effects.
+- Routed configured File System Agent workspace operations through saved DAGs;
+  roots remain aliases from local configuration and write payloads are capped.
 
 ## No standalone day-tagged commit
 

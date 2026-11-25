@@ -290,6 +290,36 @@ void ml_tasks_require_bounded_inline_linear_regression_data() {
     check(rejected, "saved-DAG ML task accepted an unsupported model");
 }
 
+void file_system_tasks_are_limited_to_configured_workspace_operations() {
+    auto files = task("write-note", Json::array(), "file_system_agent");
+    files["intent"] = "FILES";
+    files["payload"] = {{"root", "workspace"}, {"operation", "write"},
+        {"path", "notes/result.txt"}, {"content", "bounded result"}, {"overwrite", false}};
+    const Json plan{{"tasks", {files}}};
+    bool rejected = false;
+    try { (void)ark::order_tasks(plan); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    check(rejected, "file-system task was accepted without native-tool opt-in");
+    check(ark::order_tasks(plan, true).at(0).at(0).payload == files.at("payload"),
+          "configured workspace operation was not preserved");
+    files["payload"]["absolute_path"] = "/etc/passwd";
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {files}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("Unsupported file system task payload field") != std::string_view::npos;
+    }
+    check(rejected, "file-system task accepted an arbitrary path field");
+    files["payload"].erase("absolute_path");
+    files["payload"].erase("content");
+    files["intent"] = "RESEARCH";
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {files}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("requires FILES") != std::string_view::npos;
+    }
+    check(rejected, "file-system worker accepted an unrelated intent");
+}
+
 void route_in_parallel() {
     std::mutex mutex;
     std::condition_variable partners;
@@ -498,6 +528,7 @@ int main() {
         data_analysis_tasks_accept_only_bounded_inline_csv();
         scientific_report_tasks_require_supplied_bounded_evidence();
         ml_tasks_require_bounded_inline_linear_regression_data();
+        file_system_tasks_are_limited_to_configured_workspace_operations();
         route_in_parallel();
         skip_blocked_tasks();
         retries_without_replaying_successful_tasks();
