@@ -161,6 +161,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   Security Agent's bounded dependency-check action.
 - Routed Capability Discovery questions through the planner with evidence
   loaded from the local registry, reflections, and benchmark history.
+- Routed read-only GitHub issue queries through the planner and rejected
+  planner-selected repositories or Materials Project IDs absent from the goal.
 
 ## No standalone day-tagged commit
 

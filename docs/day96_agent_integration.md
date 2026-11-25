@@ -93,3 +93,9 @@ planner. For question-only tasks, dispatch loads registry, reflection, and
 benchmark evidence from configured local stores. It fails explicitly when the
 agent registry is unavailable, so an empty map is not presented as proof that
 ARK lacks a capability. The live path still needs Redis and a local model.
+
+Natural-language GitHub issue listing now plans a read-only task for a named
+`owner/repository`. Planner validation rejects repositories absent from the
+goal. The same validation now rejects Materials Project IDs absent from the
+goal, tightening the earlier prompt-only instruction. Live GitHub and Materials
+Project requests still require their respective configured credentials.

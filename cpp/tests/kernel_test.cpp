@@ -749,6 +749,34 @@ void planner_can_assign_capability_question_without_inventing_evidence() {
           "planner supplied untrusted capability evidence");
 }
 
+void planner_rejects_invented_external_identifiers() {
+    std::string selected_repository = "owner/project";
+    ark::Planner github_planner([&](const ark::Request&) {
+        auto issues = task("issues", Json::array(), "github_agent");
+        issues["intent"] = "GITHUB";
+        issues["payload"] = {{"action", "get_open_issues"}, {"repository", selected_repository}};
+        return ark::Response{200, Json{{"message", {{"content", Json{{"tasks", {issues}}}.dump()}}}}.dump()};
+    }, "http://localhost:11434", "local-test");
+    check(github_planner.plan("list issues in owner/project", {"github_agent"}, Json::array(), true)
+              .at("tasks").at(0).at("agent") == "github_agent", "explicit repository was rejected");
+    selected_repository = "other/private";
+    bool rejected = false;
+    try { (void)github_planner.plan("list issues in owner/project", {"github_agent"}, Json::array(), true); }
+    catch (const std::runtime_error&) { rejected = true; }
+    check(rejected, "planner accepted a repository absent from the user goal");
+
+    ark::Planner materials_planner([](const ark::Request&) {
+        auto materials = task("materials", Json::array(), "materials_project_agent");
+        materials["intent"] = "MATERIALS_QUERY";
+        materials["payload"] = {{"material_ids", {"mp-149", "mp-999"}}};
+        return ark::Response{200, Json{{"message", {{"content", Json{{"tasks", {materials}}}.dump()}}}}.dump()};
+    }, "http://localhost:11434", "local-test");
+    rejected = false;
+    try { (void)materials_planner.plan("summarize mp-149", {"materials_project_agent"}, Json::array(), true); }
+    catch (const std::runtime_error&) { rejected = true; }
+    check(rejected, "planner accepted a material ID absent from the user goal");
+}
+
 void planner_can_assign_a_bounded_dependency_security_check() {
     ark::Planner planner([](const ark::Request& request) {
         const auto body = Json::parse(request.body);
@@ -845,6 +873,7 @@ int main() {
         planner_can_assign_typed_science_tasks();
         planner_can_assign_an_isolated_evaluation();
         planner_can_assign_capability_question_without_inventing_evidence();
+        planner_rejects_invented_external_identifiers();
         planner_can_assign_a_bounded_dependency_security_check();
         reconciles_output_conflicts_with_both_workers();
         optional_cloud_failure_falls_back_to_local();

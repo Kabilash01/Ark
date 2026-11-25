@@ -86,7 +86,8 @@ HYPOTHESIZE (generate hypotheses for a scientific domain),
 MATERIALS_QUERY (retrieve material summaries for explicit Materials Project IDs),
 PROPOSE_IMPROVEMENT (propose a coding-agent prompt change for stored failures),
 MEMORY (store a user-requested memory or search existing memories),
-SECURITY (check explicitly supplied pinned dependencies against supplied advisories).)";
+SECURITY (check explicitly supplied pinned dependencies against supplied advisories),
+GITHUB (list open issues in an explicitly named GitHub owner/repository).)";
 
 constexpr std::string_view planner =
     R"(Build a directed acyclic task plan for the supplied goal. Use only the provided available_agents.
@@ -99,6 +100,7 @@ PROPOSE_IMPROVEMENT for self_improvement_agent with payload {"target_agent":"cod
 STORE or SEARCH for memory_agent with payload {"action":"store_episode","summary":"..."} or {"action":"search_episodes","query":"...","limit":10}; choose STORE only when asked to remember something,
 SECURITY for security_agent dependency checks with payload {"action":"check_dependencies","dependencies":{"package":"version"},"advisories":[{"package":"package","affected_versions":["version"],"id":"ADV-1"}]}; use only dependencies and advisories provided in the goal,
 DISCOVER for capability_discovery_agent with payload {"question":"..."}; registry evidence is loaded locally by the worker,
+GITHUB for github_agent with payload {"action":"get_open_issues","repository":"owner/repository","page":1}; use only a repository named in the user goal,
 and EXECUTE for terminal_agent when it is listed as available. For terminal_agent, put the
 literal shell command to execute in the task instruction; it will run inside the restricted Docker sandbox.
 Use vision_agent only when the task includes an image. Include synthesis in a RESEARCH task.
@@ -142,19 +144,22 @@ Json plan_format(const std::vector<std::string>& agents) {
             allowed_intents.push_back("SECURITY");
         } else if (agent == "capability_discovery_agent") {
             allowed_intents.push_back("DISCOVER");
+        } else if (agent == "github_agent") {
+            allowed_intents.push_back("GITHUB");
         }
     }
     Json payload_properties{{"hypothesis", text}, {"domain", text},
         {"material_ids", {{"type", "array"}, {"items", text}, {"minItems", 1}, {"maxItems", 50}}},
         {"fields", {{"type", "array"}, {"items", text}, {"maxItems", 30}}},
         {"target_agent", {{"type", "string"}, {"enum", {"coding_agent"}}}},
-        {"action", {{"type", "string"}, {"enum", {"store_episode", "search_episodes"}}}},
-        {"summary", text}, {"query", text}, {"question", text},
+        {"action", {{"type", "string"}, {"enum", {"store_episode", "search_episodes", "get_open_issues"}}}},
+        {"summary", text}, {"query", text}, {"question", text}, {"repository", text},
         {"dependencies", {{"type", "object"}, {"additionalProperties", text}}},
         {"advisories", {{"type", "array"}, {"items", {{"type", "object"},
             {"additionalProperties", false}, {"properties", {{"package", text},
                 {"affected_versions", {{"type", "array"}, {"items", text}}}, {"id", text}}}}}}},
         {"limit", {{"type", "integer"}, {"minimum", 1}, {"maximum", 100}}}};
+    payload_properties["page"] = {{"type", "integer"}, {"minimum", 1}, {"maximum", 10000}};
     const Json payload_schema{{"type", "object"}, {"additionalProperties", false},
                               {"properties", std::move(payload_properties)}};
     const Json task{{"type", "object"}, {"additionalProperties", false},
@@ -866,7 +871,7 @@ std::string Planner::request(const AgentProfile& profile, std::string_view input
 std::string Planner::classify(std::string_view goal) const {
     static constexpr std::array allowed{
         "RESEARCH", "SEARCH", "CODE", "EXECUTE", "EVALUATE", "DISCOVER", "BROWSE", "SECURITY", "VISION",
-        "DESIGN_EXPERIMENT", "HYPOTHESIZE", "MATERIALS_QUERY", "PROPOSE_IMPROVEMENT", "MEMORY", "SECURITY",
+        "DESIGN_EXPERIMENT", "HYPOTHESIZE", "MATERIALS_QUERY", "PROPOSE_IMPROVEMENT", "MEMORY", "SECURITY", "GITHUB",
     };
     const auto output = Json::parse(request(supervisor_, goal, "json", goal));
     const auto intent = output.at("intent").get<std::string>();
@@ -891,6 +896,17 @@ Json Planner::plan(std::string_view goal, const std::vector<std::string>& agents
         for (const auto& task : layer) {
             if (!contains(agents, task.agent)) {
                 throw std::runtime_error("Local model selected an unavailable worker");
+            }
+            if (task.agent == "github_agent"
+                && goal.find(task.payload.at("repository").get_ref<const std::string&>()) == std::string_view::npos) {
+                throw std::runtime_error("Planner selected a GitHub repository absent from the user goal");
+            }
+            if (task.agent == "materials_project_agent") {
+                for (const auto& id : task.payload.at("material_ids")) {
+                    if (goal.find(id.get_ref<const std::string&>()) == std::string_view::npos) {
+                        throw std::runtime_error("Planner selected a material ID absent from the user goal");
+                    }
+                }
             }
         }
     }

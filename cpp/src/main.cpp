@@ -969,12 +969,12 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
                 && intent != "EVALUATE"
                 && intent != "DESIGN_EXPERIMENT" && intent != "HYPOTHESIZE" && intent != "MATERIALS_QUERY"
                 && intent != "PROPOSE_IMPROVEMENT" && intent != "MEMORY" && intent != "SECURITY"
-                && intent != "DISCOVER") {
+                && intent != "DISCOVER" && intent != "GITHUB") {
                 throw std::invalid_argument("No native worker available for intent " + intent);
             }
             const bool include_native_tools = intent == "EXECUTE" || intent == "DESIGN_EXPERIMENT"
                 || intent == "HYPOTHESIZE" || intent == "MATERIALS_QUERY" || intent == "PROPOSE_IMPROVEMENT"
-                || intent == "SECURITY" || intent == "DISCOVER";
+                || intent == "SECURITY" || intent == "DISCOVER" || intent == "GITHUB";
             const auto agents = intent == "EXECUTE" ? std::vector<std::string>{"terminal_agent"}
                 : intent == "EVALUATE" ? std::vector<std::string>{"evaluation_agent"}
                 : intent == "DESIGN_EXPERIMENT" ? std::vector<std::string>{"experiment_designer"}
@@ -984,12 +984,13 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
                 : intent == "MEMORY" ? std::vector<std::string>{"memory_agent"}
                 : intent == "SECURITY" ? std::vector<std::string>{"security_agent"}
                 : intent == "DISCOVER" ? std::vector<std::string>{"capability_discovery_agent"}
+                : intent == "GITHUB" ? std::vector<std::string>{"github_agent"}
                 : intent == "CODE" && !explicit_research ? std::vector<std::string>{"coding_agent"}
                 : intent == "SEARCH" ? std::vector<std::string>{"research_agent"}
                 : std::vector<std::string>{"research_agent", "coding_agent"};
             auto context = (intent == "DESIGN_EXPERIMENT" || intent == "HYPOTHESIZE" || intent == "MATERIALS_QUERY"
                 || intent == "PROPOSE_IMPROVEMENT" || intent == "MEMORY" || intent == "SECURITY"
-                || intent == "DISCOVER")
+                || intent == "DISCOVER" || intent == "GITHUB")
                 ? ark::Json::array() : recall(settings, goal);
             versions["planner_agent"] = plan_profile.version;
             const auto instruction = std::string(goal) + std::string(followup);
