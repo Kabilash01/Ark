@@ -139,3 +139,9 @@ with a hypothesis, experiment spec, and supplied numeric results returned
 `DONE` with LaTeX output while Ollama and Neo4j were stopped. A payload missing
 the required experiment spec was rejected. This verifies deterministic report
 rendering from supplied evidence, not a live SAGE research or citation flow.
+
+`ark-cpp run 'Optimize linear regression from JSON: {...}'` now passes a
+supplied dataset and search ranges to the bounded native ML Engineer route.
+A 20-row, two-trial local run returned `DONE` with validation RMSE. Saved-DAG
+limits remain 10–1000 rows, 1–16 feature dimensions, at most 20 trials, and
+the total compute cap. This route does not log to MLflow or train other models.

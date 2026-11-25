@@ -173,6 +173,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   run with successful analysis and reflection on a local model.
 - Added direct report generation from supplied JSON evidence and verified
   LaTeX output without model or citation-graph services.
+- Added direct bounded linear-regression runs from supplied JSON and verified
+  a 20-row, two-trial experiment without model or MLflow services.
 
 ## No standalone day-tagged commit
 
