@@ -85,7 +85,8 @@ DESIGN_EXPERIMENT (design a bounded experiment for an explicit hypothesis),
 HYPOTHESIZE (generate hypotheses for a scientific domain),
 MATERIALS_QUERY (retrieve material summaries for explicit Materials Project IDs),
 PROPOSE_IMPROVEMENT (propose a coding-agent prompt change for stored failures),
-MEMORY (store a user-requested memory or search existing memories).)";
+MEMORY (store a user-requested memory or search existing memories),
+SECURITY (check explicitly supplied pinned dependencies against supplied advisories).)";
 
 constexpr std::string_view planner =
     R"(Build a directed acyclic task plan for the supplied goal. Use only the provided available_agents.
@@ -96,6 +97,7 @@ HYPOTHESIZE for hypothesis_engine with payload {"domain":"..."},
 MATERIALS_QUERY for materials_project_agent with payload {"material_ids":["mp-..."],"fields":["..."],"limit":10}; use only IDs supplied by the user,
 PROPOSE_IMPROVEMENT for self_improvement_agent with payload {"target_agent":"coding_agent"},
 STORE or SEARCH for memory_agent with payload {"action":"store_episode","summary":"..."} or {"action":"search_episodes","query":"...","limit":10}; choose STORE only when asked to remember something,
+SECURITY for security_agent dependency checks with payload {"action":"check_dependencies","dependencies":{"package":"version"},"advisories":[{"package":"package","affected_versions":["version"],"id":"ADV-1"}]}; use only dependencies and advisories provided in the goal,
 and EXECUTE for terminal_agent when it is listed as available. For terminal_agent, put the
 literal shell command to execute in the task instruction; it will run inside the restricted Docker sandbox.
 Use vision_agent only when the task includes an image. Include synthesis in a RESEARCH task.
@@ -135,6 +137,8 @@ Json plan_format(const std::vector<std::string>& agents) {
             allowed_intents.push_back("MATERIALS_QUERY");
         } else if (agent == "self_improvement_agent") {
             allowed_intents.push_back("PROPOSE_IMPROVEMENT");
+        } else if (agent == "security_agent") {
+            allowed_intents.push_back("SECURITY");
         }
     }
     Json payload_properties{{"hypothesis", text}, {"domain", text},
@@ -143,6 +147,10 @@ Json plan_format(const std::vector<std::string>& agents) {
         {"target_agent", {{"type", "string"}, {"enum", {"coding_agent"}}}},
         {"action", {{"type", "string"}, {"enum", {"store_episode", "search_episodes"}}}},
         {"summary", text}, {"query", text},
+        {"dependencies", {{"type", "object"}, {"additionalProperties", text}}},
+        {"advisories", {{"type", "array"}, {"items", {{"type", "object"},
+            {"additionalProperties", false}, {"properties", {{"package", text},
+                {"affected_versions", {{"type", "array"}, {"items", text}}}, {"id", text}}}}}}},
         {"limit", {{"type", "integer"}, {"minimum", 1}, {"maximum", 100}}}};
     const Json payload_schema{{"type", "object"}, {"additionalProperties", false},
                               {"properties", std::move(payload_properties)}};
@@ -855,7 +863,7 @@ std::string Planner::request(const AgentProfile& profile, std::string_view input
 std::string Planner::classify(std::string_view goal) const {
     static constexpr std::array allowed{
         "RESEARCH", "SEARCH", "CODE", "EXECUTE", "EVALUATE", "DISCOVER", "BROWSE", "SECURITY", "VISION",
-        "DESIGN_EXPERIMENT", "HYPOTHESIZE", "MATERIALS_QUERY", "PROPOSE_IMPROVEMENT", "MEMORY",
+        "DESIGN_EXPERIMENT", "HYPOTHESIZE", "MATERIALS_QUERY", "PROPOSE_IMPROVEMENT", "MEMORY", "SECURITY",
     };
     const auto output = Json::parse(request(supervisor_, goal, "json", goal));
     const auto intent = output.at("intent").get<std::string>();

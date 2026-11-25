@@ -157,6 +157,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
 - Routed natural-language remember/recall requests to typed episodic Memory
   Agent STORE and SEARCH tasks.
 - Routed evaluation-only goals through `ark-cpp run` to the Evaluation Agent.
+- Routed explicit pinned-dependency and local-advisory checks through the
+  Security Agent's bounded dependency-check action.
 
 ## No standalone day-tagged commit
 

@@ -1279,3 +1279,7 @@ task-selected path.
 Evaluation-only goals now constrain planning to `evaluation_agent`, so requests
 to assess a supplied artifact can reach the existing evaluator through
 `ark-cpp run`.
+
+Security dependency checks can also be planned from explicitly supplied pinned
+versions and local advisory data. The plan is constrained to `security_agent`
+and uses the existing native-tool opt-in; no external advisory feed is queried.
