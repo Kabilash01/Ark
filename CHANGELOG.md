@@ -156,6 +156,7 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   evaluation and promotion remain gated by the existing A/B workflow.
 - Routed natural-language remember/recall requests to typed episodic Memory
   Agent STORE and SEARCH tasks.
+- Routed evaluation-only goals through `ark-cpp run` to the Evaluation Agent.
 
 ## No standalone day-tagged commit
 

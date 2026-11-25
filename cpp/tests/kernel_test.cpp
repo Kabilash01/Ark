@@ -717,6 +717,22 @@ void planner_can_assign_typed_science_tasks() {
           "memory planner did not preserve the typed search action");
 }
 
+void planner_can_assign_an_isolated_evaluation() {
+    ark::Planner planner([](const ark::Request& request) {
+        const auto body = Json::parse(request.body);
+        const auto& schema = body.at("format").at("properties").at("tasks").at("items");
+        check(schema.at("properties").at("agent").at("enum") == Json::array({"evaluation_agent"}),
+              "evaluation plan exposed unrelated workers");
+        auto evaluation = task("evaluate", Json::array(), "evaluation_agent");
+        evaluation["intent"] = "EVALUATE";
+        evaluation["instruction"] = "Evaluate the supplied artifact for correctness and clarity.";
+        return ark::Response{200, Json{{"message", {{"content", Json{{"tasks", {evaluation}}}.dump()}}}}.dump()};
+    }, "http://localhost:11434", "local-test");
+    const auto plan = planner.plan("evaluate this artifact", {"evaluation_agent"});
+    check(plan.at("tasks").at(0).at("intent") == "EVALUATE",
+          "planner did not retain the evaluation intent");
+}
+
 void reconciles_output_conflicts_with_both_workers() {
     auto code = task("code", {"research"}, "coding_agent");
     code["intent"] = "CODE";
@@ -792,6 +808,7 @@ int main() {
         model_plans_are_validated();
         planner_can_assign_an_isolated_terminal_command();
         planner_can_assign_typed_science_tasks();
+        planner_can_assign_an_isolated_evaluation();
         reconciles_output_conflicts_with_both_workers();
         optional_cloud_failure_falls_back_to_local();
     } catch (const std::exception& error) {

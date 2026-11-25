@@ -948,6 +948,7 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
                 break;
             }
             if (intent != "RESEARCH" && intent != "SEARCH" && intent != "CODE" && intent != "EXECUTE"
+                && intent != "EVALUATE"
                 && intent != "DESIGN_EXPERIMENT" && intent != "HYPOTHESIZE" && intent != "MATERIALS_QUERY"
                 && intent != "PROPOSE_IMPROVEMENT" && intent != "MEMORY") {
                 throw std::invalid_argument("No native worker available for intent " + intent);
@@ -955,6 +956,7 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
             const bool include_native_tools = intent == "EXECUTE" || intent == "DESIGN_EXPERIMENT"
                 || intent == "HYPOTHESIZE" || intent == "MATERIALS_QUERY" || intent == "PROPOSE_IMPROVEMENT";
             const auto agents = intent == "EXECUTE" ? std::vector<std::string>{"terminal_agent"}
+                : intent == "EVALUATE" ? std::vector<std::string>{"evaluation_agent"}
                 : intent == "DESIGN_EXPERIMENT" ? std::vector<std::string>{"experiment_designer"}
                 : intent == "HYPOTHESIZE" ? std::vector<std::string>{"hypothesis_engine"}
                 : intent == "MATERIALS_QUERY" ? std::vector<std::string>{"materials_project_agent"}

@@ -1275,3 +1275,7 @@ Natural-language memory requests now route to episodic STORE or SEARCH tasks.
 The planner chooses between the two typed actions, and dispatch still validates
 the summary/query fields and uses the configured SQLite database rather than a
 task-selected path.
+
+Evaluation-only goals now constrain planning to `evaluation_agent`, so requests
+to assess a supplied artifact can reach the existing evaluator through
+`ark-cpp run`.
