@@ -167,6 +167,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   supplied-content checks and confined output paths.
 - Routed inline CSV analysis through natural-language planning with exact
   source-data preservation and the saved-DAG size limit.
+- Preserved specialist native-tool authorization through dispatch and added an
+  exact inline-CSV execution path verified with a live local analysis run.
 
 ## No standalone day-tagged commit
 

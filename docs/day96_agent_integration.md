@@ -119,3 +119,12 @@ working local planning model.
 Inline CSV analysis now has a natural-language route to the deterministic Data
 Analysis Agent. Planner output must contain the exact CSV bytes supplied in
 the goal, and saved-DAG validation retains its 60 KiB input limit.
+
+A live smoke run with local `qwen2.5:0.5b` exposed two routing defects. The
+small model classified an explicit CSV request as `GITHUB`, and the run path
+had validated specialist plans with native-tool access but dispatched them
+without it. Dispatch now carries the same native-tool flag through execution.
+The exact `Analyze this CSV:` form creates a deterministic analysis task from
+the supplied bytes; a live two-row run returned `DONE` and mean `1.5`. The
+optional reflection from that small model failed because it omitted
+`skill_update`, so this run does not verify reflection or the full model path.

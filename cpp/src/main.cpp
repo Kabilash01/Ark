@@ -950,10 +950,30 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
     const bool has_browser_site = ark::browser_start_url(goal).has_value();
     const bool explicit_browse = has_browser_site && (lower_goal.starts_with("browse ") || lower_goal.starts_with("navigate ")
         || lower_goal.starts_with("visit ") || lower_goal.starts_with("open "));
+    constexpr std::string_view csv_prefix = "analyze this csv:";
+    const bool direct_csv = lower_goal.starts_with(csv_prefix);
+    const auto native_tool_intent = [](std::string_view value) {
+        return value == "EXECUTE" || value == "DESIGN_EXPERIMENT" || value == "HYPOTHESIZE"
+            || value == "MATERIALS_QUERY" || value == "PROPOSE_IMPROVEMENT" || value == "SECURITY"
+            || value == "DISCOVER" || value == "GITHUB" || value == "DOCUMENT" || value == "ANALYZE_DATA";
+    };
     std::string intent = "SUPERVISE";
     ark::Json dag;
     for (int attempt = 1; ; ++attempt) {
         try {
+            if (direct_csv) {
+                auto csv = std::string(goal.substr(csv_prefix.size()));
+                if (!csv.empty() && (csv.front() == ' ' || csv.front() == '\n')) csv.erase(0, 1);
+                if (csv.empty() || csv.size() > 60 * 1024) {
+                    throw std::invalid_argument("Inline CSV must be between 1 byte and 60 KiB");
+                }
+                intent = "ANALYZE_DATA";
+                dag["tasks"] = ark::Json::array({{{"task_id", "csv-analysis"},
+                    {"agent", "data_analysis_agent"}, {"intent", intent}, {"instruction", "Analyze the supplied CSV"},
+                    {"payload", {{"csv", csv}}}, {"depends_on", ark::Json::array()},
+                    {"parallel_with", ark::Json::array()}}});
+                break;
+            }
             owner = "supervisor_agent";
             emit(events, "agent_started", {{"agent", owner}});
             intent = explicit_browse ? "BROWSE" : planner.classify(goal);
@@ -973,10 +993,7 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
                 && intent != "ANALYZE_DATA") {
                 throw std::invalid_argument("No native worker available for intent " + intent);
             }
-            const bool include_native_tools = intent == "EXECUTE" || intent == "DESIGN_EXPERIMENT"
-                || intent == "HYPOTHESIZE" || intent == "MATERIALS_QUERY" || intent == "PROPOSE_IMPROVEMENT"
-                || intent == "SECURITY" || intent == "DISCOVER" || intent == "GITHUB" || intent == "DOCUMENT"
-                || intent == "ANALYZE_DATA";
+            const bool include_native_tools = native_tool_intent(intent);
             const auto agents = intent == "EXECUTE" ? std::vector<std::string>{"terminal_agent"}
                 : intent == "EVALUATE" ? std::vector<std::string>{"evaluation_agent"}
                 : intent == "DESIGN_EXPERIMENT" ? std::vector<std::string>{"experiment_designer"}
@@ -1027,7 +1044,7 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
             return result;
         }
     }
-    ensure_evaluation(dag);
+    if (!direct_csv) ensure_evaluation(dag);
     dag["goal"] = goal;
     dag["privacy"] = task_privacy.enabled;
     dag["airgap_mode"] = task_privacy.airgap;
@@ -1035,7 +1052,7 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
         dag["coding_test_files"] = trusted_tests;
     }
     return dispatch(dag, settings, intent, std::move(task_id), versions, via_api, events,
-                    intent == "EXECUTE");
+                    native_tool_intent(intent));
 }
 
 ark::Json run_task(std::string_view goal, const ark::ResearchConfig& settings, const ark::Json& trusted_tests,
