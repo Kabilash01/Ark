@@ -43,6 +43,7 @@
 #include "ark/web_search.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cerrno>
 #include <cctype>
 #include <cstdlib>
@@ -53,6 +54,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <thread>
 #include <signal.h>
 #include <spawn.h>
@@ -1479,9 +1481,155 @@ ark::Json memory_tier(std::string_view tier, std::string_view query, std::string
     return ark::Json::array();
 }
 
+struct BuiltinAgent {
+    std::string_view name;
+    std::string_view capability;
+    std::string_view backend;
+    bool versioned;
+};
+
+constexpr std::array<BuiltinAgent, 20> builtin_agents{{
+    {"supervisor_agent", "SUPERVISE", "general", true},
+    {"planner_agent", "PLAN", "general", true},
+    {"memory_agent", "STORE", "sqlite", false},
+    {"evaluation_agent", "EVALUATE", "evaluation", true},
+    {"research_agent", "RESEARCH", "general", true},
+    {"web_search_agent", "BROWSE", "general", true},
+    {"browser_agent", "BROWSE", "general", true},
+    {"document_agent", "DOCUMENT", "native-document-io", true},
+    {"coding_agent", "CODE", "code", true},
+    {"github_agent", "GITHUB", "github-api", false},
+    {"terminal_agent", "EXECUTE", "docker-sandbox", true},
+    {"file_system_agent", "FILES", "local-files", false},
+    {"security_agent", "SECURITY", "semgrep-bandit", true},
+    {"reflection_agent", "REFLECT", "reflection", true},
+    {"vision_agent", "VISION", "vision", true},
+    {"ml_engineer_agent", "ML_OPTIMIZE", "native-ml", false},
+    {"devops_agent", "DEVOPS", "docker", false},
+    {"data_analysis_agent", "ANALYZE_DATA", "native-analysis", false},
+    {"self_improvement_agent", "PROPOSE_IMPROVEMENT", "general", false},
+    {"capability_discovery_agent", "DISCOVER", "registry", false},
+}};
+
+bool executable_on_path(std::string_view name) {
+    const auto path = env("PATH");
+    std::size_t start = 0;
+    while (start <= path.size()) {
+        const auto end = path.find(':', start);
+        const auto directory = path.substr(start, end == std::string::npos ? end : end - start);
+        if (access((std::filesystem::path(directory.empty() ? "." : directory) / name).c_str(), X_OK) == 0) return true;
+        if (end == std::string::npos) break;
+        start = end + 1;
+    }
+    return false;
+}
+
+ark::Json agent_registry_snapshot(ark::Redis& redis) {
+    ark::AgentRegistry registry(redis);
+    const auto settings = config(false);
+    const auto general_model = configured_model("ARK_MODEL", "general");
+    const auto code_model = configured_model("ARK_CODE_MODEL", "code");
+    const auto evaluation_model = env("ARK_EVAL_MODEL", general_model);
+    const auto reflection_model = env("ARK_REFLECTION_MODEL", general_model);
+    const auto vision_model = configured_model("ARK_VISION_MODEL", "vision");
+    ark::CurlTransport http;
+    const auto probe = [&](const std::string& url, const std::string& socket = "") {
+        try {
+            const auto response = http({url, "GET", {}, {}, std::chrono::seconds(2), socket});
+            return response.status >= 200 && response.status < 300;
+        } catch (const std::exception&) { return false; }
+    };
+    std::set<std::string> installed_models;
+    const auto llama_url = ark::configured_llama_url();
+    const bool llama_ready = !llama_url.empty() && probe(llama_url + "/health");
+    if (llama_url.empty()) {
+        try {
+            const auto response = http({settings.ollama_url + "/api/tags", "GET", {}, {}, std::chrono::seconds(2)});
+            if (response.status == 200) {
+                const auto tags = ark::Json::parse(response.body);
+                for (const auto& model : tags.at("models"))
+                    installed_models.insert(model.at("name").get<std::string>());
+            }
+        } catch (const std::exception&) {}
+    }
+    const auto model_ready = [&](const std::string& model) {
+        return llama_ready || installed_models.contains(model);
+    };
+    const bool docker_ready = probe("http://localhost/_ping", env("ARK_DOCKER_SOCKET", "/var/run/docker.sock"));
+    const bool qdrant_ready = probe(settings.qdrant_url + "/collections");
+    bool file_access_ready = false;
+    try {
+        const auto path = config_dir() / "file_system.json";
+        file_access_ready = std::filesystem::exists(path)
+            && !ark::read_json(path).at("allowed_directories").empty();
+    } catch (const std::exception&) {}
+
+    auto result = registry.all();
+    for (const auto& spec : builtin_agents) {
+        const auto name = std::string(spec.name);
+        auto found = std::find_if(result.begin(), result.end(), [&](const auto& row) { return row.value("name", "") == name; });
+        if (found == result.end()) {
+            if (spec.versioned) {
+                (void)actor_profile(name, spec.name == "vision_agent" ? vision_model : general_model, &redis);
+            } else {
+                (void)registry.add(name, ark::Json::array({std::string(spec.capability)}), spec.backend, "1.0.0");
+            }
+            result.push_back(registry.get(name));
+            found = std::prev(result.end());
+        }
+        std::string reason;
+        const auto needs_model = [&](const std::string& model) {
+            if (!model_ready(model)) reason = llama_url.empty()
+                ? "Install model " + model + " and start Ollama"
+                : "Start the configured llama.cpp server";
+        };
+        if (spec.name == "supervisor_agent" || spec.name == "planner_agent"
+            || spec.name == "self_improvement_agent") needs_model(general_model);
+        else if (spec.name == "evaluation_agent") needs_model(evaluation_model);
+        else if (spec.name == "reflection_agent") needs_model(reflection_model);
+        else if (spec.name == "vision_agent") needs_model(vision_model);
+        else if (spec.name == "research_agent") {
+            needs_model(general_model);
+            if (reason.empty() && !qdrant_ready) reason = "Start Qdrant";
+            if (reason.empty()) needs_model(settings.embedding_model);
+        } else if (spec.name == "web_search_agent") {
+            needs_model(general_model);
+            if (reason.empty() && env("TAVILY_API_KEY").empty()) reason = "Set TAVILY_API_KEY";
+        } else if (spec.name == "browser_agent") {
+            needs_model(general_model);
+            if (reason.empty() && !executable_on_path("chromium")) reason = "Install Chromium";
+        } else if (spec.name == "coding_agent") {
+            needs_model(code_model);
+            if (reason.empty() && !docker_ready) reason = "Start Docker";
+        } else if (spec.name == "terminal_agent" || spec.name == "devops_agent") {
+            if (!docker_ready) reason = "Start Docker";
+        } else if (spec.name == "file_system_agent" && !file_access_ready) {
+            reason = "Configure allowed_directories in file_system.json";
+        }
+        const auto desired = reason.empty() ? "IDLE" : "OFFLINE";
+        if (found->value("status", "") != desired) (void)registry.status(name, desired);
+        if (reason.empty()) (void)registry.heartbeat(name);
+        (*found)["status"] = desired;
+        if (reason.empty()) found->erase("availability_reason");
+        else (*found)["availability_reason"] = reason;
+    }
+    return result;
+}
+
+ark::Json unavailable_registry_snapshot() {
+    auto result = ark::Json::array();
+    for (const auto& spec : builtin_agents) {
+        result.push_back({{"name", spec.name}, {"capabilities", {spec.capability}},
+                          {"model", spec.backend}, {"version", "1.0.0"},
+                          {"status", "OFFLINE"}, {"availability_reason", "Start Redis"}});
+    }
+    return result;
+}
+
 int serve(int port) {
     const auto redis_port = std::stoi(env("ARK_REDIS_PORT", "6379"));
     const auto redis_db = std::stoi(env("ARK_REDIS_DB", "0"));
+    if (const auto redis = runtime_redis(redis_port, redis_db)) (void)agent_registry_snapshot(*redis);
     ark::TaskScheduler scheduler(env("ARK_SCHEDULE_DB", "data/schedules.db"), [](std::string_view goal, bool privacy) {
         const auto task_id = ark::make_message("scheduler", "supervisor_agent", "SUPERVISE", ark::Json::object())
             .at("task_id").get<std::string>();
@@ -1501,7 +1649,7 @@ int serve(int port) {
         },
         [=] {
             const auto redis = runtime_redis(redis_port, redis_db);
-            return redis ? ark::AgentRegistry(*redis).all() : ark::Json::array();
+            return redis ? agent_registry_snapshot(*redis) : unavailable_registry_snapshot();
         },
         [=](std::string_view name) {
             ark::Redis redis(redis_port, redis_db);

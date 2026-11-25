@@ -28,6 +28,21 @@ def main():
         if status != 200 or marker not in content:
             raise RuntimeError(f"Dashboard asset failed: {path}")
 
+    _, _, body = get(base, "/agents")
+    agents = {agent["name"]: agent for agent in json.loads(body)}
+    required = {"supervisor_agent", "planner_agent", "memory_agent", "evaluation_agent",
+                "research_agent", "web_search_agent", "browser_agent", "document_agent",
+                "coding_agent", "github_agent", "terminal_agent", "file_system_agent",
+                "security_agent", "reflection_agent", "vision_agent", "ml_engineer_agent",
+                "devops_agent", "data_analysis_agent", "self_improvement_agent",
+                "capability_discovery_agent"}
+    if not required.issubset(agents):
+        raise RuntimeError(f"Built-in agents missing from registry: {sorted(required - agents.keys())}")
+    for name in required:
+        agent = agents[name]
+        if agent["status"] == "OFFLINE" and not agent.get("availability_reason"):
+            raise RuntimeError(f"Offline agent has no setup reason: {name}")
+
     goal = "Analyze this CSV: sample,value\nA,1\nB,2"
     request = urllib.request.Request(base + "/task", data=json.dumps({"goal": goal}).encode(),
                                      headers={"Content-Type": "application/json"})

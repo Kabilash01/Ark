@@ -41,6 +41,12 @@ python3 scripts/product_smoke.py
 python3 scripts/product_smoke.py --browser  # also clicks New task in Chromium
 ```
 
+The agent cards reflect on-demand C++ workers. **Idle** means the worker's
+required local services are available; **Needs setup** shows the missing
+prerequisite on the card. ARK registers its 20 built-in agents in Redis when
+the server starts and refreshes their readiness when the dashboard requests
+`/agents`. A missing Redis service appears as **Start Redis** on every card.
+
 This check covers the served dashboard assets, task submission, the native CSV
 worker, result retrieval, events, and invalid-goal handling. The standard
 `ctest` suite covers worker fixtures; the browser and Phase 2 integration tests

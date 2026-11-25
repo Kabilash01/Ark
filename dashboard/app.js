@@ -33,7 +33,7 @@ const eventNames = {
   conflict_detected: "Conflict detected", version_updated: "Version updated",
 };
 const statusLabels = {
-  idle: "Idle", running: "Running", offline: "Offline", unregistered: "Unregistered", unknown: "Unknown",
+  idle: "Idle", running: "Running", offline: "Needs setup", unregistered: "Unregistered", unknown: "Unknown",
   pending: "Queued", done: "Done", failed: "Failed", cancelled: "Cancelled",
 };
 
@@ -124,6 +124,7 @@ function agentCard([id, label, group]) {
   versionLabel.setAttribute("aria-label", agent?.version ? `Version ${agent.version}` : "Version unavailable");
   meta.append(versionLabel, badge(status));
   card.append(header, meta);
+  if (agent?.availability_reason) card.append(create("p", "agent-reason", agent.availability_reason));
   return card;
 }
 
