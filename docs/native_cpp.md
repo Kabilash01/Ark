@@ -1265,3 +1265,8 @@ client. The planner may only request supplied material IDs, up to 50, with
 bounded fields and result count; the existing dispatcher validates every field
 and the API endpoint remains locally configured. A live request requires
 `MP_API_KEY` and an available Materials Project service.
+
+Natural-language self-improvement requests route only to a Coding Agent prompt
+proposal. The planner schema fixes the target to `coding_agent`; existing
+dispatch validation enforces that restriction. Benchmark comparison and
+promotion still require the explicit ten-case A/B workflow.

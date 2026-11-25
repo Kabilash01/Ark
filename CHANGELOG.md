@@ -152,6 +152,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   validation enforced at DAG dispatch.
 - Routed natural-language Materials Project queries using explicitly supplied
   material IDs through the bounded saved-DAG client adapter.
+- Routed self-improvement goals to bounded Coding Agent prompt proposals;
+  evaluation and promotion remain gated by the existing A/B workflow.
 
 ## No standalone day-tagged commit
 

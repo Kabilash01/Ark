@@ -688,6 +688,20 @@ void planner_can_assign_typed_science_tasks() {
     const auto material_plan = planner.plan("summarize mp-149", {"materials_project_agent"}, Json::array(), true);
     check(material_plan.at("tasks").at(0).at("payload").at("material_ids") == Json::array({"mp-149"}),
           "Materials Project planner did not preserve explicit ID");
+    ark::Planner improvement_planner([](const ark::Request& request) {
+        const auto body = Json::parse(request.body);
+        const auto& schema = body.at("format").at("properties").at("tasks").at("items");
+        check(schema.at("properties").at("payload").at("properties").at("target_agent").at("enum")
+                  == Json::array({"coding_agent"}), "self-improvement planner exposed unsupported targets");
+        auto planned = task("proposal", Json::array(), "self_improvement_agent");
+        planned["intent"] = "PROPOSE_IMPROVEMENT";
+        planned["payload"] = {{"target_agent", "coding_agent"}};
+        return ark::Response{200, Json{{"message", {{"content", Json{{"tasks", {planned}}}.dump()}}}}.dump()};
+    }, "http://localhost:11434", "local-test");
+    const auto improvement = improvement_planner.plan("suggest a coding agent improvement", {"self_improvement_agent"},
+                                                       Json::array(), true);
+    check(improvement.at("tasks").at(0).at("payload").at("target_agent") == "coding_agent",
+          "self-improvement planner did not keep proposal target bounded");
 }
 
 void reconciles_output_conflicts_with_both_workers() {
