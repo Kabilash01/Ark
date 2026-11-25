@@ -80,14 +80,15 @@ constexpr std::string_view classifier =
     R"(Classify the ARK user goal. Return {"intent":"..."} using exactly one of
 RESEARCH (review or compare multiple sources), SEARCH (single fact lookup), CODE (write or fix code),
 EXECUTE (run existing code), EVALUATE (score an artifact), DISCOVER (describe ARK capabilities),
-BROWSE (use a specific website), SECURITY (defensive code audit), VISION (analyze an image),
+BROWSE (use a specific website), VISION (analyze an image),
 DESIGN_EXPERIMENT (design a bounded experiment for an explicit hypothesis),
 HYPOTHESIZE (generate hypotheses for a scientific domain),
 MATERIALS_QUERY (retrieve material summaries for explicit Materials Project IDs),
 PROPOSE_IMPROVEMENT (propose a coding-agent prompt change for stored failures),
 MEMORY (store a user-requested memory or search existing memories),
 SECURITY (check explicitly supplied pinned dependencies against supplied advisories),
-GITHUB (list open issues in an explicitly named GitHub owner/repository).)";
+GITHUB (list open issues in an explicitly named GitHub owner/repository),
+DOCUMENT (create DOCX, XLSX, or PDF from supplied content).)";
 
 constexpr std::string_view planner =
     R"(Build a directed acyclic task plan for the supplied goal. Use only the provided available_agents.
@@ -101,6 +102,7 @@ STORE or SEARCH for memory_agent with payload {"action":"store_episode","summary
 SECURITY for security_agent dependency checks with payload {"action":"check_dependencies","dependencies":{"package":"version"},"advisories":[{"package":"package","affected_versions":["version"],"id":"ADV-1"}]}; use only dependencies and advisories provided in the goal,
 DISCOVER for capability_discovery_agent with payload {"question":"..."}; registry evidence is loaded locally by the worker,
 GITHUB for github_agent with payload {"action":"get_open_issues","repository":"owner/repository","page":1}; use only a repository named in the user goal,
+DOCUMENT for document_agent with payload {"action":"write_docx","title":"...","paragraphs":["..."]}, {"action":"write_pdf","title":"...","paragraphs":["..."]}, or {"action":"write_xlsx","rows":[["..."]]}; use only content supplied in the goal,
 and EXECUTE for terminal_agent when it is listed as available. For terminal_agent, put the
 literal shell command to execute in the task instruction; it will run inside the restricted Docker sandbox.
 Use vision_agent only when the task includes an image. Include synthesis in a RESEARCH task.
@@ -146,20 +148,25 @@ Json plan_format(const std::vector<std::string>& agents) {
             allowed_intents.push_back("DISCOVER");
         } else if (agent == "github_agent") {
             allowed_intents.push_back("GITHUB");
+        } else if (agent == "document_agent") {
+            allowed_intents.push_back("DOCUMENT");
         }
     }
     Json payload_properties{{"hypothesis", text}, {"domain", text},
         {"material_ids", {{"type", "array"}, {"items", text}, {"minItems", 1}, {"maxItems", 50}}},
         {"fields", {{"type", "array"}, {"items", text}, {"maxItems", 30}}},
         {"target_agent", {{"type", "string"}, {"enum", {"coding_agent"}}}},
-        {"action", {{"type", "string"}, {"enum", {"store_episode", "search_episodes", "get_open_issues"}}}},
-        {"summary", text}, {"query", text}, {"question", text}, {"repository", text},
+        {"action", {{"type", "string"}, {"enum", {"store_episode", "search_episodes", "get_open_issues",
+            "write_docx", "write_pdf", "write_xlsx"}}}},
+        {"summary", text}, {"query", text}, {"question", text}, {"repository", text}, {"title", text},
         {"dependencies", {{"type", "object"}, {"additionalProperties", text}}},
         {"advisories", {{"type", "array"}, {"items", {{"type", "object"},
             {"additionalProperties", false}, {"properties", {{"package", text},
                 {"affected_versions", {{"type", "array"}, {"items", text}}}, {"id", text}}}}}}},
         {"limit", {{"type", "integer"}, {"minimum", 1}, {"maximum", 100}}}};
     payload_properties["page"] = {{"type", "integer"}, {"minimum", 1}, {"maximum", 10000}};
+    payload_properties["paragraphs"] = {{"type", "array"}, {"items", text}};
+    payload_properties["rows"] = {{"type", "array"}, {"items", {{"type", "array"}, {"items", text}}}};
     const Json payload_schema{{"type", "object"}, {"additionalProperties", false},
                               {"properties", std::move(payload_properties)}};
     const Json task{{"type", "object"}, {"additionalProperties", false},
@@ -871,7 +878,7 @@ std::string Planner::request(const AgentProfile& profile, std::string_view input
 std::string Planner::classify(std::string_view goal) const {
     static constexpr std::array allowed{
         "RESEARCH", "SEARCH", "CODE", "EXECUTE", "EVALUATE", "DISCOVER", "BROWSE", "SECURITY", "VISION",
-        "DESIGN_EXPERIMENT", "HYPOTHESIZE", "MATERIALS_QUERY", "PROPOSE_IMPROVEMENT", "MEMORY", "SECURITY", "GITHUB",
+        "DESIGN_EXPERIMENT", "HYPOTHESIZE", "MATERIALS_QUERY", "PROPOSE_IMPROVEMENT", "MEMORY", "SECURITY", "GITHUB", "DOCUMENT",
     };
     const auto output = Json::parse(request(supervisor_, goal, "json", goal));
     const auto intent = output.at("intent").get<std::string>();
@@ -905,6 +912,24 @@ Json Planner::plan(std::string_view goal, const std::vector<std::string>& agents
                 for (const auto& id : task.payload.at("material_ids")) {
                     if (goal.find(id.get_ref<const std::string&>()) == std::string_view::npos) {
                         throw std::runtime_error("Planner selected a material ID absent from the user goal");
+                    }
+                }
+            }
+            if (task.agent == "document_agent") {
+                const auto supplied = [&](const Json& value) {
+                    if (!value.is_string() || goal.find(value.get_ref<const std::string&>()) == std::string_view::npos) {
+                        throw std::runtime_error("Planner added document content absent from the user goal");
+                    }
+                };
+                if (task.payload.contains("paragraphs")) {
+                    if (!task.payload.at("paragraphs").is_array()) throw std::runtime_error("Document paragraphs must be an array");
+                    for (const auto& paragraph : task.payload.at("paragraphs")) supplied(paragraph);
+                }
+                if (task.payload.contains("rows")) {
+                    if (!task.payload.at("rows").is_array()) throw std::runtime_error("Document rows must be an array");
+                    for (const auto& row : task.payload.at("rows")) {
+                        if (!row.is_array()) throw std::runtime_error("Document rows must contain arrays");
+                        for (const auto& cell : row) supplied(cell);
                     }
                 }
             }

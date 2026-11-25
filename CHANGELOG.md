@@ -163,6 +163,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   loaded from the local registry, reflections, and benchmark history.
 - Routed read-only GitHub issue queries through the planner and rejected
   planner-selected repositories or Materials Project IDs absent from the goal.
+- Routed DOCX, XLSX, and PDF creation through natural-language planning with
+  supplied-content checks and confined output paths.
 
 ## No standalone day-tagged commit
 

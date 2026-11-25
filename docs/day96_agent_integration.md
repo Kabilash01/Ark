@@ -109,3 +109,9 @@ live Chromium, Docker, Redis, and SQLite. The other 38 CTest entries passed in
 the standard local run. The temporary Redis instance was stopped afterward.
 This evidence verifies the Phase 2 path; it does not include a live local model,
 Qdrant, Neo4j, Materials Project, or the Day 96 all-20-agent task.
+
+The planner now routes document creation requests to the confined DOCX, XLSX,
+or PDF writer. Every planned paragraph and spreadsheet cell must occur in the
+user's goal, and the existing dispatcher supplies the output path from its
+configured document directory. A live natural-language run still needs a
+working local planning model.

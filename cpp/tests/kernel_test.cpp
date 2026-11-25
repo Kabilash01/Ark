@@ -777,6 +777,25 @@ void planner_rejects_invented_external_identifiers() {
     check(rejected, "planner accepted a material ID absent from the user goal");
 }
 
+void planner_rejects_invented_document_content() {
+    std::string paragraph = "Measured conductivity increased.";
+    ark::Planner planner([&](const ark::Request&) {
+        auto document = task("document", Json::array(), "document_agent");
+        document["intent"] = "DOCUMENT";
+        document["payload"] = {{"action", "write_pdf"}, {"title", "Study"},
+            {"paragraphs", Json::array({paragraph})}};
+        return ark::Response{200, Json{{"message", {{"content", Json{{"tasks", {document}}}.dump()}}}}.dump()};
+    }, "http://localhost:11434", "local-test");
+    const auto goal = "Create a PDF with: Measured conductivity increased.";
+    check(planner.plan(goal, {"document_agent"}, Json::array(), true).at("tasks").size() == 1,
+          "supplied document content was rejected");
+    paragraph = "Unsupported new result.";
+    bool rejected = false;
+    try { (void)planner.plan(goal, {"document_agent"}, Json::array(), true); }
+    catch (const std::runtime_error&) { rejected = true; }
+    check(rejected, "planner added document content absent from the goal");
+}
+
 void planner_can_assign_a_bounded_dependency_security_check() {
     ark::Planner planner([](const ark::Request& request) {
         const auto body = Json::parse(request.body);
@@ -874,6 +893,7 @@ int main() {
         planner_can_assign_an_isolated_evaluation();
         planner_can_assign_capability_question_without_inventing_evidence();
         planner_rejects_invented_external_identifiers();
+        planner_rejects_invented_document_content();
         planner_can_assign_a_bounded_dependency_security_check();
         reconciles_output_conflicts_with_both_workers();
         optional_cloud_failure_falls_back_to_local();
