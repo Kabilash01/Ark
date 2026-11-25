@@ -152,3 +152,10 @@ built from the installed `python:3.11-slim` image, executed a Python command,
 and returned `DONE` with `ark devops smoke` on stdout. The existing worker
 disables network access during build and run and cleans up its container/image.
 This is a container execution check, not a deployed REST API or all-agent run.
+
+`ark-cpp run 'Run file operation from JSON: {...}'` now routes list, read, and
+write actions to the File System Agent using only configured root aliases.
+A temporary workspace smoke run wrote and read `note.txt` successfully; the
+configured alias, workspace directory, and episodic database were temporary.
+The repository's default `config/file_system.json` still has no allowed roots,
+so normal use requires an explicit local workspace configuration.

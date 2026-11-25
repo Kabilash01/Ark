@@ -177,6 +177,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   a 20-row, two-trial experiment without model or MLflow services.
 - Added direct bounded Docker build/run from supplied JSON and verified the
   network-disabled DevOps worker against the local Docker daemon.
+- Added direct configured-alias file operations from supplied JSON and verified
+  a temporary-workspace write/read cycle.
 
 ## No standalone day-tagged commit
 
