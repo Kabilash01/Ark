@@ -1259,3 +1259,9 @@ and hypothesis generation uses a bounded `domain` string. The existing DAG
 dispatcher validates payload content and requires native-tool opt-in before
 execution. Planner fixture tests cover both routes. A live model-to-agent run
 still depends on local inference, semantic memory, and citation graph services.
+
+Natural-language `MATERIALS_QUERY` goals can also reach the Materials Project
+client. The planner may only request supplied material IDs, up to 50, with
+bounded fields and result count; the existing dispatcher validates every field
+and the API endpoint remains locally configured. A live request requires
+`MP_API_KEY` and an available Materials Project service.

@@ -673,6 +673,21 @@ void planner_can_assign_typed_science_tasks() {
         check(plan.at("tasks").at(0).at("payload").at(key) == value,
               "typed science payload was not returned by planner");
     }
+    ark::Planner planner([](const ark::Request& request) {
+        const auto body = Json::parse(request.body);
+        const auto& task_schema = body.at("format").at("properties").at("tasks").at("items");
+        check(task_schema.at("properties").at("agent").at("enum") == Json::array({"materials_project_agent"}),
+              "Materials Project plan did not constrain its worker");
+        check(task_schema.at("properties").at("payload").at("properties").contains("material_ids"),
+              "Materials Project ID payload missing from planner schema");
+        auto planned = task("materials", Json::array(), "materials_project_agent");
+        planned["intent"] = "MATERIALS_QUERY";
+        planned["payload"] = {{"material_ids", {"mp-149"}}, {"fields", {"formula_pretty"}}, {"limit", 1}};
+        return ark::Response{200, Json{{"message", {{"content", Json{{"tasks", {planned}}}.dump()}}}}.dump()};
+    }, "http://localhost:11434", "local-test");
+    const auto material_plan = planner.plan("summarize mp-149", {"materials_project_agent"}, Json::array(), true);
+    check(material_plan.at("tasks").at(0).at("payload").at("material_ids") == Json::array({"mp-149"}),
+          "Materials Project planner did not preserve explicit ID");
 }
 
 void reconciles_output_conflicts_with_both_workers() {

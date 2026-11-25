@@ -150,6 +150,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
 - Routed natural-language `DESIGN_EXPERIMENT` and `HYPOTHESIZE` goals to their
   typed specialists, with planner fixture coverage and existing bounded payload
   validation enforced at DAG dispatch.
+- Routed natural-language Materials Project queries using explicitly supplied
+  material IDs through the bounded saved-DAG client adapter.
 
 ## No standalone day-tagged commit
 
