@@ -165,6 +165,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   planner-selected repositories or Materials Project IDs absent from the goal.
 - Routed DOCX, XLSX, and PDF creation through natural-language planning with
   supplied-content checks and confined output paths.
+- Routed inline CSV analysis through natural-language planning with exact
+  source-data preservation and the saved-DAG size limit.
 
 ## No standalone day-tagged commit
 

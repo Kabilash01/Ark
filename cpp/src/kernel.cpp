@@ -88,7 +88,8 @@ PROPOSE_IMPROVEMENT (propose a coding-agent prompt change for stored failures),
 MEMORY (store a user-requested memory or search existing memories),
 SECURITY (check explicitly supplied pinned dependencies against supplied advisories),
 GITHUB (list open issues in an explicitly named GitHub owner/repository),
-DOCUMENT (create DOCX, XLSX, or PDF from supplied content).)";
+DOCUMENT (create DOCX, XLSX, or PDF from supplied content),
+ANALYZE_DATA (analyze an inline CSV supplied in the goal).)";
 
 constexpr std::string_view planner =
     R"(Build a directed acyclic task plan for the supplied goal. Use only the provided available_agents.
@@ -103,6 +104,7 @@ SECURITY for security_agent dependency checks with payload {"action":"check_depe
 DISCOVER for capability_discovery_agent with payload {"question":"..."}; registry evidence is loaded locally by the worker,
 GITHUB for github_agent with payload {"action":"get_open_issues","repository":"owner/repository","page":1}; use only a repository named in the user goal,
 DOCUMENT for document_agent with payload {"action":"write_docx","title":"...","paragraphs":["..."]}, {"action":"write_pdf","title":"...","paragraphs":["..."]}, or {"action":"write_xlsx","rows":[["..."]]}; use only content supplied in the goal,
+ANALYZE_DATA for data_analysis_agent with payload {"csv":"..."}; copy the CSV exactly from the user goal,
 and EXECUTE for terminal_agent when it is listed as available. For terminal_agent, put the
 literal shell command to execute in the task instruction; it will run inside the restricted Docker sandbox.
 Use vision_agent only when the task includes an image. Include synthesis in a RESEARCH task.
@@ -150,6 +152,8 @@ Json plan_format(const std::vector<std::string>& agents) {
             allowed_intents.push_back("GITHUB");
         } else if (agent == "document_agent") {
             allowed_intents.push_back("DOCUMENT");
+        } else if (agent == "data_analysis_agent") {
+            allowed_intents.push_back("ANALYZE_DATA");
         }
     }
     Json payload_properties{{"hypothesis", text}, {"domain", text},
@@ -158,7 +162,7 @@ Json plan_format(const std::vector<std::string>& agents) {
         {"target_agent", {{"type", "string"}, {"enum", {"coding_agent"}}}},
         {"action", {{"type", "string"}, {"enum", {"store_episode", "search_episodes", "get_open_issues",
             "write_docx", "write_pdf", "write_xlsx"}}}},
-        {"summary", text}, {"query", text}, {"question", text}, {"repository", text}, {"title", text},
+        {"summary", text}, {"query", text}, {"question", text}, {"repository", text}, {"title", text}, {"csv", text},
         {"dependencies", {{"type", "object"}, {"additionalProperties", text}}},
         {"advisories", {{"type", "array"}, {"items", {{"type", "object"},
             {"additionalProperties", false}, {"properties", {{"package", text},
@@ -878,7 +882,7 @@ std::string Planner::request(const AgentProfile& profile, std::string_view input
 std::string Planner::classify(std::string_view goal) const {
     static constexpr std::array allowed{
         "RESEARCH", "SEARCH", "CODE", "EXECUTE", "EVALUATE", "DISCOVER", "BROWSE", "SECURITY", "VISION",
-        "DESIGN_EXPERIMENT", "HYPOTHESIZE", "MATERIALS_QUERY", "PROPOSE_IMPROVEMENT", "MEMORY", "SECURITY", "GITHUB", "DOCUMENT",
+        "DESIGN_EXPERIMENT", "HYPOTHESIZE", "MATERIALS_QUERY", "PROPOSE_IMPROVEMENT", "MEMORY", "SECURITY", "GITHUB", "DOCUMENT", "ANALYZE_DATA",
     };
     const auto output = Json::parse(request(supervisor_, goal, "json", goal));
     const auto intent = output.at("intent").get<std::string>();
@@ -932,6 +936,10 @@ Json Planner::plan(std::string_view goal, const std::vector<std::string>& agents
                         for (const auto& cell : row) supplied(cell);
                     }
                 }
+            }
+            if (task.agent == "data_analysis_agent"
+                && goal.find(task.payload.at("csv").get_ref<const std::string&>()) == std::string_view::npos) {
+                throw std::runtime_error("Planner changed the supplied CSV data");
             }
         }
     }

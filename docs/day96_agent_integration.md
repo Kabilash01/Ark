@@ -115,3 +115,7 @@ or PDF writer. Every planned paragraph and spreadsheet cell must occur in the
 user's goal, and the existing dispatcher supplies the output path from its
 configured document directory. A live natural-language run still needs a
 working local planning model.
+
+Inline CSV analysis now has a natural-language route to the deterministic Data
+Analysis Agent. Planner output must contain the exact CSV bytes supplied in
+the goal, and saved-DAG validation retains its 60 KiB input limit.

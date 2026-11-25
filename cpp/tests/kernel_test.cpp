@@ -796,6 +796,24 @@ void planner_rejects_invented_document_content() {
     check(rejected, "planner added document content absent from the goal");
 }
 
+void planner_preserves_inline_csv_bytes() {
+    std::string csv = "sample,value\nA,1\nB,2";
+    ark::Planner planner([&](const ark::Request&) {
+        auto analysis = task("analyze", Json::array(), "data_analysis_agent");
+        analysis["intent"] = "ANALYZE_DATA";
+        analysis["payload"] = {{"csv", csv}};
+        return ark::Response{200, Json{{"message", {{"content", Json{{"tasks", {analysis}}}.dump()}}}}.dump()};
+    }, "http://localhost:11434", "local-test");
+    const auto goal = "Analyze this CSV: sample,value\nA,1\nB,2";
+    check(planner.plan(goal, {"data_analysis_agent"}, Json::array(), true)
+              .at("tasks").at(0).at("payload").at("csv") == csv, "supplied CSV was rejected");
+    csv = "sample,value\nA,1\nB,999";
+    bool rejected = false;
+    try { (void)planner.plan(goal, {"data_analysis_agent"}, Json::array(), true); }
+    catch (const std::runtime_error&) { rejected = true; }
+    check(rejected, "planner altered a supplied CSV value");
+}
+
 void planner_can_assign_a_bounded_dependency_security_check() {
     ark::Planner planner([](const ark::Request& request) {
         const auto body = Json::parse(request.body);
@@ -894,6 +912,7 @@ int main() {
         planner_can_assign_capability_question_without_inventing_evidence();
         planner_rejects_invented_external_identifiers();
         planner_rejects_invented_document_content();
+        planner_preserves_inline_csv_bytes();
         planner_can_assign_a_bounded_dependency_security_check();
         reconciles_output_conflicts_with_both_workers();
         optional_cloud_failure_falls_back_to_local();
