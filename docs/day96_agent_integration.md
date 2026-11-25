@@ -145,3 +145,10 @@ supplied dataset and search ranges to the bounded native ML Engineer route.
 A 20-row, two-trial local run returned `DONE` with validation RMSE. Saved-DAG
 limits remain 10–1000 rows, 1–16 feature dimensions, at most 20 trials, and
 the total compute cap. This route does not log to MLflow or train other models.
+
+`ark-cpp run 'Run container from JSON: {...}'` now routes a supplied Dockerfile
+context and command through the bounded DevOps worker. A live local Docker run
+built from the installed `python:3.11-slim` image, executed a Python command,
+and returned `DONE` with `ark devops smoke` on stdout. The existing worker
+disables network access during build and run and cleans up its container/image.
+This is a container execution check, not a deployed REST API or all-agent run.

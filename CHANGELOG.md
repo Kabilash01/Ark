@@ -175,6 +175,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   LaTeX output without model or citation-graph services.
 - Added direct bounded linear-regression runs from supplied JSON and verified
   a 20-row, two-trial experiment without model or MLflow services.
+- Added direct bounded Docker build/run from supplied JSON and verified the
+  network-disabled DevOps worker against the local Docker daemon.
 
 ## No standalone day-tagged commit
 

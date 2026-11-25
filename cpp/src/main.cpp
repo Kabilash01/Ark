@@ -953,19 +953,30 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
     constexpr std::string_view csv_prefix = "analyze this csv:";
     constexpr std::string_view report_prefix = "generate report from json:";
     constexpr std::string_view ml_prefix = "optimize linear regression from json:";
+    constexpr std::string_view devops_prefix = "run container from json:";
     const bool direct_csv = lower_goal.starts_with(csv_prefix);
     const bool direct_report = lower_goal.starts_with(report_prefix);
     const bool direct_ml = lower_goal.starts_with(ml_prefix);
+    const bool direct_devops = lower_goal.starts_with(devops_prefix);
     const auto native_tool_intent = [](std::string_view value) {
         return value == "EXECUTE" || value == "DESIGN_EXPERIMENT" || value == "HYPOTHESIZE"
             || value == "MATERIALS_QUERY" || value == "PROPOSE_IMPROVEMENT" || value == "SECURITY"
             || value == "DISCOVER" || value == "GITHUB" || value == "DOCUMENT" || value == "ANALYZE_DATA"
-            || value == "GENERATE_REPORT" || value == "ML_OPTIMIZE";
+            || value == "GENERATE_REPORT" || value == "ML_OPTIMIZE" || value == "DEVOPS";
     };
     std::string intent = "SUPERVISE";
     ark::Json dag;
     for (int attempt = 1; ; ++attempt) {
         try {
+            if (direct_devops) {
+                const auto payload = ark::Json::parse(goal.substr(devops_prefix.size()));
+                intent = "DEVOPS";
+                dag["tasks"] = ark::Json::array({{{"task_id", "container-run"},
+                    {"agent", "devops_agent"}, {"intent", intent},
+                    {"instruction", "Build and run the supplied container"}, {"payload", payload},
+                    {"depends_on", ark::Json::array()}, {"parallel_with", ark::Json::array()}}});
+                break;
+            }
             if (direct_ml) {
                 const auto payload = ark::Json::parse(goal.substr(ml_prefix.size()));
                 intent = "ML_OPTIMIZE";
@@ -1067,7 +1078,7 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
             return result;
         }
     }
-    if (!direct_csv && !direct_report && !direct_ml) ensure_evaluation(dag);
+    if (!direct_csv && !direct_report && !direct_ml && !direct_devops) ensure_evaluation(dag);
     dag["goal"] = goal;
     dag["privacy"] = task_privacy.enabled;
     dag["airgap_mode"] = task_privacy.airgap;
