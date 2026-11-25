@@ -5,8 +5,9 @@ a live task. `ark-cpp dispatch` now routes typed tasks through adapters for
 memory, file system, document generation, security, CSV analysis, ML linear
 regression, scientific report generation, terminal execution, coding,
 evaluation, browser, vision, and web search. These routes are not all exposed
-to natural-language planning. GitHub, DevOps, Hypothesis Engine, Experiment
-Designer, and end-to-end Capability Discovery are not yet unified workers.
+to natural-language planning. DevOps, Hypothesis Engine, and Experiment
+Designer remain outside saved-DAG dispatch; GitHub is limited to read-only issue
+listing, and Capability Discovery requires explicit evidence inputs.
 Ollama, Redis, Qdrant, and Neo4j are unreachable on loopback here, so the full
 model and service-backed integration has not been demonstrated.
 
@@ -52,6 +53,9 @@ workspace aliases, with relative-path validation and a 48 KiB saved-DAG write
 limit.
 Capability Discovery now accepts inline registry, reflection, and benchmark
 evidence and answers a bounded `DISCOVER` question without writing a file.
+GitHub saved-DAG support is limited to read-only open-issue listing for a
+validated repository; PR creation, commits, pushes, and cloning remain outside
+this route.
 These are explicit saved-plan integrations; the normal natural-language
 planner does not invent source files, document content, or automatically
 schedule these specialist tasks. The live model-to-tool flows remain unverified

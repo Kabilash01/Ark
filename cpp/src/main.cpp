@@ -566,6 +566,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
                     && task.agent != "ml_engineer_agent"
                     && task.agent != "file_system_agent"
                     && task.agent != "capability_discovery_agent"
+                    && task.agent != "github_agent"
                     && !resolved.contains(task.agent)) {
                     const auto model = task.agent == "vision_agent" ? configured_model("ARK_VISION_MODEL", "vision") : settings.model;
                     resolved.emplace(task.agent, actor_profile(task.agent, model, redis.get()));
@@ -595,6 +596,9 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     if (std::any_of(dag.at("tasks").begin(), dag.at("tasks").end(), [](const auto& task) {
             return task.value("agent", "") == "capability_discovery_agent";
         })) versions["capability_discovery_agent"] = "1.0.0";
+    if (std::any_of(dag.at("tasks").begin(), dag.at("tasks").end(), [](const auto& task) {
+            return task.value("agent", "") == "github_agent";
+        })) versions["github_agent"] = "1.0.0";
     if (events) {
         auto plan = ark::Json::array();
         for (const auto& task : dag.at("tasks")) {
@@ -736,6 +740,10 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
             result = {{"task_id", message.at("task_id")}, {"status", "DONE"}, {"intent", task.intent},
                 {"agent_version", "capability_discovery_agent@1.0.0"}, {"quality_score", -1.0},
                 {"output", {{"summary", answer.at("reason")}, {"answer", answer}, {"capability_map", capability_map}}}};
+        } else if (task.agent == "github_agent") {
+            result = ark::GitHubAgent(transport, env("GH_TOKEN", env("GITHUB_TOKEN")))
+                .run(ark::make_message("router", "github_agent", task.intent, task.payload, parent_id));
+            result["agent_version"] = "github_agent@1.0.0";
         } else {
             result = research_pool.run([&](std::string_view instance) {
                 auto assigned = source;
@@ -782,7 +790,8 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     }, [&](std::string_view name) {
         if (name == "memory_agent" || name == "data_analysis_agent"
             || name == "scientific_report_generator" || name == "ml_engineer_agent"
-            || name == "file_system_agent" || name == "capability_discovery_agent") return true;
+            || name == "file_system_agent" || name == "capability_discovery_agent"
+            || name == "github_agent") return true;
         if (!profiles.contains(name)) {
             return false;
         }

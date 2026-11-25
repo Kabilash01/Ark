@@ -135,6 +135,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   roots remain aliases from local configuration and write payloads are capped.
 - Routed Capability Discovery through saved DAGs using bounded inline registry,
   reflection, and benchmark evidence without filesystem or network writes.
+- Added read-only GitHub open-issue listing to saved DAGs; PR, push, clone, and
+  commit actions remain excluded from that route.
 
 ## No standalone day-tagged commit
 

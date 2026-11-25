@@ -5,6 +5,7 @@
 #include <array>
 #include <future>
 #include <map>
+#include <regex>
 #include <set>
 #include <stdexcept>
 #include <thread>
@@ -13,14 +14,14 @@
 namespace ark {
 namespace {
 
-constexpr std::array<std::string_view, 18> intents{
+constexpr std::array<std::string_view, 19> intents{
     "RESEARCH", "CODE", "SEARCH", "EXECUTE", "STORE", "EVALUATE", "REFLECT",
-    "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION", "DOCUMENT", "ANALYZE_DATA", "GENERATE_REPORT", "ML_OPTIMIZE", "FILES",
+    "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION", "DOCUMENT", "ANALYZE_DATA", "GENERATE_REPORT", "ML_OPTIMIZE", "FILES", "GITHUB",
 };
-constexpr std::array<std::string_view, 15> workers{
+constexpr std::array<std::string_view, 16> workers{
     "research_agent", "coding_agent", "evaluation_agent", "memory_agent", "web_search_agent",
     "browser_agent", "document_agent", "terminal_agent", "security_agent", "vision_agent", "data_analysis_agent",
-    "scientific_report_generator", "ml_engineer_agent", "file_system_agent", "capability_discovery_agent",
+    "scientific_report_generator", "ml_engineer_agent", "file_system_agent", "capability_discovery_agent", "github_agent",
 };
 
 bool contains(const auto& values, std::string_view value) {
@@ -155,7 +156,8 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
         const bool tool_worker = task.agent == "document_agent" || task.agent == "terminal_agent"
             || task.agent == "security_agent" || task.agent == "data_analysis_agent"
             || task.agent == "scientific_report_generator" || task.agent == "ml_engineer_agent"
-            || task.agent == "file_system_agent" || task.agent == "capability_discovery_agent";
+            || task.agent == "file_system_agent" || task.agent == "capability_discovery_agent"
+            || task.agent == "github_agent";
         if ((!contains(workers, task.agent) || (tool_worker && !include_native_tools)) || !contains(intents, task.intent)) {
             throw std::invalid_argument("Unknown worker or intent for task " + task.id + ": "
                                         + task.agent + " / " + task.intent);
@@ -295,6 +297,30 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
             }
             if (task.payload.contains("benchmark_histories") && !task.payload.at("benchmark_histories").is_object()) {
                 throw std::invalid_argument("Capability benchmark evidence must be an object");
+            }
+        }
+        if (task.agent == "github_agent") {
+            if (task.intent != "GITHUB") {
+                throw std::invalid_argument("github_agent requires GITHUB intent for task " + task.id);
+            }
+            static const std::set<std::string, std::less<>> allowed{"action", "page", "repository"};
+            for (auto it = task.payload.begin(); it != task.payload.end(); ++it) {
+                if (!allowed.contains(it.key())) {
+                    throw std::invalid_argument("Unsupported saved-DAG GitHub payload field: " + it.key());
+                }
+            }
+            if (task.payload.value("action", "") != "get_open_issues" || !task.payload.contains("repository")
+                || !task.payload.at("repository").is_string() || task.payload.at("repository").get<std::string>().size() > 150) {
+                throw std::invalid_argument("Saved-DAG GitHub tasks support open-issue listing for an owner/repository only");
+            }
+            static const std::regex repository_pattern(R"([A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9_.-]+)");
+            const auto repository = task.payload.at("repository").get<std::string>();
+            if (!std::regex_match(repository, repository_pattern) || repository.ends_with("/.") || repository.ends_with("/..")) {
+                throw std::invalid_argument("GitHub repository must be a valid owner/name");
+            }
+            if (task.payload.contains("page") && (!task.payload.at("page").is_number_integer()
+                || task.payload.at("page").get<int>() < 1 || task.payload.at("page").get<int>() > 10000)) {
+                throw std::invalid_argument("GitHub page must be an integer from 1 to 10000");
             }
         }
         if (task.agent == "memory_agent") {

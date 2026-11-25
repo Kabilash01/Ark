@@ -104,6 +104,10 @@ rejects symlink traversal; no planner-supplied root directory is accepted.
 `capability_discovery_agent` accepts a `DISCOVER` question with optional inline
 registry, reflection, and ARKBench evidence. It returns an evidence-based answer
 and capability map without writing files or querying external services.
+`github_agent` saved-DAG support is limited to listing open issues for a
+validated `owner/repository` with bounded pagination. It uses `GH_TOKEN` or
+`GITHUB_TOKEN` when configured; write actions such as PR creation, local commits,
+pushes, and cloning remain unavailable through saved DAGs.
 
 Set `ARK_REDIS_PORT` and `ARK_EPISODIC_DB` to persist native run metadata to
 Redis and SQLite. Run `ark-cpp audit` and `ark-cpp episodes` with the same

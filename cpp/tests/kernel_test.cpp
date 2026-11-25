@@ -350,6 +350,31 @@ void capability_discovery_tasks_use_only_typed_evidence() {
     check(rejected, "capability discovery accepted an unrelated intent");
 }
 
+void github_saved_dag_tasks_are_read_only() {
+    auto github = task("issues", Json::array(), "github_agent");
+    github["intent"] = "GITHUB";
+    github["payload"] = {{"action", "get_open_issues"}, {"repository", "example/project"}, {"page", 2}};
+    const Json plan{{"tasks", {github}}};
+    bool rejected = false;
+    try { (void)ark::order_tasks(plan); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    check(rejected, "GitHub task was accepted without native-tool opt-in");
+    check(ark::order_tasks(plan, true).at(0).at(0).payload == github.at("payload"),
+          "GitHub issue request was not preserved");
+    github["payload"]["action"] = "create_pull_request";
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {github}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("open-issue listing") != std::string_view::npos;
+    }
+    check(rejected, "saved-DAG GitHub task accepted a write action");
+    github["payload"] = {{"action", "get_open_issues"}, {"repository", "../private"}};
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {github}}}, true); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    check(rejected, "saved-DAG GitHub task accepted an invalid repository path");
+}
+
 void route_in_parallel() {
     std::mutex mutex;
     std::condition_variable partners;
@@ -560,6 +585,7 @@ int main() {
         ml_tasks_require_bounded_inline_linear_regression_data();
         file_system_tasks_are_limited_to_configured_workspace_operations();
         capability_discovery_tasks_use_only_typed_evidence();
+        github_saved_dag_tasks_are_read_only();
         route_in_parallel();
         skip_blocked_tasks();
         retries_without_replaying_successful_tasks();
