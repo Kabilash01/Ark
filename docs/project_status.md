@@ -138,6 +138,6 @@ kernel tests validate that route and its opt-in boundary. Saved DAG dispatch
 also supports typed `security_agent` inputs; local task checks reject host
 report paths, and ARKBench fixture routing remains covered. Saved DAG dispatch
 now also supports confined DOCX, XLSX, and PDF document writes with no
-planner-controlled output path. A live model-to-Docker or document-tool run is
-not implied by kernel and fixture coverage, and the all-20-agent integration
-criterion stays open.
+planner-controlled output path. The saved-DAG memory worker now provides typed
+episodic writes and searches against SQLite. Live model-to-Docker remains
+unverified, and the all-20-agent integration criterion stays open.

@@ -80,7 +80,11 @@ dispatch also supports `document_agent` write actions (`write_docx`,
 `write_xlsx`, and `write_pdf`). These tasks accept bounded content fields, never
 a path; output names are derived from the task ID and written under
 `ARK_DOCUMENT_OUTPUT_DIR` (default `data/documents`). Reads remain available
-through the direct `ark-cpp document` command.
+through the direct `ark-cpp document` command. `memory_agent` saved-DAG tasks
+support `STORE` with a `store_episode` summary/metadata payload and `SEARCH`
+with a `search_episodes` query and limit. Both use the SQLite episode database
+selected by `ARK_EPISODIC_DB` (default `data/episodic_memory.db`); task payloads
+cannot select a database path or invoke arbitrary memory operations.
 
 Set `ARK_REDIS_PORT` and `ARK_EPISODIC_DB` to persist native run metadata to
 Redis and SQLite. Run `ark-cpp audit` and `ark-cpp episodes` with the same

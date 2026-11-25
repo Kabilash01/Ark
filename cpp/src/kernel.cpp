@@ -160,6 +160,42 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
         if (task.agent == "terminal_agent" && task.intent != "EXECUTE") {
             throw std::invalid_argument("terminal_agent requires EXECUTE intent for task " + task.id);
         }
+        if (task.agent == "memory_agent") {
+            if (!task.payload.contains("action") || !task.payload.at("action").is_string()) {
+                throw std::invalid_argument("memory_agent requires a typed action");
+            }
+            const auto action = task.payload.value("action", std::string{});
+            if (action == "store_episode") {
+                if (task.intent != "STORE") throw std::invalid_argument("memory_agent store_episode requires STORE intent");
+                static const std::set<std::string, std::less<>> allowed{"action", "metadata", "summary"};
+                for (auto it = task.payload.begin(); it != task.payload.end(); ++it) {
+                    if (!allowed.contains(it.key())) throw std::invalid_argument("Unsupported memory task payload field: " + it.key());
+                }
+                if (!task.payload.contains("summary") || !task.payload.at("summary").is_string()
+                    || task.payload.at("summary").get<std::string>().empty()) {
+                    throw std::invalid_argument("Memory store_episode requires a non-empty summary");
+                }
+                if (task.payload.contains("metadata") && !task.payload.at("metadata").is_object()) {
+                    throw std::invalid_argument("Memory metadata must be an object");
+                }
+            } else if (action == "search_episodes") {
+                if (task.intent != "SEARCH") throw std::invalid_argument("memory_agent search_episodes requires SEARCH intent");
+                static const std::set<std::string, std::less<>> allowed{"action", "limit", "query"};
+                for (auto it = task.payload.begin(); it != task.payload.end(); ++it) {
+                    if (!allowed.contains(it.key())) throw std::invalid_argument("Unsupported memory task payload field: " + it.key());
+                }
+                if (!task.payload.contains("query") || !task.payload.at("query").is_string()
+                    || task.payload.at("query").get<std::string>().empty()) {
+                    throw std::invalid_argument("Memory search_episodes requires a non-empty query");
+                }
+                if (task.payload.contains("limit") && (!task.payload.at("limit").is_number_integer()
+                    || task.payload.at("limit").get<int>() < 1 || task.payload.at("limit").get<int>() > 50)) {
+                    throw std::invalid_argument("Memory search limit must be from 1 to 50");
+                }
+            } else {
+                throw std::invalid_argument("memory_agent action must be store_episode or search_episodes");
+            }
+        }
         if (task.agent == "document_agent") {
             if (task.intent != "DOCUMENT") {
                 throw std::invalid_argument("document_agent requires DOCUMENT intent for task " + task.id);

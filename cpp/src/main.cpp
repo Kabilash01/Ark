@@ -572,6 +572,9 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     for (const auto& [name, profile] : profiles) {
         versions[name] = profile.version;
     }
+    if (std::any_of(dag.at("tasks").begin(), dag.at("tasks").end(), [](const auto& task) {
+            return task.value("agent", "") == "memory_agent";
+        })) versions["memory_agent"] = "1.0.0";
     if (events) {
         auto plan = ark::Json::array();
         for (const auto& task : dag.at("tasks")) {
@@ -668,6 +671,23 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
             message["payload"]["path"] = target.string();
             result = ark::DocumentAgent().run(std::move(message));
             result["agent_version"] = "document_agent@" + profiles.at(task.agent).version;
+        } else if (task.agent == "memory_agent") {
+            const auto action = task.payload.at("action").get<std::string>();
+            const std::filesystem::path path = env("ARK_EPISODIC_DB", "data/episodic_memory.db");
+            ark::EpisodicMemory store(path);
+            ark::Json output;
+            if (action == "store_episode") {
+                const auto record_id = store.log({{"task_id", task.id}, {"agent_name", "memory_agent"},
+                    {"agent_version", "memory_agent@1.0.0"}, {"intent", "STORE"},
+                    {"summary", task.payload.at("summary")}, {"metadata", task.payload.value("metadata", ark::Json::object())}});
+                output = {{"summary", "Stored episodic memory record"}, {"record_id", record_id}};
+            } else {
+                auto records = store.search(task.payload.at("query").get<std::string>(), task.payload.value("limit", 10));
+                output = {{"summary", "Found " + std::to_string(records.size()) + " episodic memory records"},
+                          {"records", std::move(records)}};
+            }
+            result = { {"task_id", message.at("task_id")}, {"status", "DONE"}, {"intent", task.intent},
+                {"agent_version", "memory_agent@1.0.0"}, {"quality_score", -1.0}, {"output", std::move(output)} };
         } else {
             result = research_pool.run([&](std::string_view instance) {
                 auto assigned = source;
@@ -712,6 +732,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         emit(events, "agent_done", activity);
         return result;
     }, [&](std::string_view name) {
+        if (name == "memory_agent") return true;
         if (!profiles.contains(name)) {
             return false;
         }

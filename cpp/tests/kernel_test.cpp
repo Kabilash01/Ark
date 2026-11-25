@@ -153,6 +153,41 @@ void document_tasks_allow_only_confined_write_requests() {
     check(rejected, "document task accepted an unrelated intent");
 }
 
+void memory_tasks_require_typed_episode_operations() {
+    auto memory = task("remember", Json::array(), "memory_agent");
+    memory["intent"] = "STORE";
+    memory["payload"] = {{"action", "store_episode"}, {"summary", "The fixture succeeded."},
+                         {"metadata", {{"source", "test"}}}};
+    const auto layers = ark::order_tasks({{"tasks", {memory}}});
+    check(layers.at(0).at(0).payload == memory.at("payload"), "memory payload was not preserved");
+    memory["payload"]["path"] = "/tmp/escape.db";
+    bool rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {memory}}}); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("Unsupported memory task payload field") != std::string_view::npos;
+    }
+    check(rejected, "memory task accepted an arbitrary database path");
+    memory["payload"].erase("path");
+    memory["intent"] = "SEARCH";
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {memory}}}); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("requires STORE") != std::string_view::npos;
+    }
+    check(rejected, "memory store action accepted SEARCH intent");
+    memory["intent"] = "SEARCH";
+    memory["payload"] = {{"action", "search_episodes"}, {"query", "fixture"}, {"limit", 5}};
+    check(ark::order_tasks({{"tasks", {memory}}}).at(0).at(0).intent == "SEARCH",
+          "valid memory search was rejected");
+    memory["payload"]["limit"] = 51;
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {memory}}}); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("limit must be") != std::string_view::npos;
+    }
+    check(rejected, "memory search accepted an unbounded limit");
+}
+
 void route_in_parallel() {
     std::mutex mutex;
     std::condition_variable partners;
@@ -176,10 +211,11 @@ void route_in_parallel() {
 }
 
 void skip_blocked_tasks() {
-    const Json plan{{"tasks", {
-        task("offline", Json::array(), "memory_agent"),
-        task("blocked", {"offline"}), task("fails"), task("needs_failure", {"fails"}), task("independent"),
-    }}};
+    auto offline = task("offline", Json::array(), "memory_agent");
+    offline["intent"] = "STORE";
+    offline["payload"] = {{"action", "store_episode"}, {"summary", "offline fixture"}};
+    const Json plan{{"tasks", {offline, task("blocked", {"offline"}), task("fails"),
+        task("needs_failure", {"fails"}), task("independent")}}};
     const auto result = ark::dispatch_plan(plan, [](const ark::Task& task, const Json&) {
         if (task.id == "fails") {
             throw std::runtime_error("worker error");
@@ -260,9 +296,12 @@ void model_plans_are_validated() {
             check(body.at("format").at("properties").at("tasks").at("items").at("properties").at("agent").at("enum")
                       == Json::array({"research_agent"}), "planner must constrain models to available agents");
         }
-        const Json response = input == "goal"
-            ? Json{{"intent", "RESEARCH"}}
-            : Json{{"tasks", {task("t1", Json::array(), available ? "research_agent" : "memory_agent")}}};
+        auto planned = task("t1", Json::array(), available ? "research_agent" : "memory_agent");
+        if (!available) {
+            planned["intent"] = "STORE";
+            planned["payload"] = {{"action", "store_episode"}, {"summary", "fixture"}};
+        }
+        const Json response = input == "goal" ? Json{{"intent", "RESEARCH"}} : Json{{"tasks", {planned}}};
         return ark::Response{200, Json{{"message", {{"content", response.dump()}}}}.dump()};
     }, "http://localhost:11434/", "local-test");
     check(planner.classify("goal") == "RESEARCH", "incorrect intent");
@@ -353,6 +392,7 @@ int main() {
         native_terminal_tasks_require_explicit_opt_in();
         security_tasks_preserve_only_bounded_source_inputs();
         document_tasks_allow_only_confined_write_requests();
+        memory_tasks_require_typed_episode_operations();
         route_in_parallel();
         skip_blocked_tasks();
         retries_without_replaying_successful_tasks();

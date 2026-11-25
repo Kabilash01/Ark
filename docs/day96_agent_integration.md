@@ -46,6 +46,9 @@ advisories, and rejects host report paths. The source scanner still requires
 Docker. Typed `document_agent` saved-DAG tasks now support DOCX, XLSX, and PDF
 writes with payload-derived content and filenames confined to
 `ARK_DOCUMENT_OUTPUT_DIR`; read actions and caller-selected paths are rejected.
+The previously planner-visible `memory_agent` now has explicit episodic
+`STORE` and `SEARCH` adapters using the configured SQLite database, with
+bounded action schemas and no task-selected database path.
 These are explicit saved-plan integrations; the normal natural-language
 planner does not invent source files, document content, or automatically
 schedule these specialist tasks. The live model-to-tool flows remain unverified

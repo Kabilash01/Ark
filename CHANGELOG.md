@@ -123,6 +123,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
 - Added typed saved-DAG document writes for DOCX, XLSX, and PDF. Output paths
   are derived from task IDs beneath `ARK_DOCUMENT_OUTPUT_DIR`; reads and
   planner-supplied paths remain unavailable through this route.
+- Routed `memory_agent` `STORE` and `SEARCH` tasks through typed episodic
+  operations using SQLite, rejecting arbitrary paths and unsupported actions.
 
 ## No standalone day-tagged commit
 
