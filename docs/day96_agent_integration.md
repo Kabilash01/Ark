@@ -75,3 +75,15 @@ These are explicit saved-plan integrations; the normal natural-language
 planner does not invent source files, document content, or automatically
 schedule these specialist tasks. The live model-to-tool flows remain unverified
 when their local services are unavailable.
+
+## Natural-language route follow-up — 2026-11-25
+
+`ark-cpp run` now also exposes bounded routes for experiment design, hypothesis
+generation, Materials Project summaries, Coding Agent improvement proposals,
+episodic memory STORE/SEARCH, Evaluation Agent assessment, and Security Agent
+dependency checks. The Materials Project route requires user-supplied IDs;
+security checks use user-supplied pinned versions and local advisories. These
+routes do not establish the Day 96 single-task all-agent integration. Normal
+planning still does not expose every typed saved-DAG specialist, and local
+inference, database, vector, graph, Docker, and external API availability remain
+necessary for live end-to-end verification of their respective flows.
