@@ -136,7 +136,8 @@ The shared C++ planner now routes explicit `EXECUTE` goals through the
 supervised terminal worker in the restricted Docker sandbox. Planner and
 kernel tests validate that route and its opt-in boundary. Saved DAG dispatch
 also supports typed `security_agent` inputs; local task checks reject host
-report paths, and ARKBench fixture routing remains covered. The full suite
-reports 38 passed and 2 service-gated skips out of 40 tests. A live model-to-
-Docker run was not verified, and the all-20-agent integration criterion stays
-open.
+report paths, and ARKBench fixture routing remains covered. Saved DAG dispatch
+now also supports confined DOCX, XLSX, and PDF document writes with no
+planner-controlled output path. A live model-to-Docker or document-tool run is
+not implied by kernel and fixture coverage, and the all-20-agent integration
+criterion stays open.

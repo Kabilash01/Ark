@@ -13,9 +13,9 @@
 namespace ark {
 namespace {
 
-constexpr std::array<std::string_view, 13> intents{
+constexpr std::array<std::string_view, 14> intents{
     "RESEARCH", "CODE", "SEARCH", "EXECUTE", "STORE", "EVALUATE", "REFLECT",
-    "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION",
+    "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION", "DOCUMENT",
 };
 constexpr std::array<std::string_view, 10> workers{
     "research_agent", "coding_agent", "evaluation_agent", "memory_agent", "web_search_agent",
@@ -159,6 +159,26 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
         }
         if (task.agent == "terminal_agent" && task.intent != "EXECUTE") {
             throw std::invalid_argument("terminal_agent requires EXECUTE intent for task " + task.id);
+        }
+        if (task.agent == "document_agent") {
+            if (task.intent != "DOCUMENT") {
+                throw std::invalid_argument("document_agent requires DOCUMENT intent for task " + task.id);
+            }
+            if (task.id.size() > 80) throw std::invalid_argument("document task IDs must not exceed 80 bytes");
+            static const std::set<std::string, std::less<>> allowed_payload_keys{
+                "action", "paragraphs", "rows", "title"};
+            for (auto it = task.payload.begin(); it != task.payload.end(); ++it) {
+                if (!allowed_payload_keys.contains(it.key())) {
+                    throw std::invalid_argument("Unsupported document task payload field: " + it.key());
+                }
+            }
+            if (!task.payload.contains("action") || !task.payload.at("action").is_string()) {
+                throw std::invalid_argument("Document task requires a write action");
+            }
+            const auto action = task.payload.at("action").get<std::string>();
+            if (action != "write_docx" && action != "write_xlsx" && action != "write_pdf") {
+                throw std::invalid_argument("Supervised document tasks can only write DOCX, XLSX, or PDF files");
+            }
         }
         if (task.agent == "security_agent") {
             if (task.intent != "SECURITY") {

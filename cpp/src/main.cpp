@@ -340,6 +340,9 @@ ark::AgentProfile actor_profile(std::string_view name, const std::string& genera
     } else if (name == "security_agent") {
         defaults = {"1.0.0", "semgrep-bandit", {{"system", "Run defensive source and dependency checks on supplied files only."}}};
         capabilities = {"SECURITY"};
+    } else if (name == "document_agent") {
+        defaults = {"1.0.0", "native-document-io", {{"system", "Create the requested document from supplied content."}}};
+        capabilities = {"DOCUMENT"};
     } else {
         throw std::invalid_argument("Unknown versioned agent " + std::string(name));
     }
@@ -647,6 +650,24 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
             message["payload"] = task.payload;
             result = ark::SecurityAgent(docker_sandbox(std::ref(http))).run(std::move(message));
             result["agent_version"] = "security_agent@" + profiles.at(task.agent).version;
+        } else if (task.agent == "document_agent") {
+            message["payload"] = task.payload;
+            const auto action = task.payload.at("action").get<std::string>();
+            const auto extension = action == "write_docx" ? ".docx" : action == "write_xlsx" ? ".xlsx" : ".pdf";
+            std::string encoded_id;
+            constexpr char hex[] = "0123456789abcdef";
+            for (const unsigned char c : task.id) {
+                encoded_id.push_back(hex[c >> 4]);
+                encoded_id.push_back(hex[c & 0x0f]);
+            }
+            const std::filesystem::path requested_root = env("ARK_DOCUMENT_OUTPUT_DIR", "data/documents");
+            std::filesystem::create_directories(requested_root);
+            const auto output_root = std::filesystem::canonical(requested_root);
+            const auto target = output_root / ("ark-" + encoded_id + extension);
+            if (std::filesystem::is_symlink(target)) throw std::invalid_argument("Document output target must not be a symlink");
+            message["payload"]["path"] = target.string();
+            result = ark::DocumentAgent().run(std::move(message));
+            result["agent_version"] = "document_agent@" + profiles.at(task.agent).version;
         } else {
             result = research_pool.run([&](std::string_view instance) {
                 auto assigned = source;
@@ -1718,11 +1739,6 @@ int main(int argc, char** argv) {
         }
         if (command == "dispatch" && argc == 2) {
             const auto dag = ark::Json::parse(std::cin);
-            for (const auto& task : dag.at("tasks")) {
-                if (task.value("agent", "") == "document_agent") {
-                    throw std::invalid_argument("document_agent is not available in supervised dispatch yet; use ark-cpp document");
-                }
-            }
             return print_run(dispatch(dag, config(), "DISPATCH", {}, ark::Json::object(), false, {}, true));
         }
         if (command == "conflict-check" && argc == 2) {

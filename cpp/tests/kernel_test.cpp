@@ -116,6 +116,43 @@ void security_tasks_preserve_only_bounded_source_inputs() {
     check(rejected, "security worker accepted a non-security intent");
 }
 
+void document_tasks_allow_only_confined_write_requests() {
+    auto document = task("report", Json::array(), "document_agent");
+    document["intent"] = "DOCUMENT";
+    document["payload"] = {{"action", "write_docx"}, {"title", "Summary"},
+                            {"paragraphs", Json::array({"Results"})}};
+    const Json plan{{"tasks", {document}}};
+    bool rejected = false;
+    try { (void)ark::order_tasks(plan); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    check(rejected, "document task was accepted without native-tool opt-in");
+    const auto layers = ark::order_tasks(plan, true);
+    check(layers.at(0).at(0).payload == document.at("payload"), "document payload was not preserved");
+    document["payload"]["path"] = "/tmp/arbitrary.docx";
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {document}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("Unsupported document task payload field") != std::string_view::npos;
+    }
+    check(rejected, "document task accepted a planner-controlled host path");
+    document["payload"].erase("path");
+    document["payload"]["action"] = "read_docx";
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {document}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("only write") != std::string_view::npos;
+    }
+    check(rejected, "document task accepted a read action");
+    document["payload"]["action"] = "write_docx";
+    document["intent"] = "EXECUTE";
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {document}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("requires DOCUMENT") != std::string_view::npos;
+    }
+    check(rejected, "document task accepted an unrelated intent");
+}
+
 void route_in_parallel() {
     std::mutex mutex;
     std::condition_variable partners;
@@ -315,6 +352,7 @@ int main() {
         validate_graph();
         native_terminal_tasks_require_explicit_opt_in();
         security_tasks_preserve_only_bounded_source_inputs();
+        document_tasks_allow_only_confined_write_requests();
         route_in_parallel();
         skip_blocked_tasks();
         retries_without_replaying_successful_tasks();

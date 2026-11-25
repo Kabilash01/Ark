@@ -37,6 +37,15 @@ Json coordinated_case(const Json& task, const Transport& transport, std::string_
         if (kind == "security") {
             planned_stage["payload"] = stage.at("fixture");
             planned_stage["payload"]["action"] = "check_dependencies";
+        } else if (kind == "document") {
+            const auto& fixture = stage.at("fixture");
+            const auto format = fixture.at("format").get<std::string>();
+            if (format != "docx" && format != "xlsx" && format != "pdf") {
+                throw std::invalid_argument("Workflow document stages must write DOCX, XLSX, or PDF");
+            }
+            planned_stage["intent"] = "DOCUMENT";
+            planned_stage["payload"] = fixture.at("content");
+            planned_stage["payload"]["action"] = "write_" + format;
         }
         dag["tasks"].push_back(std::move(planned_stage));
     }

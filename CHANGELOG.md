@@ -120,6 +120,9 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   still unverified.
 - Added typed `security_agent` tasks to saved-DAG dispatch with a 64 KiB payload
   cap and host report-path rejection. Source scans still require Docker.
+- Added typed saved-DAG document writes for DOCX, XLSX, and PDF. Output paths
+  are derived from task IDs beneath `ARK_DOCUMENT_OUTPUT_DIR`; reads and
+  planner-supplied paths remain unavailable through this route.
 
 ## No standalone day-tagged commit
 

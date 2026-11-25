@@ -43,6 +43,10 @@ availability remains gated.
 Saved-DAG `ark-cpp dispatch` also routes typed `security_agent` requests. Its
 payload is capped at 64 KiB, uses inline source text or caller-supplied local
 advisories, and rejects host report paths. The source scanner still requires
-Docker. This is an explicit saved-plan integration; the normal natural-language
-planner does not invent source files or automatically schedule a security
-scan. Document generation remains a direct CLI workflow.
+Docker. Typed `document_agent` saved-DAG tasks now support DOCX, XLSX, and PDF
+writes with payload-derived content and filenames confined to
+`ARK_DOCUMENT_OUTPUT_DIR`; read actions and caller-selected paths are rejected.
+These are explicit saved-plan integrations; the normal natural-language
+planner does not invent source files, document content, or automatically
+schedule these specialist tasks. The live model-to-tool flows remain unverified
+when their local services are unavailable.

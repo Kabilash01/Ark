@@ -76,8 +76,11 @@ Security payloads are capped at
 host report paths are rejected. Source scans require the configured Docker
 scanner image. The pure `check_dependencies` action compares supplied pinned
 versions against supplied advisory records without network access. Saved-DAG
-dispatch still does not expose `document_agent`; use `ark-cpp document` for that
-workflow.
+dispatch also supports `document_agent` write actions (`write_docx`,
+`write_xlsx`, and `write_pdf`). These tasks accept bounded content fields, never
+a path; output names are derived from the task ID and written under
+`ARK_DOCUMENT_OUTPUT_DIR` (default `data/documents`). Reads remain available
+through the direct `ark-cpp document` command.
 
 Set `ARK_REDIS_PORT` and `ARK_EPISODIC_DB` to persist native run metadata to
 Redis and SQLite. Run `ark-cpp audit` and `ark-cpp episodes` with the same
