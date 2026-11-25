@@ -147,6 +147,9 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   ten-case A/B promotion gate remains separate.
 - Routed read-only Materials Project summary queries through saved DAGs with
   bounded IDs/fields and a locally configured endpoint.
+- Routed natural-language `DESIGN_EXPERIMENT` and `HYPOTHESIZE` goals to their
+  typed specialists, with planner fixture coverage and existing bounded payload
+  validation enforced at DAG dispatch.
 
 ## No standalone day-tagged commit
 

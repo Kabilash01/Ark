@@ -947,15 +947,19 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
                     {"parallel_with", ark::Json::array()}}});
                 break;
             }
-            if (intent != "RESEARCH" && intent != "SEARCH" && intent != "CODE" && intent != "EXECUTE") {
+            if (intent != "RESEARCH" && intent != "SEARCH" && intent != "CODE" && intent != "EXECUTE"
+                && intent != "DESIGN_EXPERIMENT" && intent != "HYPOTHESIZE") {
                 throw std::invalid_argument("No native worker available for intent " + intent);
             }
-            const bool include_native_tools = intent == "EXECUTE";
+            const bool include_native_tools = intent == "EXECUTE" || intent == "DESIGN_EXPERIMENT" || intent == "HYPOTHESIZE";
             const auto agents = intent == "EXECUTE" ? std::vector<std::string>{"terminal_agent"}
+                : intent == "DESIGN_EXPERIMENT" ? std::vector<std::string>{"experiment_designer"}
+                : intent == "HYPOTHESIZE" ? std::vector<std::string>{"hypothesis_engine"}
                 : intent == "CODE" && !explicit_research ? std::vector<std::string>{"coding_agent"}
                 : intent == "SEARCH" ? std::vector<std::string>{"research_agent"}
                 : std::vector<std::string>{"research_agent", "coding_agent"};
-            auto context = recall(settings, goal);
+            auto context = (intent == "DESIGN_EXPERIMENT" || intent == "HYPOTHESIZE")
+                ? ark::Json::array() : recall(settings, goal);
             versions["planner_agent"] = plan_profile.version;
             const auto instruction = std::string(goal) + std::string(followup);
             owner = "planner_agent";

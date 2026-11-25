@@ -1249,3 +1249,13 @@ cover the payload, destination, and headers; a live Notion workspace call has
 not been run. See the official [create page](https://developers.notion.com/reference/post-page)
 and [append block children](https://developers.notion.com/reference/patch-block-children)
 documentation for the API contract and current limits.
+
+## Natural-language planner routes for scientific tasks
+
+`ark-cpp run` now accepts `DESIGN_EXPERIMENT` and `HYPOTHESIZE` classifications
+and constrains each plan to the matching specialist. The planner schema includes
+the typed payload field; experiment design uses a bounded `hypothesis` string,
+and hypothesis generation uses a bounded `domain` string. The existing DAG
+dispatcher validates payload content and requires native-tool opt-in before
+execution. Planner fixture tests cover both routes. A live model-to-agent run
+still depends on local inference, semantic memory, and citation graph services.

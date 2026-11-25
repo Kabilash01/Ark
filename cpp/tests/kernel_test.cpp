@@ -654,6 +654,27 @@ void planner_can_assign_an_isolated_terminal_command() {
           "planner did not preserve the sandboxed command task");
 }
 
+void planner_can_assign_typed_science_tasks() {
+    for (const auto& [agent, intent, key, value] : std::vector<std::array<std::string, 4>>{
+             {"experiment_designer", "DESIGN_EXPERIMENT", "hypothesis", "Treatment increases conductivity"},
+             {"hypothesis_engine", "HYPOTHESIZE", "domain", "perovskite stability"}}) {
+        ark::Planner planner([&](const ark::Request& request) {
+            const auto body = Json::parse(request.body);
+            const auto& task_schema = body.at("format").at("properties").at("tasks").at("items");
+            check(task_schema.at("properties").at("agent").at("enum") == Json::array({agent}),
+                  "science planner schema did not constrain its worker");
+            check(task_schema.at("properties").contains("payload"), "science payload missing from schema");
+            auto planned = task("science", Json::array(), agent);
+            planned["intent"] = intent;
+            planned["payload"] = {{key, value}};
+            return ark::Response{200, Json{{"message", {{"content", Json{{"tasks", {planned}}}.dump()}}}}.dump()};
+        }, "http://localhost:11434", "local-test");
+        const auto plan = planner.plan("do science", {agent}, Json::array(), true);
+        check(plan.at("tasks").at(0).at("payload").at(key) == value,
+              "typed science payload was not returned by planner");
+    }
+}
+
 void reconciles_output_conflicts_with_both_workers() {
     auto code = task("code", {"research"}, "coding_agent");
     code["intent"] = "CODE";
@@ -728,6 +749,7 @@ int main() {
         escalates_exhaustion_and_permanent_errors();
         model_plans_are_validated();
         planner_can_assign_an_isolated_terminal_command();
+        planner_can_assign_typed_science_tasks();
         reconciles_output_conflicts_with_both_workers();
         optional_cloud_failure_falls_back_to_local();
     } catch (const std::exception& error) {

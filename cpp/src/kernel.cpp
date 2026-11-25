@@ -80,12 +80,16 @@ constexpr std::string_view classifier =
     R"(Classify the ARK user goal. Return {"intent":"..."} using exactly one of
 RESEARCH (review or compare multiple sources), SEARCH (single fact lookup), CODE (write or fix code),
 EXECUTE (run existing code), EVALUATE (score an artifact), DISCOVER (describe ARK capabilities),
-BROWSE (use a specific website), SECURITY (defensive code audit), VISION (analyze an image).)";
+BROWSE (use a specific website), SECURITY (defensive code audit), VISION (analyze an image),
+DESIGN_EXPERIMENT (design a bounded experiment for an explicit hypothesis),
+HYPOTHESIZE (generate hypotheses for a scientific domain).)";
 
 constexpr std::string_view planner =
     R"(Build a directed acyclic task plan for the supplied goal. Use only the provided available_agents.
 The only task intents are RESEARCH or SEARCH for research_agent, CODE for coding_agent,
 EVALUATE for evaluation_agent, STORE or SEARCH for memory_agent, VISION for vision_agent,
+DESIGN_EXPERIMENT for experiment_designer with payload {"hypothesis":"..."},
+HYPOTHESIZE for hypothesis_engine with payload {"domain":"..."},
 and EXECUTE for terminal_agent when it is listed as available. For terminal_agent, put the
 literal shell command to execute in the task instruction; it will run inside the restricted Docker sandbox.
 Use vision_agent only when the task includes an image. Include synthesis in a RESEARCH task.
@@ -116,13 +120,19 @@ Json plan_format(const std::vector<std::string>& agents) {
             allowed_intents.push_back("VISION");
         } else if (agent == "terminal_agent") {
             allowed_intents.push_back("EXECUTE");
+        } else if (agent == "experiment_designer") {
+            allowed_intents.push_back("DESIGN_EXPERIMENT");
+        } else if (agent == "hypothesis_engine") {
+            allowed_intents.push_back("HYPOTHESIZE");
         }
     }
     const Json task{{"type", "object"}, {"additionalProperties", false},
         {"properties", {{"task_id", text}, {"instruction", text},
                         {"agent", {{"type", "string"}, {"enum", agents}}},
                         {"intent", {{"type", "string"}, {"enum", allowed_intents}}},
-                        {"depends_on", ids}, {"parallel_with", ids}}},
+                        {"depends_on", ids}, {"parallel_with", ids},
+                        {"payload", {{"type", "object"}, {"additionalProperties", false},
+                                     {"properties", {{"hypothesis", text}, {"domain", text}}}}}}},
         {"required", {"task_id", "agent", "intent", "instruction", "depends_on", "parallel_with"}},
     };
     return {{"type", "object"}, {"additionalProperties", false}, {"required", {"tasks"}},
@@ -826,6 +836,7 @@ std::string Planner::request(const AgentProfile& profile, std::string_view input
 std::string Planner::classify(std::string_view goal) const {
     static constexpr std::array allowed{
         "RESEARCH", "SEARCH", "CODE", "EXECUTE", "EVALUATE", "DISCOVER", "BROWSE", "SECURITY", "VISION",
+        "DESIGN_EXPERIMENT", "HYPOTHESIZE",
     };
     const auto output = Json::parse(request(supervisor_, goal, "json", goal));
     const auto intent = output.at("intent").get<std::string>();
