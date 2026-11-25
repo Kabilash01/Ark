@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import subprocess
 import time
 import urllib.error
 import urllib.request
@@ -16,6 +17,8 @@ def get(base, path):
 def main():
     parser = argparse.ArgumentParser(description="Smoke test a running ARK product server")
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
+    parser.add_argument("--browser", action="store_true", help="also submit a task through the dashboard UI")
+    parser.add_argument("--ark-binary", default="build/ark-cpp")
     args = parser.parse_args()
     base = args.base_url.rstrip("/")
 
@@ -60,6 +63,34 @@ def main():
             raise RuntimeError(f"Invalid goal returned HTTP {error.code}, expected 422") from error
     else:
         raise RuntimeError("Invalid goal was accepted")
+
+    if args.browser:
+        _, _, body = get(base, "/tasks?limit=1")
+        previous = json.loads(body)[0]["task_id"]
+        ui_goal = "Analyze this CSV: sample,value\nUI,3\nUI2,5"
+        actions = {"timeout_ms": 15000, "actions": [
+            {"action": "navigate", "url": base + "/"},
+            {"action": "wait_for_element", "selector": "#open-task"},
+            {"action": "click", "selector": "#open-task"},
+            {"action": "fill_form", "fields": {"#goal": ui_goal}},
+            {"action": "click", "selector": "#submit-task"},
+        ]}
+        browser = subprocess.run([args.ark_binary, "browser"], input=json.dumps(actions),
+                                 capture_output=True, text=True, timeout=30, check=True)
+        json.loads(browser.stdout)
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            _, _, body = get(base, "/tasks?limit=1")
+            ui_task = json.loads(body)[0]
+            if ui_task["task_id"] != previous and ui_task["status"] in ("DONE", "FAILED"):
+                break
+            time.sleep(0.2)
+        else:
+            raise RuntimeError("Dashboard-submitted task did not finish")
+        output = ui_task.get("output", {}).get("results", {}).get("csv-analysis", {}).get("output", {})
+        if ui_task["status"] != "DONE" or output.get("numeric_columns", [{}])[0].get("mean") != 4:
+            raise RuntimeError("Dashboard-submitted CSV task returned an unexpected result")
+        print(f"PASS dashboard form submission (task {ui_task['task_id']})")
 
     print(f"PASS dashboard, task API, CSV result, task events, validation (task {task_id})")
 

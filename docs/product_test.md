@@ -38,6 +38,7 @@ checked from a terminal:
 
 ```bash
 python3 scripts/product_smoke.py
+python3 scripts/product_smoke.py --browser  # also clicks New task in Chromium
 ```
 
 This check covers the served dashboard assets, task submission, the native CSV
