@@ -17,6 +17,12 @@ ARK_MODEL=qwen2.5:7b ARK_CODE_MODEL=qwen2.5:7b \
   ARK_REDIS_PORT=6379 build/ark-cpp serve 8000
 ```
 
+For a lightweight check before the 7B model is installed, use
+`qwen2.5:0.5b` for all four model variables in the server command. The exact
+CSV goal below executes deterministically. The 0.5B model has misclassified
+ordinary free-text goals in a live check, so use the configured 7B model when
+assessing natural-language planning quality.
+
 Install the model first with `ollama pull qwen2.5:7b` if needed. Open
 <http://127.0.0.1:8000/>. Select **New task** and submit this exact goal:
 
