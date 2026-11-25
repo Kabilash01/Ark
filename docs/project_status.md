@@ -151,4 +151,6 @@ inline evidence in the same dispatcher. GitHub supports only read-only issue
 listing, Experiment Designer requires the local model, and DevOps requires a
 Docker daemon. Hypothesis Engine is routed through local inference, Qdrant, and
 Neo4j adapters but remains service-gated. Self-improvement is not yet routed
-through saved DAGs. Live full-stack verification is still open.
+through saved DAGs for Coding Agent proposal generation; benchmark gating and
+promotion remain available only through the explicit A/B command. Live
+full-stack verification is still open.

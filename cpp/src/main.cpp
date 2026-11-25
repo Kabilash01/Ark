@@ -570,6 +570,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
                     && task.agent != "experiment_designer"
                     && task.agent != "devops_agent"
                     && task.agent != "hypothesis_engine"
+                    && task.agent != "self_improvement_agent"
                     && !resolved.contains(task.agent)) {
                     const auto model = task.agent == "vision_agent" ? configured_model("ARK_VISION_MODEL", "vision") : settings.model;
                     resolved.emplace(task.agent, actor_profile(task.agent, model, redis.get()));
@@ -611,6 +612,9 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     if (std::any_of(dag.at("tasks").begin(), dag.at("tasks").end(), [](const auto& task) {
             return task.value("agent", "") == "hypothesis_engine";
         })) versions["hypothesis_engine"] = "1.0.0";
+    if (std::any_of(dag.at("tasks").begin(), dag.at("tasks").end(), [](const auto& task) {
+            return task.value("agent", "") == "self_improvement_agent";
+        })) versions["self_improvement_agent"] = "1.0.0";
     if (events) {
         auto plan = ark::Json::array();
         for (const auto& task : dag.at("tasks")) {
@@ -778,6 +782,21 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
             result = ark::HypothesisEngine(transport, settings.ollama_url, profile, papers, graph, encoder)
                 .run(ark::make_message("router", "hypothesis_engine", task.intent, task.payload, parent_id));
             result["agent_version"] = "hypothesis_engine@" + profile.version;
+        } else if (task.agent == "self_improvement_agent") {
+            const auto target = task.payload.at("target_agent").get<std::string>();
+            const auto redis = version_store();
+            const auto current = actor_profile(target, settings.model, redis.get());
+            const std::filesystem::path episode_path = env("ARK_EPISODIC_DB", "data/episodic_memory.db");
+            const auto failures = std::filesystem::exists(episode_path)
+                ? ark::EpisodicMemory(episode_path).pending_improvements(50) : ark::Json::array();
+            const auto llama = ark::configured_llama_url();
+            const auto provider = llama.empty() ? ark::InferenceProvider::ollama : ark::InferenceProvider::llama_cpp;
+            const auto model_url = llama.empty() ? settings.ollama_url : llama;
+            const auto proposal = ark::SelfImprovementAgent(transport, model_url, settings.model, provider)
+                .propose(target, current, failures);
+            result = {{"task_id", message.at("task_id")}, {"status", "DONE"}, {"intent", task.intent},
+                {"agent_version", "self_improvement_agent@1.0.0"}, {"quality_score", -1.0},
+                {"output", {{"summary", proposal.value("status", "NO_ACTION")}, {"proposal", proposal}}}};
         } else {
             result = research_pool.run([&](std::string_view instance) {
                 auto assigned = source;
@@ -826,6 +845,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
             || name == "scientific_report_generator" || name == "ml_engineer_agent"
             || name == "file_system_agent" || name == "capability_discovery_agent"
             || name == "github_agent" || name == "experiment_designer" || name == "hypothesis_engine") return true;
+        if (name == "self_improvement_agent") return true;
         if (name == "devops_agent") return true;
         if (!profiles.contains(name)) {
             return false;

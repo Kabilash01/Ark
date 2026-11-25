@@ -4,11 +4,12 @@ The guide's single-task flagship integration has not passed and was not run as
 a live task. `ark-cpp dispatch` now routes typed saved-DAG tasks through
 adapters for memory, file system, document generation, security, CSV analysis,
 ML linear regression, scientific report generation, terminal execution,
-DevOps, experiment design, GitHub issue listing, capability discovery, coding,
-evaluation, browser, vision, and web search. These routes are not all exposed
-to natural-language planning. Hypothesis Engine and self-improvement remain
-outside saved-DAG dispatch; GitHub is limited to read-only issue listing, and
-Capability Discovery requires explicit evidence inputs.
+DevOps, experiment design, GitHub issue listing, capability discovery,
+self-improvement proposals, coding, evaluation, browser, vision, and web search.
+These routes are not all exposed
+to natural-language planning. Hypothesis Engine is service-gated, and
+self-improvement DAG tasks stop at proposal generation; GitHub is limited to
+read-only issue listing, and Capability Discovery requires explicit evidence.
 Ollama, Redis, Qdrant, and Neo4j are unreachable on loopback here, so the full
 model and service-backed integration has not been demonstrated.
 
@@ -66,6 +67,9 @@ daemon remains a runtime requirement.
 Hypothesis Engine tasks now route a bounded domain to the configured local
 inference, semantic memory, and citation graph services. Those backends remain
 required for a live run.
+Self-improvement tasks can generate Coding Agent proposals from stored failure
+evidence; benchmark comparison and promotion remain in the separate ten-case
+A/B workflow.
 These are explicit saved-plan integrations; the normal natural-language
 planner does not invent source files, document content, or automatically
 schedule these specialist tasks. The live model-to-tool flows remain unverified

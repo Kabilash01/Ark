@@ -456,6 +456,26 @@ void hypothesis_tasks_require_a_bounded_domain_only() {
     check(rejected, "hypothesis task accepted an oversized domain");
 }
 
+void self_improvement_tasks_only_target_supported_versioned_agents() {
+    auto improvement = task("proposal", Json::array(), "self_improvement_agent");
+    improvement["intent"] = "PROPOSE_IMPROVEMENT";
+    improvement["payload"] = {{"target_agent", "coding_agent"}};
+    const Json plan{{"tasks", {improvement}}};
+    bool rejected = false;
+    try { (void)ark::order_tasks(plan); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    check(rejected, "self-improvement task was accepted without native-tool opt-in");
+    check(ark::order_tasks(plan, true).at(0).at(0).payload == improvement.at("payload"),
+          "valid self-improvement target was not preserved");
+    improvement["payload"] = {{"target_agent", "research_agent"}};
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {improvement}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("coding_agent proposals only") != std::string_view::npos;
+    }
+    check(rejected, "self-improvement accepted a target outside its benchmark gate");
+}
+
 void route_in_parallel() {
     std::mutex mutex;
     std::condition_variable partners;
@@ -670,6 +690,7 @@ int main() {
         experiment_design_tasks_require_one_bounded_hypothesis();
         devops_tasks_require_bounded_relative_build_contexts();
         hypothesis_tasks_require_a_bounded_domain_only();
+        self_improvement_tasks_only_target_supported_versioned_agents();
         route_in_parallel();
         skip_blocked_tasks();
         retries_without_replaying_successful_tasks();

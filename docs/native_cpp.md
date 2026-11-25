@@ -119,6 +119,10 @@ require relative text paths; a configured Docker socket is required at runtime.
 configured local inference model, semantic-paper store, and citation graph to
 generate ranked hypotheses. It requires Ollama, Qdrant, and Neo4j services/data
 for a live run; callers cannot override those service endpoints in task payloads.
+`self_improvement_agent` can propose a prompt update for the Coding Agent from
+stored reflection failures. Saved-DAG tasks do not compare or promote the
+candidate; the separate `ark-cpp self-improve` path retains its ten-case A/B
+gate and versioned promotion step.
 
 Set `ARK_REDIS_PORT` and `ARK_EPISODIC_DB` to persist native run metadata to
 Redis and SQLite. Run `ark-cpp audit` and `ark-cpp episodes` with the same

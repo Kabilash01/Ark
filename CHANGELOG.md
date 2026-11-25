@@ -143,6 +143,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   Docker execution path.
 - Routed Hypothesis Engine tasks through the configured local model, semantic
   memory, and citation graph services.
+- Added saved-DAG Coding Agent prompt proposals from stored failures; the
+  ten-case A/B promotion gate remains separate.
 
 ## No standalone day-tagged commit
 

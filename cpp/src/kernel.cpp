@@ -14,14 +14,14 @@
 namespace ark {
 namespace {
 
-constexpr std::array<std::string_view, 22> intents{
+constexpr std::array<std::string_view, 23> intents{
     "RESEARCH", "CODE", "SEARCH", "EXECUTE", "STORE", "EVALUATE", "REFLECT",
-    "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION", "DOCUMENT", "ANALYZE_DATA", "GENERATE_REPORT", "ML_OPTIMIZE", "FILES", "GITHUB", "DESIGN_EXPERIMENT", "DEVOPS", "HYPOTHESIZE",
+    "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION", "DOCUMENT", "ANALYZE_DATA", "GENERATE_REPORT", "ML_OPTIMIZE", "FILES", "GITHUB", "DESIGN_EXPERIMENT", "DEVOPS", "HYPOTHESIZE", "PROPOSE_IMPROVEMENT",
 };
-constexpr std::array<std::string_view, 19> workers{
+constexpr std::array<std::string_view, 20> workers{
     "research_agent", "coding_agent", "evaluation_agent", "memory_agent", "web_search_agent",
     "browser_agent", "document_agent", "terminal_agent", "security_agent", "vision_agent", "data_analysis_agent",
-    "scientific_report_generator", "ml_engineer_agent", "file_system_agent", "capability_discovery_agent", "github_agent", "experiment_designer", "devops_agent", "hypothesis_engine",
+    "scientific_report_generator", "ml_engineer_agent", "file_system_agent", "capability_discovery_agent", "github_agent", "experiment_designer", "devops_agent", "hypothesis_engine", "self_improvement_agent",
 };
 
 bool contains(const auto& values, std::string_view value) {
@@ -158,7 +158,7 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
             || task.agent == "scientific_report_generator" || task.agent == "ml_engineer_agent"
             || task.agent == "file_system_agent" || task.agent == "capability_discovery_agent"
             || task.agent == "github_agent" || task.agent == "experiment_designer" || task.agent == "devops_agent"
-            || task.agent == "hypothesis_engine";
+            || task.agent == "hypothesis_engine" || task.agent == "self_improvement_agent";
         if ((!contains(workers, task.agent) || (tool_worker && !include_native_tools)) || !contains(intents, task.intent)) {
             throw std::invalid_argument("Unknown worker or intent for task " + task.id + ": "
                                         + task.agent + " / " + task.intent);
@@ -367,6 +367,16 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
                 || !task.payload.at("domain").is_string() || task.payload.at("domain").get<std::string>().empty()
                 || task.payload.at("domain").get<std::string>().size() > 1000) {
                 throw std::invalid_argument("Hypothesis tasks require one domain string of 1–1000 bytes");
+            }
+        }
+        if (task.agent == "self_improvement_agent") {
+            if (task.intent != "PROPOSE_IMPROVEMENT") {
+                throw std::invalid_argument("self_improvement_agent requires PROPOSE_IMPROVEMENT intent for task " + task.id);
+            }
+            if (task.payload.size() != 1 || !task.payload.contains("target_agent")
+                || !task.payload.at("target_agent").is_string()
+                || task.payload.at("target_agent") != "coding_agent") {
+                throw std::invalid_argument("Saved-DAG self-improvement currently supports coding_agent proposals only");
             }
         }
         if (task.agent == "memory_agent") {
