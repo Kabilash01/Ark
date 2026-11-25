@@ -159,6 +159,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
 - Routed evaluation-only goals through `ark-cpp run` to the Evaluation Agent.
 - Routed explicit pinned-dependency and local-advisory checks through the
   Security Agent's bounded dependency-check action.
+- Routed Capability Discovery questions through the planner with evidence
+  loaded from the local registry, reflections, and benchmark history.
 
 ## No standalone day-tagged commit
 

@@ -733,6 +733,22 @@ void planner_can_assign_an_isolated_evaluation() {
           "planner did not retain the evaluation intent");
 }
 
+void planner_can_assign_capability_question_without_inventing_evidence() {
+    ark::Planner planner([](const ark::Request& request) {
+        const auto body = Json::parse(request.body);
+        const auto& schema = body.at("format").at("properties").at("tasks").at("items");
+        check(schema.at("properties").at("agent").at("enum") == Json::array({"capability_discovery_agent"}),
+              "capability plan exposed unrelated workers");
+        auto discovery = task("discover", Json::array(), "capability_discovery_agent");
+        discovery["intent"] = "DISCOVER";
+        discovery["payload"] = {{"question", "Can ARK analyze CSV files?"}};
+        return ark::Response{200, Json{{"message", {{"content", Json{{"tasks", {discovery}}}.dump()}}}}.dump()};
+    }, "http://localhost:11434", "local-test");
+    const auto plan = planner.plan("Can ARK analyze CSV files?", {"capability_discovery_agent"}, Json::array(), true);
+    check(plan.at("tasks").at(0).at("payload") == Json{{"question", "Can ARK analyze CSV files?"}},
+          "planner supplied untrusted capability evidence");
+}
+
 void planner_can_assign_a_bounded_dependency_security_check() {
     ark::Planner planner([](const ark::Request& request) {
         const auto body = Json::parse(request.body);
@@ -828,6 +844,7 @@ int main() {
         planner_can_assign_an_isolated_terminal_command();
         planner_can_assign_typed_science_tasks();
         planner_can_assign_an_isolated_evaluation();
+        planner_can_assign_capability_question_without_inventing_evidence();
         planner_can_assign_a_bounded_dependency_security_check();
         reconciles_output_conflicts_with_both_workers();
         optional_cloud_failure_falls_back_to_local();

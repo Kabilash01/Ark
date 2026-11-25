@@ -751,10 +751,28 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
         } else if (task.agent == "file_system_agent") {
             result = run_file_operation(task.payload);
         } else if (task.agent == "capability_discovery_agent") {
+            auto evidence = task.payload;
+            if (evidence.size() == 1 && evidence.contains("question")) {
+                const auto store = version_store(true);
+                if (!store) throw std::runtime_error("Capability discovery requires a local agent registry");
+                evidence["registry"] = ark::AgentRegistry(*store).all();
+                const std::filesystem::path episode_path = env("ARK_EPISODIC_DB", "data/episodic_memory.db");
+                evidence["reflections"] = std::filesystem::exists(episode_path)
+                    ? ark::EpisodicMemory(episode_path).recent(500) : ark::Json::array();
+                auto histories = ark::Json::object();
+                const std::filesystem::path benchmark_dir = env("ARK_BENCHMARK_RESULTS", "benchmarks/arkbench/results");
+                for (const auto& agent : evidence.at("registry")) {
+                    if (agent.is_object() && agent.contains("name") && agent.at("name").is_string()) {
+                        const auto name = agent.at("name").get<std::string>();
+                        histories[name] = ark::benchmark_history(benchmark_dir, name);
+                    }
+                }
+                evidence["benchmark_histories"] = std::move(histories);
+            }
             const auto capability_map = ark::build_capability_map(
-                task.payload.value("registry", ark::Json::array()),
-                task.payload.value("reflections", ark::Json::array()),
-                task.payload.value("benchmark_histories", ark::Json::object()));
+                evidence.value("registry", ark::Json::array()),
+                evidence.value("reflections", ark::Json::array()),
+                evidence.value("benchmark_histories", ark::Json::object()));
             const auto answer = ark::answer_capability_question(capability_map,
                 task.payload.at("question").get_ref<const std::string&>());
             result = {{"task_id", message.at("task_id")}, {"status", "DONE"}, {"intent", task.intent},
@@ -950,12 +968,13 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
             if (intent != "RESEARCH" && intent != "SEARCH" && intent != "CODE" && intent != "EXECUTE"
                 && intent != "EVALUATE"
                 && intent != "DESIGN_EXPERIMENT" && intent != "HYPOTHESIZE" && intent != "MATERIALS_QUERY"
-                && intent != "PROPOSE_IMPROVEMENT" && intent != "MEMORY" && intent != "SECURITY") {
+                && intent != "PROPOSE_IMPROVEMENT" && intent != "MEMORY" && intent != "SECURITY"
+                && intent != "DISCOVER") {
                 throw std::invalid_argument("No native worker available for intent " + intent);
             }
             const bool include_native_tools = intent == "EXECUTE" || intent == "DESIGN_EXPERIMENT"
                 || intent == "HYPOTHESIZE" || intent == "MATERIALS_QUERY" || intent == "PROPOSE_IMPROVEMENT"
-                || intent == "SECURITY";
+                || intent == "SECURITY" || intent == "DISCOVER";
             const auto agents = intent == "EXECUTE" ? std::vector<std::string>{"terminal_agent"}
                 : intent == "EVALUATE" ? std::vector<std::string>{"evaluation_agent"}
                 : intent == "DESIGN_EXPERIMENT" ? std::vector<std::string>{"experiment_designer"}
@@ -964,11 +983,13 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
                 : intent == "PROPOSE_IMPROVEMENT" ? std::vector<std::string>{"self_improvement_agent"}
                 : intent == "MEMORY" ? std::vector<std::string>{"memory_agent"}
                 : intent == "SECURITY" ? std::vector<std::string>{"security_agent"}
+                : intent == "DISCOVER" ? std::vector<std::string>{"capability_discovery_agent"}
                 : intent == "CODE" && !explicit_research ? std::vector<std::string>{"coding_agent"}
                 : intent == "SEARCH" ? std::vector<std::string>{"research_agent"}
                 : std::vector<std::string>{"research_agent", "coding_agent"};
             auto context = (intent == "DESIGN_EXPERIMENT" || intent == "HYPOTHESIZE" || intent == "MATERIALS_QUERY"
-                || intent == "PROPOSE_IMPROVEMENT" || intent == "MEMORY" || intent == "SECURITY")
+                || intent == "PROPOSE_IMPROVEMENT" || intent == "MEMORY" || intent == "SECURITY"
+                || intent == "DISCOVER")
                 ? ark::Json::array() : recall(settings, goal);
             versions["planner_agent"] = plan_profile.version;
             const auto instruction = std::string(goal) + std::string(followup);

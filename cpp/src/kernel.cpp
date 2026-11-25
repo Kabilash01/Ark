@@ -98,6 +98,7 @@ MATERIALS_QUERY for materials_project_agent with payload {"material_ids":["mp-..
 PROPOSE_IMPROVEMENT for self_improvement_agent with payload {"target_agent":"coding_agent"},
 STORE or SEARCH for memory_agent with payload {"action":"store_episode","summary":"..."} or {"action":"search_episodes","query":"...","limit":10}; choose STORE only when asked to remember something,
 SECURITY for security_agent dependency checks with payload {"action":"check_dependencies","dependencies":{"package":"version"},"advisories":[{"package":"package","affected_versions":["version"],"id":"ADV-1"}]}; use only dependencies and advisories provided in the goal,
+DISCOVER for capability_discovery_agent with payload {"question":"..."}; registry evidence is loaded locally by the worker,
 and EXECUTE for terminal_agent when it is listed as available. For terminal_agent, put the
 literal shell command to execute in the task instruction; it will run inside the restricted Docker sandbox.
 Use vision_agent only when the task includes an image. Include synthesis in a RESEARCH task.
@@ -139,6 +140,8 @@ Json plan_format(const std::vector<std::string>& agents) {
             allowed_intents.push_back("PROPOSE_IMPROVEMENT");
         } else if (agent == "security_agent") {
             allowed_intents.push_back("SECURITY");
+        } else if (agent == "capability_discovery_agent") {
+            allowed_intents.push_back("DISCOVER");
         }
     }
     Json payload_properties{{"hypothesis", text}, {"domain", text},
@@ -146,7 +149,7 @@ Json plan_format(const std::vector<std::string>& agents) {
         {"fields", {{"type", "array"}, {"items", text}, {"maxItems", 30}}},
         {"target_agent", {{"type", "string"}, {"enum", {"coding_agent"}}}},
         {"action", {{"type", "string"}, {"enum", {"store_episode", "search_episodes"}}}},
-        {"summary", text}, {"query", text},
+        {"summary", text}, {"query", text}, {"question", text},
         {"dependencies", {{"type", "object"}, {"additionalProperties", text}}},
         {"advisories", {{"type", "array"}, {"items", {{"type", "object"},
             {"additionalProperties", false}, {"properties", {{"package", text},
