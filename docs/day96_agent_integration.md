@@ -4,8 +4,9 @@ The guide's single-task flagship integration has not passed and was not run as
 a live task. `ark-cpp dispatch` now routes typed saved-DAG tasks through
 adapters for memory, file system, document generation, security, CSV analysis,
 ML linear regression, scientific report generation, terminal execution,
-DevOps, experiment design, GitHub issue listing, capability discovery,
-self-improvement proposals, coding, evaluation, browser, vision, and web search.
+DevOps, experiment design, Materials Project summaries, GitHub issue listing,
+capability discovery, self-improvement proposals, coding, evaluation, browser,
+vision, and web search.
 These routes are not all exposed
 to natural-language planning. Hypothesis Engine is service-gated, and
 self-improvement DAG tasks stop at proposal generation; GitHub is limited to

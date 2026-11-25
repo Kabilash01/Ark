@@ -571,6 +571,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
                     && task.agent != "devops_agent"
                     && task.agent != "hypothesis_engine"
                     && task.agent != "self_improvement_agent"
+                    && task.agent != "materials_project_agent"
                     && !resolved.contains(task.agent)) {
                     const auto model = task.agent == "vision_agent" ? configured_model("ARK_VISION_MODEL", "vision") : settings.model;
                     resolved.emplace(task.agent, actor_profile(task.agent, model, redis.get()));
@@ -615,6 +616,9 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     if (std::any_of(dag.at("tasks").begin(), dag.at("tasks").end(), [](const auto& task) {
             return task.value("agent", "") == "self_improvement_agent";
         })) versions["self_improvement_agent"] = "1.0.0";
+    if (std::any_of(dag.at("tasks").begin(), dag.at("tasks").end(), [](const auto& task) {
+            return task.value("agent", "") == "materials_project_agent";
+        })) versions["materials_project_agent"] = "1.0.0";
     if (events) {
         auto plan = ark::Json::array();
         for (const auto& task : dag.at("tasks")) {
@@ -797,6 +801,15 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
             result = {{"task_id", message.at("task_id")}, {"status", "DONE"}, {"intent", task.intent},
                 {"agent_version", "self_improvement_agent@1.0.0"}, {"quality_score", -1.0},
                 {"output", {{"summary", proposal.value("status", "NO_ACTION")}, {"proposal", proposal}}}};
+        } else if (task.agent == "materials_project_agent") {
+            const auto data = ark::MaterialsProjectClient(transport, env("MP_API_KEY"),
+                env("MP_API_ENDPOINT", "https://api.materialsproject.org")).summaries(
+                    task.payload.at("material_ids").get<std::vector<std::string>>(),
+                    task.payload.value("fields", std::vector<std::string>{}), task.payload.value("limit", 100));
+            result = {{"task_id", message.at("task_id")}, {"status", "DONE"}, {"intent", task.intent},
+                {"agent_version", "materials_project_agent@1.0.0"}, {"quality_score", -1.0},
+                {"output", {{"summary", "Retrieved " + std::to_string(data.size()) + " materials summaries"},
+                             {"materials", data}}}};
         } else {
             result = research_pool.run([&](std::string_view instance) {
                 auto assigned = source;
@@ -845,7 +858,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
             || name == "scientific_report_generator" || name == "ml_engineer_agent"
             || name == "file_system_agent" || name == "capability_discovery_agent"
             || name == "github_agent" || name == "experiment_designer" || name == "hypothesis_engine") return true;
-        if (name == "self_improvement_agent") return true;
+        if (name == "self_improvement_agent" || name == "materials_project_agent") return true;
         if (name == "devops_agent") return true;
         if (!profiles.contains(name)) {
             return false;

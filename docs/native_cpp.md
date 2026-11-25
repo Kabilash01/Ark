@@ -123,6 +123,9 @@ for a live run; callers cannot override those service endpoints in task payloads
 stored reflection failures. Saved-DAG tasks do not compare or promote the
 candidate; the separate `ark-cpp self-improve` path retains its ten-case A/B
 gate and versioned promotion step.
+`materials_project_agent` provides read-only summary queries for 1–50 material
+IDs and at most 30 requested fields. It uses `MP_API_KEY` and the configured
+Materials Project endpoint; task payloads cannot select the endpoint.
 
 Set `ARK_REDIS_PORT` and `ARK_EPISODIC_DB` to persist native run metadata to
 Redis and SQLite. Run `ark-cpp audit` and `ark-cpp episodes` with the same

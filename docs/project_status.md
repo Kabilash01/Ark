@@ -148,9 +148,9 @@ route for the ML Engineer is also available through saved DAGs; MLflow and
 other model families are not included in that route. File-system operations
 use configured workspace aliases; Capability Discovery now answers from
 inline evidence in the same dispatcher. GitHub supports only read-only issue
-listing, Experiment Designer requires the local model, and DevOps requires a
-Docker daemon. Hypothesis Engine is routed through local inference, Qdrant, and
-Neo4j adapters but remains service-gated. Self-improvement is not yet routed
-through saved DAGs for Coding Agent proposal generation; benchmark gating and
-promotion remain available only through the explicit A/B command. Live
-full-stack verification is still open.
+listing, Experiment Designer requires the local model, DevOps requires a Docker
+daemon, and Materials Project queries require `MP_API_KEY`. Hypothesis Engine
+is routed through local inference, Qdrant, and Neo4j adapters but remains
+service-gated. Self-improvement supports Coding Agent proposal generation;
+benchmark gating and promotion remain available only through the explicit A/B
+command. Live full-stack verification is still open.

@@ -14,14 +14,14 @@
 namespace ark {
 namespace {
 
-constexpr std::array<std::string_view, 23> intents{
+constexpr std::array<std::string_view, 24> intents{
     "RESEARCH", "CODE", "SEARCH", "EXECUTE", "STORE", "EVALUATE", "REFLECT",
-    "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION", "DOCUMENT", "ANALYZE_DATA", "GENERATE_REPORT", "ML_OPTIMIZE", "FILES", "GITHUB", "DESIGN_EXPERIMENT", "DEVOPS", "HYPOTHESIZE", "PROPOSE_IMPROVEMENT",
+    "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION", "DOCUMENT", "ANALYZE_DATA", "GENERATE_REPORT", "ML_OPTIMIZE", "FILES", "GITHUB", "DESIGN_EXPERIMENT", "DEVOPS", "HYPOTHESIZE", "PROPOSE_IMPROVEMENT", "MATERIALS_QUERY",
 };
-constexpr std::array<std::string_view, 20> workers{
+constexpr std::array<std::string_view, 21> workers{
     "research_agent", "coding_agent", "evaluation_agent", "memory_agent", "web_search_agent",
     "browser_agent", "document_agent", "terminal_agent", "security_agent", "vision_agent", "data_analysis_agent",
-    "scientific_report_generator", "ml_engineer_agent", "file_system_agent", "capability_discovery_agent", "github_agent", "experiment_designer", "devops_agent", "hypothesis_engine", "self_improvement_agent",
+    "scientific_report_generator", "ml_engineer_agent", "file_system_agent", "capability_discovery_agent", "github_agent", "experiment_designer", "devops_agent", "hypothesis_engine", "self_improvement_agent", "materials_project_agent",
 };
 
 bool contains(const auto& values, std::string_view value) {
@@ -159,7 +159,8 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
             || task.agent == "file_system_agent" || task.agent == "capability_discovery_agent"
             || task.agent == "github_agent" || task.agent == "experiment_designer" || task.agent == "devops_agent"
             || task.agent == "hypothesis_engine" || task.agent == "self_improvement_agent";
-        if ((!contains(workers, task.agent) || (tool_worker && !include_native_tools)) || !contains(intents, task.intent)) {
+        const bool external_tool_worker = task.agent == "materials_project_agent";
+        if ((!contains(workers, task.agent) || ((tool_worker || external_tool_worker) && !include_native_tools)) || !contains(intents, task.intent)) {
             throw std::invalid_argument("Unknown worker or intent for task " + task.id + ": "
                                         + task.agent + " / " + task.intent);
         }
@@ -377,6 +378,39 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
                 || !task.payload.at("target_agent").is_string()
                 || task.payload.at("target_agent") != "coding_agent") {
                 throw std::invalid_argument("Saved-DAG self-improvement currently supports coding_agent proposals only");
+            }
+        }
+        if (task.agent == "materials_project_agent") {
+            if (task.intent != "MATERIALS_QUERY") {
+                throw std::invalid_argument("materials_project_agent requires MATERIALS_QUERY intent for task " + task.id);
+            }
+            static const std::set<std::string, std::less<>> allowed{"fields", "limit", "material_ids"};
+            for (auto it = task.payload.begin(); it != task.payload.end(); ++it) {
+                if (!allowed.contains(it.key())) throw std::invalid_argument("Unsupported Materials Project payload field: " + it.key());
+            }
+            if (!task.payload.contains("material_ids") || !task.payload.at("material_ids").is_array()
+                || task.payload.at("material_ids").empty() || task.payload.at("material_ids").size() > 50) {
+                throw std::invalid_argument("Materials Project tasks require 1–50 material IDs");
+            }
+            for (const auto& id : task.payload.at("material_ids")) {
+                if (!id.is_string() || id.get<std::string>().empty() || id.get<std::string>().size() > 128
+                    || id.get<std::string>().find_first_of(",\r\n") != std::string::npos) {
+                    throw std::invalid_argument("Materials Project IDs must be bounded strings without separators");
+                }
+            }
+            if (task.payload.contains("fields")) {
+                const auto& fields = task.payload.at("fields");
+                if (!fields.is_array() || fields.size() > 30) throw std::invalid_argument("Materials Project accepts at most 30 fields");
+                for (const auto& field : fields) {
+                    if (!field.is_string() || field.get<std::string>().empty() || field.get<std::string>().size() > 128
+                        || field.get<std::string>().find_first_of(",\r\n") != std::string::npos) {
+                        throw std::invalid_argument("Materials Project fields must be bounded strings without separators");
+                    }
+                }
+            }
+            if (task.payload.contains("limit") && (!task.payload.at("limit").is_number_integer()
+                || task.payload.at("limit").get<int>() < 1 || task.payload.at("limit").get<int>() > 100)) {
+                throw std::invalid_argument("Saved-DAG Materials Project limit must be from 1 to 100");
             }
         }
         if (task.agent == "memory_agent") {

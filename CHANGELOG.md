@@ -145,6 +145,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   memory, and citation graph services.
 - Added saved-DAG Coding Agent prompt proposals from stored failures; the
   ten-case A/B promotion gate remains separate.
+- Routed read-only Materials Project summary queries through saved DAGs with
+  bounded IDs/fields and a locally configured endpoint.
 
 ## No standalone day-tagged commit
 

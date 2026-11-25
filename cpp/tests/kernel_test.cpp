@@ -476,6 +476,35 @@ void self_improvement_tasks_only_target_supported_versioned_agents() {
     check(rejected, "self-improvement accepted a target outside its benchmark gate");
 }
 
+void materials_project_tasks_allow_bounded_read_queries() {
+    auto materials = task("lookup", Json::array(), "materials_project_agent");
+    materials["intent"] = "MATERIALS_QUERY";
+    materials["payload"] = {{"material_ids", Json::array({"mp-149", "mp-13"})},
+        {"fields", Json::array({"material_id", "formula_pretty"})}, {"limit", 10}};
+    const Json plan{{"tasks", {materials}}};
+    bool rejected = false;
+    try { (void)ark::order_tasks(plan); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    check(rejected, "Materials Project task was accepted without native-tool opt-in");
+    check(ark::order_tasks(plan, true).at(0).at(0).payload == materials.at("payload"),
+          "Materials Project query was not preserved");
+    materials["payload"]["endpoint"] = "https://attacker.invalid";
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {materials}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("Unsupported Materials Project payload field") != std::string_view::npos;
+    }
+    check(rejected, "Materials Project task accepted a caller-selected endpoint");
+    materials["payload"].erase("endpoint");
+    materials["payload"]["limit"] = 101;
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {materials}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("from 1 to 100") != std::string_view::npos;
+    }
+    check(rejected, "Materials Project task accepted an unbounded result count");
+}
+
 void route_in_parallel() {
     std::mutex mutex;
     std::condition_variable partners;
@@ -691,6 +720,7 @@ int main() {
         devops_tasks_require_bounded_relative_build_contexts();
         hypothesis_tasks_require_a_bounded_domain_only();
         self_improvement_tasks_only_target_supported_versioned_agents();
+        materials_project_tasks_allow_bounded_read_queries();
         route_in_parallel();
         skip_blocked_tasks();
         retries_without_replaying_successful_tasks();
