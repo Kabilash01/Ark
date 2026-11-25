@@ -702,6 +702,19 @@ void planner_can_assign_typed_science_tasks() {
                                                        Json::array(), true);
     check(improvement.at("tasks").at(0).at("payload").at("target_agent") == "coding_agent",
           "self-improvement planner did not keep proposal target bounded");
+    ark::Planner memory_planner([](const ark::Request& request) {
+        const auto body = Json::parse(request.body);
+        const auto& schema = body.at("format").at("properties").at("tasks").at("items");
+        check(schema.at("properties").at("intent").at("enum") == Json::array({"STORE", "SEARCH"}),
+              "memory planner did not expose only episodic actions");
+        auto planned = task("recall", Json::array(), "memory_agent");
+        planned["intent"] = "SEARCH";
+        planned["payload"] = {{"action", "search_episodes"}, {"query", "conductivity result"}, {"limit", 5}};
+        return ark::Response{200, Json{{"message", {{"content", Json{{"tasks", {planned}}}.dump()}}}}.dump()};
+    }, "http://localhost:11434", "local-test");
+    const auto memory_plan = memory_planner.plan("recall my conductivity notes", {"memory_agent"});
+    check(memory_plan.at("tasks").at(0).at("payload").at("action") == "search_episodes",
+          "memory planner did not preserve the typed search action");
 }
 
 void reconciles_output_conflicts_with_both_workers() {

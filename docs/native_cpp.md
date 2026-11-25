@@ -1270,3 +1270,8 @@ Natural-language self-improvement requests route only to a Coding Agent prompt
 proposal. The planner schema fixes the target to `coding_agent`; existing
 dispatch validation enforces that restriction. Benchmark comparison and
 promotion still require the explicit ten-case A/B workflow.
+
+Natural-language memory requests now route to episodic STORE or SEARCH tasks.
+The planner chooses between the two typed actions, and dispatch still validates
+the summary/query fields and uses the configured SQLite database rather than a
+task-selected path.

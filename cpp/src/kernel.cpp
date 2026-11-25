@@ -84,7 +84,8 @@ BROWSE (use a specific website), SECURITY (defensive code audit), VISION (analyz
 DESIGN_EXPERIMENT (design a bounded experiment for an explicit hypothesis),
 HYPOTHESIZE (generate hypotheses for a scientific domain),
 MATERIALS_QUERY (retrieve material summaries for explicit Materials Project IDs),
-PROPOSE_IMPROVEMENT (propose a coding-agent prompt change for stored failures).)";
+PROPOSE_IMPROVEMENT (propose a coding-agent prompt change for stored failures),
+MEMORY (store a user-requested memory or search existing memories).)";
 
 constexpr std::string_view planner =
     R"(Build a directed acyclic task plan for the supplied goal. Use only the provided available_agents.
@@ -94,6 +95,7 @@ DESIGN_EXPERIMENT for experiment_designer with payload {"hypothesis":"..."},
 HYPOTHESIZE for hypothesis_engine with payload {"domain":"..."},
 MATERIALS_QUERY for materials_project_agent with payload {"material_ids":["mp-..."],"fields":["..."],"limit":10}; use only IDs supplied by the user,
 PROPOSE_IMPROVEMENT for self_improvement_agent with payload {"target_agent":"coding_agent"},
+STORE or SEARCH for memory_agent with payload {"action":"store_episode","summary":"..."} or {"action":"search_episodes","query":"...","limit":10}; choose STORE only when asked to remember something,
 and EXECUTE for terminal_agent when it is listed as available. For terminal_agent, put the
 literal shell command to execute in the task instruction; it will run inside the restricted Docker sandbox.
 Use vision_agent only when the task includes an image. Include synthesis in a RESEARCH task.
@@ -120,6 +122,7 @@ Json plan_format(const std::vector<std::string>& agents) {
             allowed_intents.push_back("EVALUATE");
         } else if (agent == "memory_agent") {
             allowed_intents.push_back("STORE");
+            allowed_intents.push_back("SEARCH");
         } else if (agent == "vision_agent") {
             allowed_intents.push_back("VISION");
         } else if (agent == "terminal_agent") {
@@ -134,12 +137,15 @@ Json plan_format(const std::vector<std::string>& agents) {
             allowed_intents.push_back("PROPOSE_IMPROVEMENT");
         }
     }
+    Json payload_properties{{"hypothesis", text}, {"domain", text},
+        {"material_ids", {{"type", "array"}, {"items", text}, {"minItems", 1}, {"maxItems", 50}}},
+        {"fields", {{"type", "array"}, {"items", text}, {"maxItems", 30}}},
+        {"target_agent", {{"type", "string"}, {"enum", {"coding_agent"}}}},
+        {"action", {{"type", "string"}, {"enum", {"store_episode", "search_episodes"}}}},
+        {"summary", text}, {"query", text},
+        {"limit", {{"type", "integer"}, {"minimum", 1}, {"maximum", 100}}}};
     const Json payload_schema{{"type", "object"}, {"additionalProperties", false},
-        {"properties", {{"hypothesis", text}, {"domain", text},
-            {"material_ids", {{"type", "array"}, {"items", text}, {"minItems", 1}, {"maxItems", 50}}},
-            {"fields", {{"type", "array"}, {"items", text}, {"maxItems", 30}}},
-            {"limit", {{"type", "integer"}, {"minimum", 1}, {"maximum", 100}}},
-            {"target_agent", {{"type", "string"}, {"enum", {"coding_agent"}}}}}}};
+                              {"properties", std::move(payload_properties)}};
     const Json task{{"type", "object"}, {"additionalProperties", false},
         {"properties", {{"task_id", text}, {"instruction", text},
                         {"agent", {{"type", "string"}, {"enum", agents}}},
@@ -849,7 +855,7 @@ std::string Planner::request(const AgentProfile& profile, std::string_view input
 std::string Planner::classify(std::string_view goal) const {
     static constexpr std::array allowed{
         "RESEARCH", "SEARCH", "CODE", "EXECUTE", "EVALUATE", "DISCOVER", "BROWSE", "SECURITY", "VISION",
-        "DESIGN_EXPERIMENT", "HYPOTHESIZE", "MATERIALS_QUERY", "PROPOSE_IMPROVEMENT",
+        "DESIGN_EXPERIMENT", "HYPOTHESIZE", "MATERIALS_QUERY", "PROPOSE_IMPROVEMENT", "MEMORY",
     };
     const auto output = Json::parse(request(supervisor_, goal, "json", goal));
     const auto intent = output.at("intent").get<std::string>();

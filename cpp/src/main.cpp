@@ -949,7 +949,7 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
             }
             if (intent != "RESEARCH" && intent != "SEARCH" && intent != "CODE" && intent != "EXECUTE"
                 && intent != "DESIGN_EXPERIMENT" && intent != "HYPOTHESIZE" && intent != "MATERIALS_QUERY"
-                && intent != "PROPOSE_IMPROVEMENT") {
+                && intent != "PROPOSE_IMPROVEMENT" && intent != "MEMORY") {
                 throw std::invalid_argument("No native worker available for intent " + intent);
             }
             const bool include_native_tools = intent == "EXECUTE" || intent == "DESIGN_EXPERIMENT"
@@ -959,11 +959,12 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
                 : intent == "HYPOTHESIZE" ? std::vector<std::string>{"hypothesis_engine"}
                 : intent == "MATERIALS_QUERY" ? std::vector<std::string>{"materials_project_agent"}
                 : intent == "PROPOSE_IMPROVEMENT" ? std::vector<std::string>{"self_improvement_agent"}
+                : intent == "MEMORY" ? std::vector<std::string>{"memory_agent"}
                 : intent == "CODE" && !explicit_research ? std::vector<std::string>{"coding_agent"}
                 : intent == "SEARCH" ? std::vector<std::string>{"research_agent"}
                 : std::vector<std::string>{"research_agent", "coding_agent"};
             auto context = (intent == "DESIGN_EXPERIMENT" || intent == "HYPOTHESIZE" || intent == "MATERIALS_QUERY"
-                || intent == "PROPOSE_IMPROVEMENT")
+                || intent == "PROPOSE_IMPROVEMENT" || intent == "MEMORY")
                 ? ark::Json::array() : recall(settings, goal);
             versions["planner_agent"] = plan_profile.version;
             const auto instruction = std::string(goal) + std::string(followup);

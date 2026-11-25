@@ -154,6 +154,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   material IDs through the bounded saved-DAG client adapter.
 - Routed self-improvement goals to bounded Coding Agent prompt proposals;
   evaluation and promotion remain gated by the existing A/B workflow.
+- Routed natural-language remember/recall requests to typed episodic Memory
+  Agent STORE and SEARCH tasks.
 
 ## No standalone day-tagged commit
 
