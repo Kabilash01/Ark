@@ -17,10 +17,10 @@ constexpr std::array<std::string_view, 18> intents{
     "RESEARCH", "CODE", "SEARCH", "EXECUTE", "STORE", "EVALUATE", "REFLECT",
     "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION", "DOCUMENT", "ANALYZE_DATA", "GENERATE_REPORT", "ML_OPTIMIZE", "FILES",
 };
-constexpr std::array<std::string_view, 14> workers{
+constexpr std::array<std::string_view, 15> workers{
     "research_agent", "coding_agent", "evaluation_agent", "memory_agent", "web_search_agent",
     "browser_agent", "document_agent", "terminal_agent", "security_agent", "vision_agent", "data_analysis_agent",
-    "scientific_report_generator", "ml_engineer_agent", "file_system_agent",
+    "scientific_report_generator", "ml_engineer_agent", "file_system_agent", "capability_discovery_agent",
 };
 
 bool contains(const auto& values, std::string_view value) {
@@ -155,7 +155,7 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
         const bool tool_worker = task.agent == "document_agent" || task.agent == "terminal_agent"
             || task.agent == "security_agent" || task.agent == "data_analysis_agent"
             || task.agent == "scientific_report_generator" || task.agent == "ml_engineer_agent"
-            || task.agent == "file_system_agent";
+            || task.agent == "file_system_agent" || task.agent == "capability_discovery_agent";
         if ((!contains(workers, task.agent) || (tool_worker && !include_native_tools)) || !contains(intents, task.intent)) {
             throw std::invalid_argument("Unknown worker or intent for task " + task.id + ": "
                                         + task.agent + " / " + task.intent);
@@ -270,6 +270,31 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
             }
             if (task.payload.contains("overwrite") && !task.payload.at("overwrite").is_boolean()) {
                 throw std::invalid_argument("File overwrite must be a boolean");
+            }
+        }
+        if (task.agent == "capability_discovery_agent") {
+            if (task.intent != "DISCOVER") {
+                throw std::invalid_argument("capability_discovery_agent requires DISCOVER intent for task " + task.id);
+            }
+            static const std::set<std::string, std::less<>> allowed{
+                "benchmark_histories", "question", "reflections", "registry"};
+            for (auto it = task.payload.begin(); it != task.payload.end(); ++it) {
+                if (!allowed.contains(it.key())) {
+                    throw std::invalid_argument("Unsupported capability discovery payload field: " + it.key());
+                }
+            }
+            if (!task.payload.contains("question") || !task.payload.at("question").is_string()
+                || task.payload.at("question").get<std::string>().empty() || task.payload.at("question").get<std::string>().size() > 2000) {
+                throw std::invalid_argument("Capability discovery requires a question no longer than 2 KiB");
+            }
+            if (task.payload.contains("registry") && !task.payload.at("registry").is_array()) {
+                throw std::invalid_argument("Capability registry evidence must be an array");
+            }
+            if (task.payload.contains("reflections") && !task.payload.at("reflections").is_array()) {
+                throw std::invalid_argument("Capability reflection evidence must be an array");
+            }
+            if (task.payload.contains("benchmark_histories") && !task.payload.at("benchmark_histories").is_object()) {
+                throw std::invalid_argument("Capability benchmark evidence must be an object");
             }
         }
         if (task.agent == "memory_agent") {

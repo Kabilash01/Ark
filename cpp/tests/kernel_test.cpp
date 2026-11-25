@@ -320,6 +320,36 @@ void file_system_tasks_are_limited_to_configured_workspace_operations() {
     check(rejected, "file-system worker accepted an unrelated intent");
 }
 
+void capability_discovery_tasks_use_only_typed_evidence() {
+    auto discovery = task("discover", Json::array(), "capability_discovery_agent");
+    discovery["intent"] = "DISCOVER";
+    discovery["payload"] = {{"question", "Can you analyze data?"},
+        {"registry", Json::array({{{"name", "data_analysis_agent"}, {"capabilities", Json::array({"analyze data"})}}})},
+        {"reflections", Json::array()}, {"benchmark_histories", Json::object()}};
+    const Json plan{{"tasks", {discovery}}};
+    bool rejected = false;
+    try { (void)ark::order_tasks(plan); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    check(rejected, "capability discovery was accepted without native-tool opt-in");
+    check(ark::order_tasks(plan, true).at(0).at(0).payload == discovery.at("payload"),
+          "capability evidence was not preserved");
+    discovery["payload"]["output_path"] = "/tmp/capabilities.json";
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {discovery}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("Unsupported capability discovery payload field") != std::string_view::npos;
+    }
+    check(rejected, "capability discovery accepted an output path");
+    discovery["payload"].erase("output_path");
+    discovery["intent"] = "RESEARCH";
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {discovery}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("requires DISCOVER") != std::string_view::npos;
+    }
+    check(rejected, "capability discovery accepted an unrelated intent");
+}
+
 void route_in_parallel() {
     std::mutex mutex;
     std::condition_variable partners;
@@ -529,6 +559,7 @@ int main() {
         scientific_report_tasks_require_supplied_bounded_evidence();
         ml_tasks_require_bounded_inline_linear_regression_data();
         file_system_tasks_are_limited_to_configured_workspace_operations();
+        capability_discovery_tasks_use_only_typed_evidence();
         route_in_parallel();
         skip_blocked_tasks();
         retries_without_replaying_successful_tasks();

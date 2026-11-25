@@ -101,6 +101,9 @@ budget. It does not log to MLflow or execute caller-provided code.
 `config/file_system.json` and support only list/read/write with relative paths.
 Write content is capped at 48 KiB, and the existing descriptor-based worker
 rejects symlink traversal; no planner-supplied root directory is accepted.
+`capability_discovery_agent` accepts a `DISCOVER` question with optional inline
+registry, reflection, and ARKBench evidence. It returns an evidence-based answer
+and capability map without writing files or querying external services.
 
 Set `ARK_REDIS_PORT` and `ARK_EPISODIC_DB` to persist native run metadata to
 Redis and SQLite. Run `ark-cpp audit` and `ark-cpp episodes` with the same

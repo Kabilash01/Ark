@@ -133,6 +133,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   bounded inline numeric data and no MLflow side effects.
 - Routed configured File System Agent workspace operations through saved DAGs;
   roots remain aliases from local configuration and write payloads are capped.
+- Routed Capability Discovery through saved DAGs using bounded inline registry,
+  reflection, and benchmark evidence without filesystem or network writes.
 
 ## No standalone day-tagged commit
 

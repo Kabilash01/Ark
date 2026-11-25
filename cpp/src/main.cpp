@@ -565,6 +565,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
                     && task.agent != "scientific_report_generator"
                     && task.agent != "ml_engineer_agent"
                     && task.agent != "file_system_agent"
+                    && task.agent != "capability_discovery_agent"
                     && !resolved.contains(task.agent)) {
                     const auto model = task.agent == "vision_agent" ? configured_model("ARK_VISION_MODEL", "vision") : settings.model;
                     resolved.emplace(task.agent, actor_profile(task.agent, model, redis.get()));
@@ -591,6 +592,9 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     if (std::any_of(dag.at("tasks").begin(), dag.at("tasks").end(), [](const auto& task) {
             return task.value("agent", "") == "file_system_agent";
         })) versions["file_system_agent"] = "1.0.0";
+    if (std::any_of(dag.at("tasks").begin(), dag.at("tasks").end(), [](const auto& task) {
+            return task.value("agent", "") == "capability_discovery_agent";
+        })) versions["capability_discovery_agent"] = "1.0.0";
     if (events) {
         auto plan = ark::Json::array();
         for (const auto& task : dag.at("tasks")) {
@@ -722,6 +726,16 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
                 {"output", ark::run_linear_regression_experiment(task.payload)} };
         } else if (task.agent == "file_system_agent") {
             result = run_file_operation(task.payload);
+        } else if (task.agent == "capability_discovery_agent") {
+            const auto capability_map = ark::build_capability_map(
+                task.payload.value("registry", ark::Json::array()),
+                task.payload.value("reflections", ark::Json::array()),
+                task.payload.value("benchmark_histories", ark::Json::object()));
+            const auto answer = ark::answer_capability_question(capability_map,
+                task.payload.at("question").get_ref<const std::string&>());
+            result = {{"task_id", message.at("task_id")}, {"status", "DONE"}, {"intent", task.intent},
+                {"agent_version", "capability_discovery_agent@1.0.0"}, {"quality_score", -1.0},
+                {"output", {{"summary", answer.at("reason")}, {"answer", answer}, {"capability_map", capability_map}}}};
         } else {
             result = research_pool.run([&](std::string_view instance) {
                 auto assigned = source;
@@ -768,7 +782,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     }, [&](std::string_view name) {
         if (name == "memory_agent" || name == "data_analysis_agent"
             || name == "scientific_report_generator" || name == "ml_engineer_agent"
-            || name == "file_system_agent") return true;
+            || name == "file_system_agent" || name == "capability_discovery_agent") return true;
         if (!profiles.contains(name)) {
             return false;
         }

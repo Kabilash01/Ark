@@ -1,23 +1,14 @@
 # Day 96: all-agent integration status
 
 The guide's single-task flagship integration has not passed and was not run as
-a live task. The source currently makes that test impossible through the normal
-`ark-cpp run` path:
-
-- `run_goal` passes at most `research_agent`, `coding_agent`, and
-  `evaluation_agent` to the planner (or only `coding_agent` for code-only work).
-  `memory_agent` appears in the standalone `plan` command, but its task handler
-  is not implemented in the shared dispatch path.
-- The generic dispatcher has explicit branches for coding, evaluation, web
-  search, browser, and vision; other agent names fall through to the Research
-  Agent. The normal run path validates plans without enabling the native
-  document, terminal, and security worker set.
-- Specialist C++ modules such as DevOps, ML Engineer, Data Analysis, GitHub,
-  Materials Project, Experiment Designer, and Scientific Report are currently
-  exposed as direct CLI workflows rather than unified planner workers.
-- Ollama, Redis, Qdrant, and Neo4j are unreachable on loopback in this
-  environment, so model-backed planning and the requested services are also
-  unavailable for a live demo.
+a live task. `ark-cpp dispatch` now routes typed tasks through adapters for
+memory, file system, document generation, security, CSV analysis, ML linear
+regression, scientific report generation, terminal execution, coding,
+evaluation, browser, vision, and web search. These routes are not all exposed
+to natural-language planning. GitHub, DevOps, Hypothesis Engine, Experiment
+Designer, and end-to-end Capability Discovery are not yet unified workers.
+Ollama, Redis, Qdrant, and Neo4j are unreachable on loopback here, so the full
+model and service-backed integration has not been demonstrated.
 
 Day 96 therefore remains open. Completing it requires a common worker adapter
 for the existing native modules, dependency-aware routing for the materials,
@@ -34,11 +25,9 @@ path only for this explicit execution flow. Kernel and planner fixture tests
 cover the intent/worker contract and native-tool opt-in.
 
 This closes the earlier terminal-routing gap for one intent; it does not close
-the all-agent criterion. Document and security workers still need typed,
-bounded inputs and dedicated adapters, and the DevOps, analysis, GitHub, and
-science specialists remain direct workflows. The live planner → terminal →
-Docker → evaluator flow has not been run here because model and service
-availability remains gated.
+the all-agent criterion. Several specialists still need adapters or normal
+planner routes, and the live planner → terminal → Docker → evaluator flow has
+not been run here because model and service availability remains gated.
 
 Saved-DAG `ark-cpp dispatch` also routes typed `security_agent` requests. Its
 payload is capped at 64 KiB, uses inline source text or caller-supplied local
@@ -61,6 +50,8 @@ enable MLflow logging through saved DAGs.
 The File System Agent now routes list/read/write tasks through the configured
 workspace aliases, with relative-path validation and a 48 KiB saved-DAG write
 limit.
+Capability Discovery now accepts inline registry, reflection, and benchmark
+evidence and answers a bounded `DISCOVER` question without writing a file.
 These are explicit saved-plan integrations; the normal natural-language
 planner does not invent source files, document content, or automatically
 schedule these specialist tasks. The live model-to-tool flows remain unverified
