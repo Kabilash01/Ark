@@ -951,16 +951,28 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
     const bool explicit_browse = has_browser_site && (lower_goal.starts_with("browse ") || lower_goal.starts_with("navigate ")
         || lower_goal.starts_with("visit ") || lower_goal.starts_with("open "));
     constexpr std::string_view csv_prefix = "analyze this csv:";
+    constexpr std::string_view report_prefix = "generate report from json:";
     const bool direct_csv = lower_goal.starts_with(csv_prefix);
+    const bool direct_report = lower_goal.starts_with(report_prefix);
     const auto native_tool_intent = [](std::string_view value) {
         return value == "EXECUTE" || value == "DESIGN_EXPERIMENT" || value == "HYPOTHESIZE"
             || value == "MATERIALS_QUERY" || value == "PROPOSE_IMPROVEMENT" || value == "SECURITY"
-            || value == "DISCOVER" || value == "GITHUB" || value == "DOCUMENT" || value == "ANALYZE_DATA";
+            || value == "DISCOVER" || value == "GITHUB" || value == "DOCUMENT" || value == "ANALYZE_DATA"
+            || value == "GENERATE_REPORT";
     };
     std::string intent = "SUPERVISE";
     ark::Json dag;
     for (int attempt = 1; ; ++attempt) {
         try {
+            if (direct_report) {
+                const auto payload = ark::Json::parse(goal.substr(report_prefix.size()));
+                intent = "GENERATE_REPORT";
+                dag["tasks"] = ark::Json::array({{{"task_id", "scientific-report"},
+                    {"agent", "scientific_report_generator"}, {"intent", intent},
+                    {"instruction", "Generate a report from supplied evidence"}, {"payload", payload},
+                    {"depends_on", ark::Json::array()}, {"parallel_with", ark::Json::array()}}});
+                break;
+            }
             if (direct_csv) {
                 auto csv = std::string(goal.substr(csv_prefix.size()));
                 if (!csv.empty() && (csv.front() == ' ' || csv.front() == '\n')) csv.erase(0, 1);
@@ -1044,7 +1056,7 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
             return result;
         }
     }
-    if (!direct_csv) ensure_evaluation(dag);
+    if (!direct_csv && !direct_report) ensure_evaluation(dag);
     dag["goal"] = goal;
     dag["privacy"] = task_privacy.enabled;
     dag["airgap_mode"] = task_privacy.airgap;

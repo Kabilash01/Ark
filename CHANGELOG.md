@@ -171,6 +171,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   exact inline-CSV execution path verified with a live local analysis run.
 - Accepted omitted optional reflection proposal fields and verified a live CSV
   run with successful analysis and reflection on a local model.
+- Added direct report generation from supplied JSON evidence and verified
+  LaTeX output without model or citation-graph services.
 
 ## No standalone day-tagged commit
 

@@ -132,3 +132,10 @@ The reflection validator now defaults omitted proposal fields to no proposal
 while retaining required text validation. A second live two-row run returned
 `DONE` for both analysis and reflection, with mean `1.5`. The small model and
 single deterministic task still do not establish the all-agent criterion.
+
+`ark-cpp run 'Generate report from JSON: {...}'` now routes a supplied report
+payload directly to the native Scientific Report Generator. A local smoke run
+with a hypothesis, experiment spec, and supplied numeric results returned
+`DONE` with LaTeX output while Ollama and Neo4j were stopped. A payload missing
+the required experiment spec was rejected. This verifies deterministic report
+rendering from supplied evidence, not a live SAGE research or citation flow.
