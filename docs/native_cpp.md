@@ -43,6 +43,42 @@ dependency edges and skips tasks whose prerequisites failed.
 The dispatcher refreshes `STATE.md` after each worker finishes. Use
 `ARK_STATE_PATH` to select a different snapshot file.
 
+Saved DAGs can route a typed defensive scan through the same supervisor:
+
+```json
+{
+  "goal": "Scan the supplied Python source",
+  "tasks": [
+    {
+      "task_id": "audit",
+      "agent": "security_agent",
+      "intent": "SECURITY",
+      "instruction": "Run the configured source checks",
+      "depends_on": [],
+      "parallel_with": [],
+      "payload": {
+        "language": "python",
+        "files": {"app.py": "query = request.args.get('q')"}
+      }
+    }
+  ]
+}
+```
+
+Save the plan as `security-plan.json`, then run:
+
+```bash
+build/ark-cpp dispatch < security-plan.json
+```
+
+Security payloads are capped at
+64 KiB and accept only source text, scanner selection, and local advisory data;
+host report paths are rejected. Source scans require the configured Docker
+scanner image. The pure `check_dependencies` action compares supplied pinned
+versions against supplied advisory records without network access. Saved-DAG
+dispatch still does not expose `document_agent`; use `ark-cpp document` for that
+workflow.
+
 Set `ARK_REDIS_PORT` and `ARK_EPISODIC_DB` to persist native run metadata to
 Redis and SQLite. Run `ark-cpp audit` and `ark-cpp episodes` with the same
 settings to inspect it. Native working memory, pub/sub, registry hashes, and

@@ -39,3 +39,10 @@ bounded inputs and dedicated adapters, and the DevOps, analysis, GitHub, and
 science specialists remain direct workflows. The live planner → terminal →
 Docker → evaluator flow has not been run here because model and service
 availability remains gated.
+
+Saved-DAG `ark-cpp dispatch` also routes typed `security_agent` requests. Its
+payload is capped at 64 KiB, uses inline source text or caller-supplied local
+advisories, and rejects host report paths. The source scanner still requires
+Docker. This is an explicit saved-plan integration; the normal natural-language
+planner does not invent source files or automatically schedule a security
+scan. Document generation remains a direct CLI workflow.

@@ -142,6 +142,12 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
     for (const auto& raw : dag["tasks"]) {
         Task task{nonempty_string(raw, "task_id"), nonempty_string(raw, "agent"),
                   nonempty_string(raw, "intent"), nonempty_string(raw, "instruction"), ids(raw, "depends_on")};
+        if (raw.contains("payload")) {
+            if (!raw.at("payload").is_object() || raw.at("payload").dump().size() > 64 * 1024) {
+                throw std::invalid_argument("Task payload must be an object no larger than 64 KiB");
+            }
+            task.payload = raw.at("payload");
+        }
         if (!indices.emplace(task.id, tasks.size()).second) {
             throw std::invalid_argument("Duplicate task ID " + task.id);
         }
@@ -153,6 +159,23 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
         }
         if (task.agent == "terminal_agent" && task.intent != "EXECUTE") {
             throw std::invalid_argument("terminal_agent requires EXECUTE intent for task " + task.id);
+        }
+        if (task.agent == "security_agent") {
+            if (task.intent != "SECURITY") {
+                throw std::invalid_argument("security_agent requires SECURITY intent for task " + task.id);
+            }
+            static const std::set<std::string, std::less<>> allowed_payload_keys{
+                "action", "advisories", "dependencies", "files", "language"};
+            for (auto it = task.payload.begin(); it != task.payload.end(); ++it) {
+                if (!allowed_payload_keys.contains(it.key())) {
+                    throw std::invalid_argument("Unsupported security task payload field: " + it.key());
+                }
+            }
+            const auto action = task.payload.value("action", "audit");
+            const bool dependency_check = action == "check_dependencies";
+            if (!dependency_check && (!task.payload.contains("files") || !task.payload.at("files").is_object())) {
+                throw std::invalid_argument("Security source scan requires a files object");
+            }
         }
         (void)ids(raw, "parallel_with");
         tasks.push_back(std::move(task));

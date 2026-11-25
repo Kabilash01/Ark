@@ -75,6 +75,47 @@ void native_terminal_tasks_require_explicit_opt_in() {
     check(rejected, "terminal worker accepted a non-execution intent");
 }
 
+void security_tasks_preserve_only_bounded_source_inputs() {
+    auto security = task("audit", Json::array(), "security_agent");
+    security["intent"] = "SECURITY";
+    security["payload"] = {{"language", "python"}, {"files", {{"app.py", "query = request.args.get('q')\n"}}}};
+    const Json plan{{"tasks", {security}}};
+    bool rejected = false;
+    try { (void)ark::order_tasks(plan); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    check(rejected, "security task was accepted without native-tool opt-in");
+    const auto layers = ark::order_tasks(plan, true);
+    check(layers.at(0).at(0).payload == security.at("payload"),
+          "typed security input was dropped while validating the task DAG");
+    int calls = 0;
+    const auto run = ark::supervise_plan(plan, [&](const ark::Task& work, const Json&, int, const Json&) {
+        ++calls;
+        check(work.payload.at("files").at("app.py").get<std::string>().starts_with("query ="),
+              "security worker did not receive source text");
+        return Json{{"status", "DONE"}, {"output", {{"findings", Json::array()}}}};
+    }, [](std::string_view) { return true; }, 1, {}, true);
+    check(calls == 1 && run.results.at("audit").at("status") == "DONE",
+          "supervised security task did not complete");
+
+    security["payload"]["report_path"] = "/tmp/untrusted-report.html";
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {security}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("Unsupported security task payload field") != std::string_view::npos;
+    }
+    check(rejected, "security task accepted a host report path");
+
+    security["payload"].erase("report_path");
+    security["payload"]["action"] = "run_semgrep";
+    security["intent"] = "EXECUTE";
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {security}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("requires SECURITY") != std::string_view::npos;
+    }
+    check(rejected, "security worker accepted a non-security intent");
+}
+
 void route_in_parallel() {
     std::mutex mutex;
     std::condition_variable partners;
@@ -273,6 +314,7 @@ int main() {
     try {
         validate_graph();
         native_terminal_tasks_require_explicit_opt_in();
+        security_tasks_preserve_only_bounded_source_inputs();
         route_in_parallel();
         skip_blocked_tasks();
         retries_without_replaying_successful_tasks();

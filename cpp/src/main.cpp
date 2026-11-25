@@ -337,6 +337,9 @@ ark::AgentProfile actor_profile(std::string_view name, const std::string& genera
     } else if (name == "terminal_agent") {
         defaults = {"1.0.0", "docker-sandbox", {{"system", "Run requested shell commands only inside the restricted Docker sandbox."}}};
         capabilities = {"EXECUTE"};
+    } else if (name == "security_agent") {
+        defaults = {"1.0.0", "semgrep-bandit", {{"system", "Run defensive source and dependency checks on supplied files only."}}};
+        capabilities = {"SECURITY"};
     } else {
         throw std::invalid_argument("Unknown versioned agent " + std::string(name));
     }
@@ -553,7 +556,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     }
     const auto profiles = [&] {
         std::map<std::string, ark::AgentProfile, std::less<>> resolved;
-        for (const auto& layer : ark::order_tasks(dag)) {
+        for (const auto& layer : ark::order_tasks(dag, include_native_tools)) {
             for (const auto& task : layer) {
                 if (task.agent != "memory_agent" && !resolved.contains(task.agent)) {
                     const auto model = task.agent == "vision_agent" ? configured_model("ARK_VISION_MODEL", "vision") : settings.model;
@@ -640,6 +643,10 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
             message["payload"]["timeout_seconds"] = 30;
             result = ark::TerminalAgent(docker_sandbox(std::ref(http))).run(std::move(message));
             result["agent_version"] = "terminal_agent@" + profiles.at(task.agent).version;
+        } else if (task.agent == "security_agent") {
+            message["payload"] = task.payload;
+            result = ark::SecurityAgent(docker_sandbox(std::ref(http))).run(std::move(message));
+            result["agent_version"] = "security_agent@" + profiles.at(task.agent).version;
         } else {
             result = research_pool.run([&](std::string_view instance) {
                 auto assigned = source;
@@ -1710,7 +1717,13 @@ int main(int argc, char** argv) {
             return result.at("status") == "DONE" ? 0 : 1;
         }
         if (command == "dispatch" && argc == 2) {
-            return print_run(dispatch(ark::Json::parse(std::cin), config()));
+            const auto dag = ark::Json::parse(std::cin);
+            for (const auto& task : dag.at("tasks")) {
+                if (task.value("agent", "") == "document_agent") {
+                    throw std::invalid_argument("document_agent is not available in supervised dispatch yet; use ark-cpp document");
+                }
+            }
+            return print_run(dispatch(dag, config(), "DISPATCH", {}, ark::Json::object(), false, {}, true));
         }
         if (command == "conflict-check" && argc == 2) {
             const auto input = ark::Json::parse(std::cin);

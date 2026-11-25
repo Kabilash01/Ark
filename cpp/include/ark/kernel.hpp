@@ -17,6 +17,7 @@ struct Task {
     std::string intent;
     std::string instruction;
     std::vector<std::string> dependencies;
+    Json payload = Json::object();
 };
 
 using TaskLayer = std::vector<Task>;

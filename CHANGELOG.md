@@ -118,6 +118,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   in the restricted Docker sandbox. Planner and kernel tests cover the typed
   route and the native-tool opt-in boundary; a live planner-to-Docker run is
   still unverified.
+- Added typed `security_agent` tasks to saved-DAG dispatch with a 64 KiB payload
+  cap and host report-path rejection. Source scans still require Docker.
 
 ## No standalone day-tagged commit
 

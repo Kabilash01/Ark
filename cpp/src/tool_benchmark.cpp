@@ -31,9 +31,14 @@ Json coordinated_case(const Json& task, const Transport& transport, std::string_
             throw std::invalid_argument("Workflow stage kind or ID is invalid");
         }
         const auto intent = kind == "security" ? "SECURITY" : kind == "browser" ? "BROWSE" : "EXECUTE";
-        dag["tasks"].push_back({{"task_id", id}, {"agent", agent}, {"intent", intent},
+        Json planned_stage{{"task_id", id}, {"agent", agent}, {"intent", intent},
             {"instruction", stage.value("instruction", "Run the declared local benchmark stage")},
-            {"depends_on", stage.value("depends_on", Json::array())}, {"parallel_with", Json::array()}});
+            {"depends_on", stage.value("depends_on", Json::array())}, {"parallel_with", Json::array()}};
+        if (kind == "security") {
+            planned_stage["payload"] = stage.at("fixture");
+            planned_stage["payload"]["action"] = "check_dependencies";
+        }
+        dag["tasks"].push_back(std::move(planned_stage));
     }
     const auto max_workers = task.at("fixture").value("max_workers", 4);
     if (max_workers < 1 || max_workers > 12) throw std::invalid_argument("Workflow max_workers must be from 1 to 12");
