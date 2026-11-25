@@ -154,3 +154,9 @@ is routed through local inference, Qdrant, and Neo4j adapters but remains
 service-gated. Self-improvement supports Coding Agent proposal generation;
 benchmark gating and promotion remain available only through the explicit A/B
 command. Live full-stack verification is still open.
+
+The previously skipped browser and Phase 2 integration tests were later run
+with installed Chromium, Docker, and a temporary local Redis instance; both
+passed. Phase 2 uses fixture model and provider replies. The temporary Redis
+instance was stopped after the run. The Day 96 all-agent and live-model claims
+remain open.

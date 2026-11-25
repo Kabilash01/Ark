@@ -99,3 +99,13 @@ Natural-language GitHub issue listing now plans a read-only task for a named
 goal. The same validation now rejects Materials Project IDs absent from the
 goal, tightening the earlier prompt-only instruction. Live GitHub and Materials
 Project requests still require their respective configured credentials.
+
+## Service-enabled verification — 2026-11-25
+
+With installed Chromium and Docker and a temporary local Redis instance on
+port 16379, `ark_browser_tests` and `ark_phase2_integration_tests` both passed.
+The Phase 2 test uses fixture model and provider responses while exercising
+live Chromium, Docker, Redis, and SQLite. The other 38 CTest entries passed in
+the standard local run. The temporary Redis instance was stopped afterward.
+This evidence verifies the Phase 2 path; it does not include a live local model,
+Qdrant, Neo4j, Materials Project, or the Day 96 all-20-agent task.
