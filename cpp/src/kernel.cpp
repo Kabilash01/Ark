@@ -14,14 +14,14 @@
 namespace ark {
 namespace {
 
-constexpr std::array<std::string_view, 20> intents{
+constexpr std::array<std::string_view, 21> intents{
     "RESEARCH", "CODE", "SEARCH", "EXECUTE", "STORE", "EVALUATE", "REFLECT",
-    "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION", "DOCUMENT", "ANALYZE_DATA", "GENERATE_REPORT", "ML_OPTIMIZE", "FILES", "GITHUB", "DESIGN_EXPERIMENT",
+    "DISCOVER", "SUPERVISE", "PLAN", "BROWSE", "SECURITY", "VISION", "DOCUMENT", "ANALYZE_DATA", "GENERATE_REPORT", "ML_OPTIMIZE", "FILES", "GITHUB", "DESIGN_EXPERIMENT", "DEVOPS",
 };
-constexpr std::array<std::string_view, 17> workers{
+constexpr std::array<std::string_view, 18> workers{
     "research_agent", "coding_agent", "evaluation_agent", "memory_agent", "web_search_agent",
     "browser_agent", "document_agent", "terminal_agent", "security_agent", "vision_agent", "data_analysis_agent",
-    "scientific_report_generator", "ml_engineer_agent", "file_system_agent", "capability_discovery_agent", "github_agent", "experiment_designer",
+    "scientific_report_generator", "ml_engineer_agent", "file_system_agent", "capability_discovery_agent", "github_agent", "experiment_designer", "devops_agent",
 };
 
 bool contains(const auto& values, std::string_view value) {
@@ -157,7 +157,7 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
             || task.agent == "security_agent" || task.agent == "data_analysis_agent"
             || task.agent == "scientific_report_generator" || task.agent == "ml_engineer_agent"
             || task.agent == "file_system_agent" || task.agent == "capability_discovery_agent"
-            || task.agent == "github_agent" || task.agent == "experiment_designer";
+            || task.agent == "github_agent" || task.agent == "experiment_designer" || task.agent == "devops_agent";
         if ((!contains(workers, task.agent) || (tool_worker && !include_native_tools)) || !contains(intents, task.intent)) {
             throw std::invalid_argument("Unknown worker or intent for task " + task.id + ": "
                                         + task.agent + " / " + task.intent);
@@ -332,6 +332,30 @@ std::vector<TaskLayer> order_tasks(const Json& dag, bool include_native_tools) {
                 || task.payload.at("hypothesis").get<std::string>().empty()
                 || task.payload.at("hypothesis").get<std::string>().size() > 2500) {
                 throw std::invalid_argument("Experiment design task requires one hypothesis field of 1–2500 bytes");
+            }
+        }
+        if (task.agent == "devops_agent") {
+            if (task.intent != "DEVOPS") throw std::invalid_argument("devops_agent requires DEVOPS intent for task " + task.id);
+            if (task.payload.size() != 2 || !task.payload.contains("files") || !task.payload.at("files").is_object()
+                || task.payload.at("files").empty() || task.payload.at("files").size() > 50
+                || !task.payload.at("files").contains("Dockerfile") || !task.payload.contains("command")
+                || !task.payload.at("command").is_array() || task.payload.at("command").empty()
+                || task.payload.at("command").size() > 20) {
+                throw std::invalid_argument("DevOps DAG tasks require a Dockerfile build context and command array");
+            }
+            std::size_t total_bytes = 0;
+            for (const auto& [path, contents] : task.payload.at("files").items()) {
+                if (path.empty() || path.size() > 100 || path.starts_with('/') || path.find("..") != std::string::npos
+                    || path.find('\\') != std::string::npos || !contents.is_string()) {
+                    throw std::invalid_argument("DevOps build files must be bounded relative text paths");
+                }
+                total_bytes += contents.get_ref<const std::string&>().size();
+                if (total_bytes > 48 * 1024) throw std::invalid_argument("Saved-DAG DevOps build context exceeds 48 KiB");
+            }
+            for (const auto& arg : task.payload.at("command")) {
+                if (!arg.is_string() || arg.get<std::string>().empty() || arg.get<std::string>().size() > 1000) {
+                    throw std::invalid_argument("DevOps command arguments must be non-empty strings up to 1000 bytes");
+                }
             }
         }
         if (task.agent == "memory_agent") {

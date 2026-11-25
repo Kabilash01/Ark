@@ -139,6 +139,8 @@ This is a development-history index reconstructed from commits tagged `[Day NN]`
   commit actions remain excluded from that route.
 - Routed Experiment Designer tasks through configured local inference with a
   single bounded hypothesis payload.
+- Routed bounded DevOps build/run tasks through the existing network-disabled
+  Docker execution path.
 
 ## No standalone day-tagged commit
 

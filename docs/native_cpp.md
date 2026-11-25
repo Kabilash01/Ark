@@ -111,6 +111,10 @@ pushes, and cloning remain unavailable through saved DAGs.
 `experiment_designer` accepts a single hypothesis of at most 2,500 bytes and
 uses the configured local Ollama or llama.cpp backend to return its structured
 C++20 study design. It requires a running local model for live execution.
+`devops_agent` saved-DAG tasks build from an inline context containing a
+Dockerfile and run an argument array in its existing network-disabled,
+resource-limited Docker container. Saved-DAG contexts are capped at 48 KiB and
+require relative text paths; a configured Docker socket is required at runtime.
 
 Set `ARK_REDIS_PORT` and `ARK_EPISODIC_DB` to persist native run metadata to
 Redis and SQLite. Run `ark-cpp audit` and `ark-cpp episodes` with the same

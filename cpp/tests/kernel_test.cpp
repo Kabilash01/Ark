@@ -402,6 +402,33 @@ void experiment_design_tasks_require_one_bounded_hypothesis() {
     check(rejected, "experiment task accepted an oversized hypothesis");
 }
 
+void devops_tasks_require_bounded_relative_build_contexts() {
+    auto devops = task("run-container", Json::array(), "devops_agent");
+    devops["intent"] = "DEVOPS";
+    devops["payload"] = {{"files", {{"Dockerfile", "FROM scratch\n"}, {"run.txt", "fixture"}}},
+        {"command", Json::array({"/bin/true"})}};
+    const Json plan{{"tasks", {devops}}};
+    bool rejected = false;
+    try { (void)ark::order_tasks(plan); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    check(rejected, "DevOps task was accepted without native-tool opt-in");
+    check(ark::order_tasks(plan, true).at(0).at(0).payload == devops.at("payload"),
+          "bounded DevOps task payload was not preserved");
+    devops["payload"]["files"]["../../etc/passwd"] = "escape";
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {devops}}}, true); }
+    catch (const std::invalid_argument& error) {
+        rejected = std::string_view(error.what()).find("relative text paths") != std::string_view::npos;
+    }
+    check(rejected, "DevOps build context accepted a traversal path");
+    devops["payload"]["files"].erase("../../etc/passwd");
+    devops["payload"]["extra"] = true;
+    rejected = false;
+    try { (void)ark::order_tasks({{"tasks", {devops}}}, true); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    check(rejected, "DevOps task accepted an unsupported top-level field");
+}
+
 void route_in_parallel() {
     std::mutex mutex;
     std::condition_variable partners;
@@ -614,6 +641,7 @@ int main() {
         capability_discovery_tasks_use_only_typed_evidence();
         github_saved_dag_tasks_are_read_only();
         experiment_design_tasks_require_one_bounded_hypothesis();
+        devops_tasks_require_bounded_relative_build_contexts();
         route_in_parallel();
         skip_blocked_tasks();
         retries_without_replaying_successful_tasks();

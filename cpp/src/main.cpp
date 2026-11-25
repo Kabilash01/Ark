@@ -568,6 +568,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
                     && task.agent != "capability_discovery_agent"
                     && task.agent != "github_agent"
                     && task.agent != "experiment_designer"
+                    && task.agent != "devops_agent"
                     && !resolved.contains(task.agent)) {
                     const auto model = task.agent == "vision_agent" ? configured_model("ARK_VISION_MODEL", "vision") : settings.model;
                     resolved.emplace(task.agent, actor_profile(task.agent, model, redis.get()));
@@ -603,6 +604,9 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
     if (std::any_of(dag.at("tasks").begin(), dag.at("tasks").end(), [](const auto& task) {
             return task.value("agent", "") == "experiment_designer";
         })) versions["experiment_designer"] = "1.0.0";
+    if (std::any_of(dag.at("tasks").begin(), dag.at("tasks").end(), [](const auto& task) {
+            return task.value("agent", "") == "devops_agent";
+        })) versions["devops_agent"] = "1.0.0";
     if (events) {
         auto plan = ark::Json::array();
         for (const auto& task : dag.at("tasks")) {
@@ -756,6 +760,10 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
             result = ark::ExperimentDesigner(transport, model_url, profile, provider)
                 .run(ark::make_message("router", "experiment_designer", task.intent, task.payload, parent_id));
             result["agent_version"] = "experiment_designer@" + profile.version;
+        } else if (task.agent == "devops_agent") {
+            result = ark::DevOpsAgent(transport, env("ARK_DOCKER_SOCKET", "/var/run/docker.sock"))
+                .run(ark::make_message("router", "devops_agent", task.intent, task.payload, parent_id));
+            result["agent_version"] = "devops_agent@1.0.0";
         } else {
             result = research_pool.run([&](std::string_view instance) {
                 auto assigned = source;
@@ -804,6 +812,7 @@ ark::Json dispatch(const ark::Json& dag, const ark::ResearchConfig& settings, st
             || name == "scientific_report_generator" || name == "ml_engineer_agent"
             || name == "file_system_agent" || name == "capability_discovery_agent"
             || name == "github_agent" || name == "experiment_designer") return true;
+        if (name == "devops_agent") return true;
         if (!profiles.contains(name)) {
             return false;
         }
