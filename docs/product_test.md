@@ -99,3 +99,11 @@ banner, `web_search_agent` with a Tavily query that returned five citations,
 and `browser_agent` against the local dashboard heading. The Browser Agent
 used its full action budget but had already captured the requested heading;
 the runtime now returns that evidence with an explicit action-limit reason.
+
+On 2026-11-26, a failed research task exposed a Reflection Agent reply missing
+`what_worked`. Reflection now requests a complete JSON shape from Ollama,
+normalizes the unscored `-1` quality sentinel, and retains recorded worker
+errors in failed-task reviews. An incomplete self-improvement recommendation
+is discarded without failing the review. The active Reflection Agent was
+versioned to `1.0.1` on the installed `qwen2.5vl:7b` model. Live successful
+CSV and failed airgap research tasks both returned `reflection.status=DONE`.

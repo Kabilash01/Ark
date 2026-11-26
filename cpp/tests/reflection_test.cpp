@@ -33,11 +33,18 @@ void persists_reflection_skills_and_flags() {
                {"flag_for_self_improvement", true}, {"agent_version_recommendation", {
                    {"agent_name", "coding_agent"}, {"reason", "Timed out on first attempt"}, {"version", "invented"}}}};
     bool received_conflict = false;
+    bool received_unscored = false;
     ark::ReflectionAgent agent([&](const ark::Request& request) {
         const auto body = Json::parse(request.body);
         check(body.at("model") == "local-reflection", "incorrect reflection model");
+        check(body.at("format").at("required").size() == 6
+                  && body.at("format").at("properties").contains("what_worked"),
+              "reflection output schema was not sent to the model");
         const auto evidence = Json::parse(body.at("messages").at(1).at("content").get<std::string>());
-        check(evidence.at("attempts").at(0).at("status") == "RETRY", "failed attempt omitted from evidence");
+        check(evidence.at("attempts").at(0).at("status") == "RETRY"
+                  || evidence.at("attempts").at(0).at("status") == "DONE",
+              "attempt omitted from reflection evidence");
+        if (evidence.at("status") == "DONE" && evidence.at("quality_score").is_null()) received_unscored = true;
         received_conflict = evidence.contains("memory_conflicts_pending_human_review");
         return ark::Response{200, Json{{"message", {{"content", reply.dump()}}}}.dump()};
     }, "http://localhost:11434", ark::reflection_profile("local-reflection"));
@@ -65,6 +72,29 @@ void persists_reflection_skills_and_flags() {
     check(sparse.at("status") == "DONE" && sparse.at("skill_update").is_null()
               && sparse.at("flag_for_self_improvement") == false,
           "missing optional reflection fields should mean no proposal");
+    reply["flag_for_self_improvement"] = true;
+    reply["agent_version_recommendation"] = nullptr;
+    const auto incomplete = agent.run(task, episodes, skills);
+    check(incomplete.at("status") == "DONE" && incomplete.at("flag_for_self_improvement") == false
+              && incomplete.at("agent_version_recommendation").is_null(),
+          "incomplete model recommendation failed the whole reflection");
+    reply.erase("flag_for_self_improvement");
+    reply.erase("agent_version_recommendation");
+    task["escalations"] = Json::array({{{"agent", "research_agent"}, {"detail", "Ollama returned HTTP 400"}}});
+    const auto failed = agent.run(task, episodes, skills);
+    check(failed.at("status") == "DONE" && failed.at("what_failed") == "research_agent: Ollama returned HTTP 400"
+              && failed.at("what_worked") == "No completed worker step recorded.",
+          "failed task reflection omitted the recorded worker error");
+    task.erase("escalations");
+    task["status"] = "DONE";
+    task["quality_score"] = -1.0;
+    task["attempts"] = Json::array({{{"status", "DONE"}}});
+    const auto unscored = agent.run(task, episodes, skills);
+    check(received_unscored && unscored.at("status") == "DONE" && !unscored.contains("skill_id")
+              && unscored.at("what_failed") == "No failure recorded.",
+          "unscored task was treated as a failed or accepted scored task");
+    task["status"] = "FAILED";
+    task["quality_score"] = nullptr;
     skills.add("CODE", "Run the contract suite", {"Run a sampled test"}, "coding_agent");
     reply["what_worked"] = 5;
     const auto invalid = agent.run(task, episodes, skills);
@@ -72,7 +102,7 @@ void persists_reflection_skills_and_flags() {
           "invalid output should be logged as a failed reflection");
     check(received_conflict && invalid.at("memory_conflicts_pending_human_review").size() == 1,
           "Reflection did not receive the durable memory conflict");
-    check(reopened.by_agent("reflection_agent").size() == 4, "missing reflection episodes");
+    check(reopened.by_agent("reflection_agent").size() == 7, "missing reflection episodes");
 }
 
 } // namespace
