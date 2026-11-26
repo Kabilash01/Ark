@@ -128,6 +128,40 @@ void observes_and_extracts_from_real_chromium(const char* executable) {
           "browser opened a resource outside the requested host");
 }
 
+void completes_captured_evidence_at_budget(const char* executable) {
+    Site site;
+    site.server.Get("/", [](const auto&, httplib::Response& response) {
+        response.set_content("<!doctype html><title>ARK</title><h1>Operations</h1>", "text/html");
+    });
+    const auto url = site.start("127.0.0.1") + "/";
+    int calls = 0;
+    const ark::BrowserAgent agent([&](const auto&) {
+        return action_reply(calls++ == 0 ? Json{{"action", "navigate"}, {"url", url}}
+                                           : Json{{"action", "extract"}, {"kind", "text"}, {"selector", "h1"}});
+    }, "http://localhost:11434", ark::browser_profile("fixture-browser"),
+        {.executable = executable, .timeout = 3000ms});
+    const auto captured = agent.run(request("Browse " + url + " and extract the page heading"));
+    check(captured.at("status") == "DONE" && calls == 8
+          && captured.at("output").at("completion_reason") == "evidence_captured_at_action_limit"
+          && captured.at("output").at("extractions").at(0).at("items") == Json::array({"Operations"}),
+          "browser discarded valid evidence when the model repeated extraction");
+    calls = 0;
+    const auto incomplete = agent.run(request("Browse " + url + " and extract the first three titles"));
+    check(incomplete.at("status") == "FAILED" && calls == 8,
+          "browser accepted an extraction that missed the requested count");
+    int failed_click_calls = 0;
+    const ark::BrowserAgent invalid_click([&](const auto&) {
+        const auto step = failed_click_calls++;
+        if (step == 0) return action_reply({{"action", "navigate"}, {"url", url}});
+        if (step == 1) return action_reply({{"action", "click"}, {"selector", "#missing"}});
+        return action_reply({{"action", "extract"}, {"kind", "text"}, {"selector", "h1"}});
+    }, "http://localhost:11434", ark::browser_profile("fixture-browser"),
+        {.executable = executable, .timeout = 3000ms});
+    const auto not_clicked = invalid_click.run(request("Browse " + url + ", click the missing button, and extract the page heading"));
+    check(not_clicked.at("status") == "FAILED" && failed_click_calls == 8,
+          "browser accepted a capture after the requested interaction failed");
+}
+
 } // namespace
 
 int main() {
@@ -135,6 +169,7 @@ int main() {
         validates_before_running_a_model();
         if (const auto* executable = std::getenv("ARK_TEST_CHROMIUM")) {
             observes_and_extracts_from_real_chromium(executable);
+            completes_captured_evidence_at_budget(executable);
         }
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

@@ -24,6 +24,7 @@ Choose the shared selector for repeated entries. If the user gives a count, set 
 action to that count. For example, "the first three paper titles" requires an extract action with "limit":3.
 Check the captured count before completing the task.
 If the task requests a screenshot, use screenshot. When the requested evidence is captured, return {"action":"done"}.
+Do not repeat an extraction that already captured the requested evidence.
 Return only a JSON action. The tool returns the captured values to the user.)";
 
 constexpr std::array<std::string_view, 6> action_names{"navigate", "click", "type", "extract", "screenshot", "done"};
@@ -221,6 +222,27 @@ Json BrowserAgent::run(Json message, const BrowserActivity& activity) const {
             }
             notify(activity, action, item.at("status").get_ref<const std::string&>());
             trace.push_back(std::move(item));
+        }
+        static const std::regex extract_request(R"(\b(?:extract|read)\b)", std::regex::icase);
+        static const std::regex screenshot_request(R"(\bscreenshot\b)", std::regex::icase);
+        static const std::regex interaction_request(R"(\b(?:click|type|fill|submit)\b)", std::regex::icase);
+        const bool wants_extract = std::regex_search(goal, extract_request);
+        const bool wants_screenshot = std::regex_search(goal, screenshot_request);
+        const bool count_met = !count || std::any_of(extractions.begin(), extractions.end(), [&](const auto& extraction) {
+            return extraction.at("items").size() == *count;
+        });
+        const bool interaction_done = std::any_of(trace.begin(), trace.end(), [](const Json& entry) {
+            return (entry.at("action") == "click" || entry.at("action") == "type") && entry.value("status", "") == "DONE";
+        });
+        if ((wants_extract || wants_screenshot) && (!wants_extract || !extractions.empty())
+            && (!wants_screenshot || !screenshots.empty()) && count_met
+            && (!std::regex_search(goal, interaction_request) || interaction_done)) {
+            message["status"] = "DONE";
+            message["output"] = {{"summary", "Captured browser evidence from " + host + " at the action limit"},
+                {"completion_reason", "evidence_captured_at_action_limit"},
+                {"extractions", std::move(extractions)}, {"screenshots", std::move(screenshots)},
+                {"actions", std::move(trace)}};
+            return message;
         }
         throw std::runtime_error("Browser agent exhausted its eight-action budget");
     } catch (const std::exception& error) {

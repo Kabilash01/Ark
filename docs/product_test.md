@@ -11,7 +11,9 @@ OLLAMA_NO_CLOUD=1 ollama serve
 In another terminal, start Redis if it is not already running, then start ARK:
 
 ```bash
-redis-server --bind 127.0.0.1 --port 6379 --save '' --appendonly no --daemonize yes
+mkdir -p data/redis
+redis-server --bind 127.0.0.1 --port 6379 --dir "$PWD/data/redis" \
+  --appendonly yes --save 60 1 --daemonize yes
 ARK_MODEL=qwen2.5:7b ARK_CODE_MODEL=qwen2.5:7b \
   ARK_EVAL_MODEL=qwen2.5:7b ARK_REFLECTION_MODEL=qwen2.5:7b \
   ARK_REDIS_PORT=6379 build/ark-cpp serve 8000
@@ -22,6 +24,9 @@ For a lightweight check before the 7B model is installed, use
 CSV goal below executes deterministically. The 0.5B model has misclassified
 ordinary free-text goals in a live check, so use the configured 7B model when
 assessing natural-language planning quality.
+
+The local Redis AOF under `data/redis` preserves agent profiles and versions
+across Redis restarts. The directory is ignored by Git.
 
 Install the models first with `ollama pull qwen2.5:7b` and
 `ollama pull qwen2.5-coder:7b` if needed. Open
@@ -88,3 +93,9 @@ dashboard then showed 19 ready agents and one needing setup: web search still
 requires `TAVILY_API_KEY`. Downloads of the separate general and coding 7B
 models were interrupted by registry DNS failures, so this verification used
 the installed vision model for those four active profiles.
+
+A later live check exercised `terminal_agent` inside Docker with an ASCII
+banner, `web_search_agent` with a Tavily query that returned five citations,
+and `browser_agent` against the local dashboard heading. The Browser Agent
+used its full action budget but had already captured the requested heading;
+the runtime now returns that evidence with an explicit action-limit reason.
