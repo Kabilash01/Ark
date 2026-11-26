@@ -67,12 +67,36 @@ void caps_repairs() {
     check(result.at("status") == "FAILED" && result.at("retry_count") == 3 && calls == 4, result.dump());
 }
 
+void repairs_generated_nan_assertion(const char* socket) {
+    constexpr auto generated = "import unittest\nfrom solution import add\n"
+        "class TestSolution(unittest.TestCase):\n"
+        " def test_nan(self):\n"
+        "  self.assertEqual(add(float('nan'), 0), float('nan'))\n";
+    int calls = 0;
+    ark::CurlTransport http;
+    const ark::DockerSandbox sandbox(std::ref(http), socket ? socket : "/var/run/docker.sock");
+    ark::CodingAgent agent([&](const auto&) {
+        ++calls;
+        return ark::Response{200, Json{{"message", {{"content", Json{{"filename", "solution.py"},
+            {"source", good_solution}, {"test_source", generated}}.dump()}}}}.dump()};
+    }, "http://localhost:11434", "fixture-coder", [&](const auto& workspace) {
+        const auto corrected = workspace.read_file("test_solution.py");
+        check(corrected.find("import math") != std::string::npos
+              && corrected.find("self.assertTrue(math.isnan(add(float('nan'), 0)))") != std::string::npos,
+              "invalid generated NaN equality was not corrected");
+        return socket ? sandbox.run_tests(workspace) : ark::SandboxResult{0, false, "", "Ran 1 test"};
+    });
+    const auto result = agent.run(ark::make_message("router", "coding_agent", "CODE", {{"instruction", "Implement integer add"}}));
+    check(result.at("status") == "DONE" && calls == 1, result.dump());
+}
+
 } // namespace
 
 int main() {
     try {
         repair_injected_bug(std::getenv("ARK_TEST_DOCKER_SOCKET"));
         caps_repairs();
+        repairs_generated_nan_assertion(std::getenv("ARK_TEST_DOCKER_SOCKET"));
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

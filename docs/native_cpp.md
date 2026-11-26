@@ -431,11 +431,13 @@ reaches Tavily. Private requests require `api.tavily.com` in the configured
 allowlist. [Tavily Search API](https://docs.tavily.com/documentation/api-reference/endpoint/search)
 
 Set `allowed_directories` in `config/file_system.json` or the equivalent
-file under `ARK_CONFIG_DIR`. Map each workspace name to an absolute directory.
-The default configuration grants access to no directories.
+file under `ARK_CONFIG_DIR`. Map each workspace name to an absolute directory,
+or to a path under the project `data/` directory. Relative project data paths
+are created during agent setup. The default configuration grants access
+only to `data/agent_files` as `workspace`.
 
 ```json
-{"allowed_directories":{"notes":"/absolute/path/to/notes"}}
+{"allowed_directories":{"workspace":"data/agent_files","notes":"/absolute/path/to/notes"}}
 ```
 
 ```bash

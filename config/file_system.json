@@ -1,3 +1,5 @@
 {
-  "allowed_directories": {}
+  "allowed_directories": {
+    "workspace": "data/agent_files"
+  }
 }

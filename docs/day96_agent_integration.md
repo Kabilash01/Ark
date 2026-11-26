@@ -157,5 +157,6 @@ This is a container execution check, not a deployed REST API or all-agent run.
 write actions to the File System Agent using only configured root aliases.
 A temporary workspace smoke run wrote and read `note.txt` successfully; the
 configured alias, workspace directory, and episodic database were temporary.
-The repository's default `config/file_system.json` still has no allowed roots,
-so normal use requires an explicit local workspace configuration.
+At the time of that smoke run, the default `config/file_system.json` had no
+allowed roots. On 2026-11-26, the default gained a dedicated
+`data/agent_files` workspace; a live CLI write, read, and list check passed.

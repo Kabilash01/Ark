@@ -401,11 +401,44 @@ ark::Json run_vision_agent(const ark::Transport& http, const ark::ResearchConfig
     return agent.run(std::move(message));
 }
 
-ark::Json run_file_operation(ark::Json payload) {
+ark::Json configured_file_roots() {
     const auto path = config_dir() / "file_system.json";
     const auto settings = std::filesystem::exists(path) ? ark::read_json(path) : ark::Json::object();
+    auto roots = settings.value("allowed_directories", ark::Json::object());
+    if (!roots.is_object()) throw std::invalid_argument("allowed_directories must be an object");
+    for (auto& [alias, root] : roots.items()) {
+        if (!root.is_string()) throw std::invalid_argument("File workspace paths must be strings");
+        const std::filesystem::path configured(root.get<std::string>());
+        if (configured.is_absolute()) continue;
+        const auto parts = std::vector(configured.begin(), configured.end());
+        if (parts.empty() || parts.front() != "data" ||
+            std::find(parts.begin(), parts.end(), "..") != parts.end()) {
+            throw std::invalid_argument("Relative file workspaces must stay under project data/");
+        }
+        const auto project_root = std::filesystem::canonical(std::filesystem::absolute(config_dir()).parent_path());
+        const auto data_root = project_root / "data";
+        const auto absolute = project_root / configured;
+        auto cursor = project_root;
+        for (const auto& part : configured) {
+            cursor /= part;
+            if (std::filesystem::is_symlink(std::filesystem::symlink_status(cursor))) {
+                throw std::invalid_argument("Relative file workspace cannot follow a symlink");
+            }
+        }
+        std::filesystem::create_directories(absolute);
+        const auto resolved = std::filesystem::canonical(absolute);
+        const auto inside_data = resolved.lexically_relative(data_root);
+        if (inside_data.empty() || *inside_data.begin() == "..") {
+            throw std::invalid_argument("Relative file workspace escapes project data/");
+        }
+        root = resolved.string();
+    }
+    return roots;
+}
+
+ark::Json run_file_operation(ark::Json payload) {
     ark::EpisodicMemory episodes(env("ARK_EPISODIC_DB", "data/episodic_memory.db"));
-    const ark::FileSystemAgent worker(settings.value("allowed_directories", ark::Json::object()));
+    const ark::FileSystemAgent worker(configured_file_roots());
     return worker.run(ark::make_message("user", "file_system_agent", "FILES", std::move(payload)), episodes);
 }
 
@@ -1528,9 +1561,6 @@ ark::Json agent_registry_snapshot(ark::Redis& redis) {
     ark::AgentRegistry registry(redis);
     const auto settings = config(false);
     const auto general_model = configured_model("ARK_MODEL", "general");
-    const auto code_model = configured_model("ARK_CODE_MODEL", "code");
-    const auto evaluation_model = env("ARK_EVAL_MODEL", general_model);
-    const auto reflection_model = env("ARK_REFLECTION_MODEL", general_model);
     const auto vision_model = configured_model("ARK_VISION_MODEL", "vision");
     ark::CurlTransport http;
     const auto probe = [&](const std::string& url, const std::string& socket = "") {
@@ -1559,9 +1589,10 @@ ark::Json agent_registry_snapshot(ark::Redis& redis) {
     const bool qdrant_ready = probe(settings.qdrant_url + "/collections");
     bool file_access_ready = false;
     try {
-        const auto path = config_dir() / "file_system.json";
-        file_access_ready = std::filesystem::exists(path)
-            && !ark::read_json(path).at("allowed_directories").empty();
+        const auto roots = configured_file_roots();
+        file_access_ready = std::any_of(roots.begin(), roots.end(), [](const ark::Json& root) {
+            return root.is_string() && std::filesystem::is_directory(root.get<std::string>());
+        });
     } catch (const std::exception&) {}
 
     auto result = registry.all();
@@ -1578,28 +1609,28 @@ ark::Json agent_registry_snapshot(ark::Redis& redis) {
             found = std::prev(result.end());
         }
         std::string reason;
+        const auto active_model = found->value("model", "");
         const auto needs_model = [&](const std::string& model) {
             if (!model_ready(model)) reason = llama_url.empty()
                 ? "Install model " + model + " and start Ollama"
                 : "Start the configured llama.cpp server";
         };
         if (spec.name == "supervisor_agent" || spec.name == "planner_agent"
-            || spec.name == "self_improvement_agent") needs_model(general_model);
-        else if (spec.name == "evaluation_agent") needs_model(evaluation_model);
-        else if (spec.name == "reflection_agent") needs_model(reflection_model);
-        else if (spec.name == "vision_agent") needs_model(vision_model);
+            || spec.name == "self_improvement_agent") needs_model(spec.versioned ? active_model : general_model);
+        else if (spec.name == "evaluation_agent" || spec.name == "reflection_agent"
+            || spec.name == "vision_agent") needs_model(active_model);
         else if (spec.name == "research_agent") {
-            needs_model(general_model);
+            needs_model(active_model);
             if (reason.empty() && !qdrant_ready) reason = "Start Qdrant";
             if (reason.empty()) needs_model(settings.embedding_model);
         } else if (spec.name == "web_search_agent") {
-            needs_model(general_model);
+            needs_model(active_model);
             if (reason.empty() && env("TAVILY_API_KEY").empty()) reason = "Set TAVILY_API_KEY";
         } else if (spec.name == "browser_agent") {
-            needs_model(general_model);
+            needs_model(active_model);
             if (reason.empty() && !executable_on_path("chromium")) reason = "Install Chromium";
         } else if (spec.name == "coding_agent") {
-            needs_model(code_model);
+            needs_model(active_model);
             if (reason.empty() && !docker_ready) reason = "Start Docker";
         } else if (spec.name == "terminal_agent" || spec.name == "devops_agent") {
             if (!docker_ready) reason = "Start Docker";
