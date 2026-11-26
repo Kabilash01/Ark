@@ -107,3 +107,19 @@ errors in failed-task reviews. An incomplete self-improvement recommendation
 is discarded without failing the review. The active Reflection Agent was
 versioned to `1.0.1` on the installed `qwen2.5vl:7b` model. Live successful
 CSV and failed airgap research tasks both returned `reflection.status=DONE`.
+
+A coding request for unspecified "attention" notes produced a planner task with
+only `RESEARCH` as its instruction and an empty Python source file. Code-only
+goals now pass the full goal directly to one Coding Agent task; invalid generated
+files receive repair feedback, and complete Markdown code fences are removed
+before sandbox tests. A precise `add(a, b)` request passed its generated tests.
+The original vague attention request still failed because its generated test
+expected attention weights that do not form a normalized distribution. Supply
+the intended attention algorithm, function signature, and expected examples
+when testing that subject; generated tests remain locked during repair.
+The dashboard `add(a, b)` task first passed Coding Agent tests but failed when
+the 0.5B Evaluation Agent exceeded its response token limit. Evaluation was
+versioned to `1.0.1` on `qwen2.5vl:7b`; the same dashboard task then completed
+with coding, evaluation, and reflection all `DONE`. A specified softmax
+attention task still failed because the model generated an exact equality test
+for approximate floating-point weights. This remains a coding-quality limit.

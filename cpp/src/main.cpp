@@ -1065,6 +1065,13 @@ ark::Json run_goal(std::string_view goal, const ark::ResearchConfig& settings, c
                     {"parallel_with", ark::Json::array()}}});
                 break;
             }
+            if (intent == "CODE" && !explicit_research) {
+                dag["tasks"] = ark::Json::array({{{"task_id", "code"}, {"agent", "coding_agent"},
+                    {"intent", "CODE"}, {"instruction", std::string(goal) + std::string(followup)},
+                    {"depends_on", ark::Json::array()}, {"parallel_with", ark::Json::array()}}});
+                dag["memory_context"] = recall(settings, goal);
+                break;
+            }
             if (intent != "RESEARCH" && intent != "SEARCH" && intent != "CODE" && intent != "EXECUTE"
                 && intent != "EVALUATE"
                 && intent != "DESIGN_EXPERIMENT" && intent != "HYPOTHESIZE" && intent != "MATERIALS_QUERY"

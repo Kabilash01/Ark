@@ -80,6 +80,22 @@ std::string cap(const std::string& value) {
     return Json::parse(normalized).get<std::string>();
 }
 
+std::string unwrap_code_fence(const std::string& value) {
+    static const std::regex fenced(R"(^\s*```(?:python|py)?[ \t]*\r?\n([\s\S]*?)\r?\n```[ \t]*\s*$)",
+                                   std::regex::icase);
+    std::smatch match;
+    return std::regex_match(value, match, fenced) ? match[1].str() + '\n' : value;
+}
+
+std::string add_missing_math_import(std::string source) {
+    static const std::regex import_math(R"((^|\n)[ \t]*import[ \t]+math([ \t]*,|[ \t]*\r?\n|[ \t]*$))");
+    if (source.find("math.") != std::string::npos && !std::regex_search(source, import_math)) {
+        if (!source.empty() && source.back() != '\n') source += '\n';
+        source += "import math\n";
+    }
+    return source;
+}
+
 std::string correct_nan_assertions(const std::string& generated) {
     static const std::regex invalid(
         R"(^([ \t]*)self\.assertEqual\((.*),[ \t]*float\(['"]nan['"]\)[ \t]*\)[ \t]*$)",
@@ -192,9 +208,17 @@ Json CodingAgent::solve(const Json& payload, const Json& memory, int repairs) co
         if (!initial.is_null() && !files.contains(filename)) {
             throw std::invalid_argument("Repair must return an existing source filename");
         }
-        files[filename] = proposed.at("source");
-        if (tests.empty()) tests = {{"test_solution.py", correct_nan_assertions(proposed.at("test_source").get<std::string>())}};
-        final = evaluate(files, attempt);
+        files[filename] = add_missing_math_import(unwrap_code_fence(proposed.at("source").get<std::string>()));
+        if (tests.empty()) tests = {{"test_solution.py", correct_nan_assertions(
+            unwrap_code_fence(proposed.at("test_source").get<std::string>()))}};
+        try {
+            final = evaluate(files, attempt);
+        } catch (const std::invalid_argument& error) {
+            if (attempt >= repairs) throw;
+            if (!payload.contains("test_files") || payload.at("test_files").empty()) tests = Json::object();
+            input["review_feedback"] = input.value("review_feedback", "")
+                + std::string("\nPrevious generated file was invalid: ") + error.what();
+        }
     }
     if (!initial.is_null()) final["initial_test_result"] = std::move(initial);
     return final;
