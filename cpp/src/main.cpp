@@ -65,6 +65,106 @@ extern char** environ;
 
 namespace {
 
+bool human_output = false;
+
+std::string human_name(std::string value) {
+    if (value.ends_with("_agent")) value.resize(value.size() - 6);
+    std::replace(value.begin(), value.end(), '_', ' ');
+    bool word_start = true;
+    for (auto& letter : value) {
+        if (letter == ' ') word_start = true;
+        else if (word_start) { letter = static_cast<char>(std::toupper(static_cast<unsigned char>(letter))); word_start = false; }
+    }
+    return value;
+}
+
+void print_human_content(const ark::Json& output) {
+    if (!output.is_object()) return;
+    for (const auto* key : {"summary", "answer", "caption", "extracted_text", "text", "content", "error_message", "reason"}) {
+        if (output.contains(key) && output.at(key).is_string() && !output.at(key).get_ref<const std::string&>().empty()) {
+            std::cout << output.at(key).get_ref<const std::string&>() << '\n';
+        }
+    }
+    if (output.contains("numeric_columns") && output.at("numeric_columns").is_array()) {
+        for (const auto& column : output.at("numeric_columns")) {
+            if (column.is_object()) std::cout << column.value("column", "Column") << ": mean "
+                << column.value("mean", 0.0) << " (" << column.value("count", 0) << " values)\n";
+        }
+    }
+    for (const auto* key : {"stdout", "stderr"}) {
+        if (output.contains(key) && output.at(key).is_string() && !output.at(key).get_ref<const std::string&>().empty()) {
+            if (std::string_view(key) == "stderr") std::cout << "Error output:\n";
+            std::cout << output.at(key).get_ref<const std::string&>();
+            if (!output.at(key).get_ref<const std::string&>().ends_with('\n')) std::cout << '\n';
+        }
+    }
+    if (output.contains("files") && output.at("files").is_object()) {
+        for (const auto& [path, source] : output.at("files").items()) {
+            if (source.is_string()) std::cout << "\n" << path << "\n" << source.get_ref<const std::string&>() << '\n';
+        }
+    }
+    if (output.contains("test_result") && output.at("test_result").is_object()) {
+        const auto& test = output.at("test_result");
+        std::cout << "Tests: " << (test.value("exit_code", 1) == 0 && !test.value("timed_out", false) ? "passed" : "failed") << '\n';
+        print_human_content(test);
+    }
+    if (output.contains("findings") && output.at("findings").is_array()) {
+        for (const auto& finding : output.at("findings")) {
+            if (finding.is_object() && finding.contains("text") && finding.at("text").is_string())
+                std::cout << "- " << finding.at("text").get_ref<const std::string&>() << '\n';
+        }
+    }
+    if (output.contains("citations") && output.at("citations").is_array()) {
+        for (const auto& citation : output.at("citations")) {
+            if (citation.is_string()) std::cout << "- " << citation.get_ref<const std::string&>() << '\n';
+            else if (citation.is_object()) std::cout << "- " << citation.value("title", "Source")
+                << " " << citation.value("url", "") << '\n';
+        }
+    }
+    if (output.contains("extractions") && output.at("extractions").is_array()) {
+        for (const auto& extraction : output.at("extractions")) {
+            if (!extraction.is_object() || !extraction.contains("items") || !extraction.at("items").is_array()) continue;
+            for (const auto& item : extraction.at("items")) {
+                if (item.is_string()) std::cout << "- " << item.get_ref<const std::string&>() << '\n';
+            }
+        }
+    }
+}
+
+void print_human_result(const ark::Json& result) {
+    std::cout << "[" << result.value("status", "UNKNOWN") << "]";
+    if (result.contains("task_id") && result.at("task_id").is_string())
+        std::cout << " " << result.at("task_id").get_ref<const std::string&>();
+    std::cout << '\n';
+    const ark::Json empty = ark::Json::object();
+    const auto& output = result.contains("results") ? result
+        : result.contains("output") ? result.at("output") : empty;
+    if (output.is_object() && output.contains("results") && output.at("results").is_object()) {
+        for (const auto& [id, worker] : output.at("results").items()) {
+            if (!worker.is_object()) continue;
+            std::cout << "\n" << human_name(worker.value("receiver", id)) << ": " << worker.value("status", "UNKNOWN") << '\n';
+            print_human_content(worker.value("output", ark::Json::object()));
+            if (worker.contains("reason") && worker.at("reason").is_string()) std::cout << worker.at("reason") << '\n';
+        }
+    } else print_human_content(output);
+    if (output.is_object() && output.contains("escalations") && output.at("escalations").is_array()) {
+        for (const auto& failure : output.at("escalations")) {
+            if (failure.is_object()) std::cout << "Error: " << human_name(failure.value("agent", "task")) << ": "
+                << failure.value("detail", "Unknown error") << '\n';
+        }
+    }
+    if (output.is_object() && output.contains("reflection") && output.at("reflection").is_object()) {
+        const auto& reflection = output.at("reflection");
+        if (reflection.value("status", "") == "DONE") {
+            std::cout << "\nReflection\n";
+            for (const auto* key : {"what_worked", "what_failed", "pattern_learned"}) {
+                if (reflection.contains(key) && reflection.at(key).is_string())
+                    std::cout << human_name(key) << ": " << reflection.at(key).get_ref<const std::string&>() << '\n';
+            }
+        }
+    }
+}
+
 std::string env(const char* name, std::string fallback = "") {
     const auto* value = std::getenv(name);
     return value && *value ? value : std::move(fallback);
@@ -254,7 +354,8 @@ int run_terminal(const char* command) {
     ark::CurlTransport http;
     const ark::TerminalAgent agent(docker_sandbox(std::ref(http)));
     const auto result = agent.run(ark::make_message("user", "terminal_agent", "EXECUTE", std::move(payload)));
-    std::cout << result.dump(2, ' ', false, ark::Json::error_handler_t::replace) << '\n';
+    if (human_output) print_human_result(result);
+    else std::cout << result.dump(2, ' ', false, ark::Json::error_handler_t::replace) << '\n';
     return result.at("status") == "DONE" ? 0 : result.at("output").value("timed_out", false) ? 124 : 1;
 }
 
@@ -1183,7 +1284,8 @@ ark::Json run_task(std::string_view goal, const ark::ResearchConfig& settings, c
 }
 
 int print_run(const ark::Json& result) {
-    std::cout << result.dump(2) << '\n';
+    if (human_output) print_human_result(result);
+    else std::cout << result.dump(2) << '\n';
     return result.at("status") == "DONE" ? 0 : 1;
 }
 
@@ -1467,7 +1569,22 @@ void api_command(std::string_view path, std::string_view method = "GET") {
     const auto response = http({"http://127.0.0.1:" + std::to_string(port) + std::string(path),
                                 std::string(method)});
     response.require_success("Native API");
-    std::cout << ark::Json::parse(response.body).dump(2) << '\n';
+    const auto result = ark::Json::parse(response.body);
+    if (!human_output) { std::cout << result.dump(2) << '\n'; return; }
+    if (result.is_array()) {
+        for (const auto& task : result) {
+            if (!task.is_object()) continue;
+            std::cout << "[" << task.value("status", "UNKNOWN") << "] " << task.value("task_id", "") << " ";
+            const auto& payload = task.value("payload", ark::Json::object());
+            if (payload.is_object() && payload.contains("goal") && payload.at("goal").is_string()) {
+                auto goal = payload.at("goal").get<std::string>().substr(0, 120);
+                std::replace(goal.begin(), goal.end(), '\n', ' ');
+                std::cout << goal;
+            }
+            std::cout << '\n';
+        }
+    } else if (result.is_object() && result.contains("status")) print_human_result(result);
+    else std::cout << result.dump(2) << '\n';
 }
 
 int manage_versions(std::string_view command, std::string_view agent, char** arguments) {
@@ -1732,8 +1849,15 @@ int serve(int port) {
 } // namespace
 
 int main(int argc, char** argv) {
+    human_output = ::isatty(STDOUT_FILENO) != 0;
+    if (argc > 1 && (std::string_view(argv[1]) == "--human" || std::string_view(argv[1]) == "--json")) {
+        human_output = std::string_view(argv[1]) == "--human";
+        ++argv;
+        --argc;
+    }
     if (argc < 2 || std::string_view(argv[1]) == "--help") {
         std::cout << "Usage: ark-cpp research [instruction]\n"
+                     "       ark-cpp --human|--json <task command>  # override terminal output format\n"
                      "       ark-cpp code [instruction]\n"
                      "       ark-cpp evaluate < message.json\n"
                      "       ark-cpp web-search [--privacy|--airgap] <query>\n"
@@ -2151,7 +2275,8 @@ int main(int argc, char** argv) {
             const auto result = research_pool.run([&](std::string_view) {
                 return ark::ResearchAgent(std::ref(http), settings, profile).run(std::move(message));
             });
-            std::cout << result.dump(2) << '\n';
+            if (human_output) print_human_result(result);
+            else std::cout << result.dump(2) << '\n';
             return result.at("status") == "DONE" ? 0 : 1;
         }
         if (command == "code" && argc <= 3) {
@@ -2162,7 +2287,8 @@ int main(int argc, char** argv) {
             const auto redis = version_store();
             const auto result = run_coding(std::ref(http), config(false), std::move(message),
                                            actor_profile("coding_agent", "", redis.get()));
-            std::cout << result.dump(2) << '\n';
+            if (human_output) print_human_result(result);
+            else std::cout << result.dump(2) << '\n';
             return result.at("status") == "DONE" ? 0 : 1;
         }
         if (command == "evaluate" && argc == 2) {
@@ -2171,7 +2297,8 @@ int main(int argc, char** argv) {
             const auto redis = version_store();
             const auto result = run_evaluation(std::ref(http), settings, ark::Json::parse(std::cin),
                                                actor_profile("evaluation_agent", settings.model, redis.get()));
-            std::cout << result.dump(2) << '\n';
+            if (human_output) print_human_result(result);
+            else std::cout << result.dump(2) << '\n';
             return result.at("status") == "DONE" ? 0 : 1;
         }
         if (command == "dispatch" && argc == 2) {

@@ -42,6 +42,123 @@ export function inspectors({ create, request, badge, eventRow, title, labelById,
     return node;
   }
 
+  function textField(parent, label, value, preformatted = false) {
+    if (typeof value !== "string" || !value.trim()) return false;
+    const field = create("div", "result-field");
+    field.append(create("strong", "", label), create(preformatted ? "pre" : "p",
+      preformatted ? "inspection-code" : "", value));
+    parent.append(field);
+    return true;
+  }
+
+  function workerResult(id, result, plan) {
+    const worker = create("article", "worker-result");
+    const agent = result?.receiver || (Array.isArray(plan) ? plan.find((item) => item.task_id === id)?.agent : "") || id;
+    const heading = create("div", "worker-heading");
+    heading.append(create("h4", "", labelById.get(agent) || title(agent)), badge(String(result?.status || "pending").toLowerCase()));
+    worker.append(heading);
+    const output = result?.output || {};
+    let shown = false;
+    shown = textField(worker, "Summary", output.summary) || shown;
+    shown = textField(worker, "Error", output.error_message || result?.reason) || shown;
+    shown = textField(worker, "Output", output.stdout, true) || shown;
+    shown = textField(worker, "Error output", output.stderr, true) || shown;
+    for (const key of ["answer", "caption", "extracted_text", "text", "markdown", "latex", "content"]) {
+      shown = textField(worker, title(key), output[key], key === "markdown" || key === "latex") || shown;
+    }
+    if (Array.isArray(output.findings) && output.findings.length) {
+      const list = create("ul", "result-list");
+      for (const finding of output.findings) {
+        const description = typeof finding === "string" ? finding : finding?.text;
+        if (description) {
+          const ids = Array.isArray(finding?.arxiv_ids) ? ` · arXiv ${finding.arxiv_ids.join(", ")}` : "";
+          list.append(create("li", "", description + ids));
+        }
+      }
+      if (list.childElementCount) { worker.append(section("Findings", list)); shown = true; }
+    }
+    if (Array.isArray(output.citations) && output.citations.length) {
+      const list = create("ul", "result-list");
+      for (const citation of output.citations) {
+        const item = create("li");
+        const url = typeof citation === "string" ? citation : citation?.url;
+        const label = citation?.title || url || "Source";
+        if (typeof url === "string" && /^https?:\/\//i.test(url)) {
+          const link = create("a", "", label);
+          link.href = url;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          item.append(link);
+        } else item.textContent = label;
+        list.append(item);
+      }
+      worker.append(section("Sources", list)); shown = true;
+    }
+    if (Array.isArray(output.extractions) && output.extractions.length) {
+      const list = create("ul", "result-list");
+      for (const extraction of output.extractions) {
+        for (const item of extraction?.items || []) {
+          list.append(create("li", "", typeof item === "string" ? item
+            : String(item?.text || item?.title || item?.value || "Extracted item")));
+        }
+      }
+      if (list.childElementCount) { worker.append(section("Extracted", list)); shown = true; }
+    }
+    if (output.files && typeof output.files === "object") {
+      for (const [path, source] of Object.entries(output.files)) {
+        shown = textField(worker, path, source, true) || shown;
+      }
+    }
+    if (Array.isArray(output.numeric_columns) && output.numeric_columns.length) {
+      const list = create("ul", "result-list");
+      for (const column of output.numeric_columns) {
+        if (!column || typeof column !== "object") continue;
+        list.append(create("li", "", `${column.column || "Column"}: mean ${column.mean ?? "—"}, ${column.count ?? 0} values`));
+      }
+      if (list.childElementCount) { worker.append(section("Numbers", list)); shown = true; }
+    }
+    if (output.test_result && typeof output.test_result === "object") {
+      const tests = output.test_result;
+      worker.append(create("p", "result-test-status", tests.exit_code === 0 && !tests.timed_out
+        ? "Tests passed" : tests.timed_out ? "Tests timed out" : `Tests failed (exit ${tests.exit_code ?? "unknown"})`));
+      shown = true;
+      shown = textField(worker, "Test output", tests.stdout, true) || shown;
+      shown = textField(worker, "Test errors", tests.stderr, true) || shown;
+    }
+    if (!shown) worker.append(create("p", "empty", result?.status === "SKIPPED" ? "This step was skipped." : "No text result for this step."));
+    return worker;
+  }
+
+  function readableOutput(output) {
+    const wrap = create("div", "readable-output");
+    const plan = output?.dag?.tasks;
+    if (Array.isArray(output?.escalations)) {
+      for (const failure of output.escalations) {
+        if (failure && typeof failure === "object")
+          textField(wrap, `${labelById.get(failure.agent) || title(failure.agent || "Task")} error`, failure.detail);
+      }
+    }
+    const results = output?.results;
+    if (results && typeof results === "object") {
+      for (const [id, result] of Object.entries(results)) wrap.append(workerResult(id, result, plan));
+    }
+    if (output?.reflection?.status === "DONE") {
+      const reflection = create("div", "reflection-result");
+      textField(reflection, "What worked", output.reflection.what_worked);
+      textField(reflection, "What failed", output.reflection.what_failed);
+      textField(reflection, "Lesson", output.reflection.pattern_learned);
+      wrap.append(section("Reflection", reflection));
+    }
+    if (!wrap.childElementCount) wrap.append(create("p", "empty", "No readable result yet."));
+    const technical = create("details", "technical-output");
+    technical.append(create("summary", "", "Show technical JSON"));
+    technical.addEventListener("toggle", () => {
+      if (technical.open && technical.childElementCount === 1) technical.append(code(output));
+    });
+    wrap.append(technical);
+    return wrap;
+  }
+
   function download(task) {
     const link = create("a");
     const url = URL.createObjectURL(new Blob([JSON.stringify(task.output, null, 2)], { type: "application/json" }));
@@ -128,7 +245,7 @@ export function inspectors({ create, request, badge, eventRow, title, labelById,
       const status = output?.cancelled ? "cancelled" : String(task.status).toLowerCase();
       overview.append(badge(status), create("span", "version", task.task_id));
       if (output) {
-        const button = create("button", "secondary", "Download output");
+        const button = create("button", "secondary", "Download JSON");
         button.addEventListener("click", () => download(task));
         overview.append(button);
       }
@@ -144,7 +261,7 @@ export function inspectors({ create, request, badge, eventRow, title, labelById,
         if (id && event.event === "agent_done") liveResults[id] = { status: event.report.status };
       }
       body.replaceChildren(overview, section("Task plan", taskGraph(output?.dag?.tasks || livePlan, output?.results || liveResults)),
-        section("Run log", log), section("Output", output ? code(output) : create("p", "empty", "Waiting for task output…")));
+        section("Run log", log), section("Result", output ? readableOutput(output) : create("p", "empty", "Waiting for task output…")));
     } catch (error) {
       if (current === view) body.replaceChildren(create("p", "task-error", error.message));
     } finally {

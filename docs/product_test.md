@@ -47,6 +47,13 @@ python3 scripts/product_smoke.py
 python3 scripts/product_smoke.py --browser  # also clicks New task in Chromium
 ```
 
+The dashboard's task inspector shows readable worker results, code, test
+errors, numbers, and reflection by default. Open **Show technical JSON** or
+select **Download JSON** for the full machine-readable record. The CLI shows
+readable task output in an interactive terminal and JSON when piped. Use
+`build/ark-cpp --human run '<goal>'` to force text, or
+`build/ark-cpp --json run '<goal>'` to force JSON.
+
 The agent cards reflect on-demand C++ workers. **Idle** means the worker's
 required local services are available; **Needs setup** shows the missing
 prerequisite on the card. ARK registers its 20 built-in agents in Redis when

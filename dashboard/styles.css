@@ -145,6 +145,18 @@ dialog textarea { width: 100%; resize: vertical; padding: 9px; border: 1px solid
 .inspector-section { display: grid; gap: 8px; min-width: 0; }
 .inspector-section h3 { font-size: 13px; font-weight: 700; }
 .inspection-code { max-height: 300px; overflow: auto; padding: 11px 13px; margin: 0; border: 1px solid var(--line); border-radius: 8px; background: #f5f7f3; font: 12px/1.5 ui-monospace, Consolas, monospace; }
+.readable-output { display: grid; gap: 14px; }
+.worker-result { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); min-width: 0; }
+.worker-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.worker-heading h4 { font-size: 14px; }
+.result-field { display: grid; gap: 4px; min-width: 0; }
+.result-field strong { font-size: 12px; }
+.result-field p, .result-list { margin: 0; overflow-wrap: anywhere; font-size: 13px; line-height: 1.5; }
+.result-list { padding-left: 19px; display: grid; gap: 5px; }
+.result-test-status { margin: 0; font-size: 13px; font-weight: 650; }
+.reflection-result { display: grid; gap: 9px; }
+.technical-output summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+.technical-output .inspection-code { margin-top: 8px; }
 .dag { display: grid; gap: 24px; position: relative; }
 .dag-layer { display: flex; gap: 8px; flex-wrap: wrap; position: relative; }
 .dag-connections { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke: #52816b; stroke-width: 1.5; pointer-events: none; }
